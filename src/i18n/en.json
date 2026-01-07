@@ -27,6 +27,10 @@
       "label": "Token",
       "placeholder": "e.g. XRP"
     },
+    "issuer": {
+      "label": "Issuer",
+      "placeholder": "r..."
+    },
     "sell_amount": {
       "label": "Sell amount",
       "placeholder": "0"
@@ -45,7 +49,14 @@
   },
   "status": {
     "waiting": "Waiting for input...",
-    "queuedAt": "Estimate queued at {time}. Connect data sources to compute."
+    "queuedAt": "Estimate queued at {time}. Connect data sources to compute.",
+    "validating": "Validating...",
+    "validation_failed": "Validation failed.",
+    "fetching": "Fetching order book...",
+    "done": "Done.",
+    "error": "Unable to fetch order book.",
+    "fetched_offers": "Fetched {count} offers from {endpointLabel}.",
+    "endpoint_switched": "Switched to {endpointLabel} endpoint."
   },
   "results": {
     "avg_price": {
@@ -85,5 +96,21 @@
     "loading": "Loading",
     "done": "Done",
     "placeholder": "--"
+  },
+  "errors": {
+    "amount_required": "Enter a sell amount greater than zero.",
+    "currency_required": "Enter a currency code.",
+    "currency_invalid": "Currency must be 3 characters or 40 hex.",
+    "issuer_required": "Issuer is required for non-XRP tokens.",
+    "issuer_invalid": "Issuer must look like a valid XRPL address.",
+    "fetch_failed": "Unable to reach the order book. Please try again."
+  },
+  "endpoints": {
+    "primary": {
+      "label": "Primary"
+    },
+    "secondary": {
+      "label": "Secondary"
+    }
   }
 }
