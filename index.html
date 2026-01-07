@@ -29,11 +29,15 @@
           <div class="grid two-column">
             <label class="field">
               <span data-i18n="fields.token.label"></span>
-              <input type="text" data-i18n-placeholder="fields.token.placeholder" />
+              <input id="token-input" type="text" data-i18n-placeholder="fields.token.placeholder" />
+            </label>
+            <label class="field">
+              <span data-i18n="fields.issuer.label"></span>
+              <input id="issuer-input" type="text" data-i18n-placeholder="fields.issuer.placeholder" />
             </label>
             <label class="field">
               <span data-i18n="fields.sell_amount.label"></span>
-              <input type="number" data-i18n-placeholder="fields.sell_amount.placeholder" />
+              <input id="sell-amount-input" type="number" data-i18n-placeholder="fields.sell_amount.placeholder" />
             </label>
             <label class="field">
               <span data-i18n="fields.slippage_limit.label"></span>
@@ -47,7 +51,10 @@
 
           <div class="actions">
             <button class="primary-button" type="button" data-i18n="actions.estimate"></button>
+            <p class="error-banner" hidden></p>
             <p class="status" data-i18n="status.waiting"></p>
+            <p class="status-debug"></p>
+            <p class="status-endpoint" hidden></p>
           </div>
         </section>
 
