@@ -283,13 +283,16 @@ estimateButton?.addEventListener("click", async () => {
     currentEndpointIndex = endpointIndex;
     const endpointLabel = t(ENDPOINTS[endpointIndex].labelKey);
 
-    if (endpointIndex !== previousEndpointIndex) {
-      setEndpointNotice(
-        t("status.endpoint_switched", {
-          endpointLabel,
-        })
-      );
-    }
+    const endpointNoticeKey =
+      endpointIndex !== previousEndpointIndex
+        ? "status.endpoint_switched"
+        : "status.endpoint_in_use";
+
+    setEndpointNotice(
+      t(endpointNoticeKey, {
+        endpointLabel,
+      })
+    );
 
     lastOffersCount = offers.length;
     setDebugLine(lastOffersCount, endpointLabel);
@@ -300,6 +303,11 @@ estimateButton?.addEventListener("click", async () => {
     if (lastOffersCount !== null) {
       const endpointLabel = t(ENDPOINTS[currentEndpointIndex].labelKey);
       setDebugLine(lastOffersCount, endpointLabel);
+      setEndpointNotice(
+        t("status.endpoint_in_use", {
+          endpointLabel,
+        })
+      );
     }
   }
 });
