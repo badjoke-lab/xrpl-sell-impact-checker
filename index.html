@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>XRPL Sell Impact Checker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app__header">
+        <div>
+          <p class="eyebrow">XRPL Sell Impact Checker</p>
+          <h1>Estimate the impact of a sale</h1>
+        </div>
+        <button class="ghost-button" type="button">Connect Wallet</button>
+      </header>
+
+      <main class="app__main">
+        <section class="card" aria-labelledby="inputs-heading">
+          <div class="card__header">
+            <h2 id="inputs-heading">Inputs</h2>
+            <div class="pill-group">
+              <span class="pill pill--active">Simple</span>
+              <span class="pill">Advanced</span>
+            </div>
+          </div>
+
+          <div class="grid two-column">
+            <label class="field">
+              Token
+              <input type="text" placeholder="e.g. XRP" />
+            </label>
+            <label class="field">
+              Sell amount
+              <input type="number" placeholder="0" />
+            </label>
+            <label class="field">
+              Slippage limit
+              <input type="number" placeholder="0%" />
+            </label>
+            <label class="field">
+              Target price
+              <input type="number" placeholder="$0.00" />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button class="primary-button" type="button">Estimate impact</button>
+            <p class="status">Waiting for input...</p>
+          </div>
+        </section>
+
+        <section class="grid two-column">
+          <article class="card" aria-labelledby="result-summary">
+            <div class="card__header">
+              <h2 id="result-summary">Result summary</h2>
+            </div>
+            <div class="result-grid">
+              <div>
+                <p class="label">Estimated avg price</p>
+                <p class="value">--</p>
+              </div>
+              <div>
+                <p class="label">Price impact</p>
+                <p class="value">--</p>
+              </div>
+              <div>
+                <p class="label">Liquidity used</p>
+                <p class="value">--</p>
+              </div>
+            </div>
+          </article>
+
+          <article class="card" aria-labelledby="result-details">
+            <div class="card__header">
+              <h2 id="result-details">Execution details</h2>
+            </div>
+            <ul class="list">
+              <li>Order count: --</li>
+              <li>Best price: --</li>
+              <li>Worst price: --</li>
+            </ul>
+          </article>
+        </section>
+
+        <section class="grid two-column">
+          <article class="card" aria-labelledby="graph-depth">
+            <div class="card__header">
+              <h2 id="graph-depth">Depth curve</h2>
+            </div>
+            <div class="graph-placeholder">Graph area</div>
+          </article>
+
+          <article class="card" aria-labelledby="graph-impact">
+            <div class="card__header">
+              <h2 id="graph-impact">Impact curve</h2>
+            </div>
+            <div class="graph-placeholder">Graph area</div>
+          </article>
+        </section>
+
+        <section class="card" aria-labelledby="faq-heading">
+          <div class="card__header">
+            <h2 id="faq-heading">FAQ</h2>
+          </div>
+          <div class="stack">
+            <p><strong>How is the estimate calculated?</strong> This is a placeholder for the pricing model.</p>
+            <p><strong>Can I use advanced controls?</strong> Toggle Advanced to reveal deeper settings.</p>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="disclaimer-heading">
+          <div class="card__header">
+            <h2 id="disclaimer-heading">Disclaimer</h2>
+          </div>
+          <p>This tool provides estimates only and does not constitute financial advice.</p>
+        </section>
+
+        <section class="card" aria-labelledby="sources-heading">
+          <div class="card__header">
+            <h2 id="sources-heading">Data sources</h2>
+          </div>
+          <ul class="list">
+            <li>XRPL DEX order books</li>
+            <li>On-ledger trade history</li>
+            <li>External price feeds (optional)</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
