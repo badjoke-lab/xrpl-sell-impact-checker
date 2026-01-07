@@ -3,6 +3,8 @@
 本書は、デザイン未確定（スケルトン）でも **スマホで表示崩れを起こさない**ための固定ルールである。  
 最小対応幅は **360px**。
 
+**Note:** v1 is English-only, but translation-ready (i18n scaffold).
+
 ---
 
 ## 1) レイアウト
