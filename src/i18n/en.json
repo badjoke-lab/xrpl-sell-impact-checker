@@ -1,11 +1,89 @@
 {
   "app": {
     "title": "XRPL Sell Impact Checker",
+    "eyebrow": "XRPL Sell Impact Checker",
+    "tagline": "Estimate the impact of a sale",
     "description": "Estimate sell impact and receive amounts before you trade."
+  },
+  "header": {
+    "connect_wallet": "Connect Wallet"
+  },
+  "sections": {
+    "inputs": "Inputs",
+    "results_summary": "Result summary",
+    "execution_details": "Execution details",
+    "depth_curve": "Depth curve",
+    "impact_curve": "Impact curve",
+    "faq": "FAQ",
+    "disclaimer": "Disclaimer",
+    "sources": "Data sources"
+  },
+  "modes": {
+    "simple": "Simple",
+    "advanced": "Advanced"
+  },
+  "fields": {
+    "token": {
+      "label": "Token",
+      "placeholder": "e.g. XRP"
+    },
+    "sell_amount": {
+      "label": "Sell amount",
+      "placeholder": "0"
+    },
+    "slippage_limit": {
+      "label": "Slippage limit",
+      "placeholder": "0%"
+    },
+    "target_price": {
+      "label": "Target price",
+      "placeholder": "$0.00"
+    }
+  },
+  "actions": {
+    "estimate": "Estimate impact"
+  },
+  "status": {
+    "waiting": "Waiting for input...",
+    "queuedAt": "Estimate queued at {time}. Connect data sources to compute."
+  },
+  "results": {
+    "avg_price": {
+      "label": "Estimated avg price"
+    },
+    "price_impact": {
+      "label": "Price impact"
+    },
+    "liquidity_used": {
+      "label": "Liquidity used"
+    }
+  },
+  "details": {
+    "order_count": "Order count",
+    "best_price": "Best price",
+    "worst_price": "Worst price"
+  },
+  "graphs": {
+    "placeholder": "Graph area"
+  },
+  "faq": {
+    "q1": "How is the estimate calculated?",
+    "a1": "This is a placeholder for the pricing model.",
+    "q2": "Can I use advanced controls?",
+    "a2": "Toggle Advanced to reveal deeper settings."
+  },
+  "disclaimer": {
+    "text": "This tool provides estimates only and does not constitute financial advice."
+  },
+  "sources": {
+    "xrpl": "XRPL DEX order books",
+    "trades": "On-ledger trade history",
+    "feeds": "External price feeds (optional)"
   },
   "common": {
     "estimate": "Estimate",
     "loading": "Loading",
-    "done": "Done"
+    "done": "Done",
+    "placeholder": "--"
   }
 }

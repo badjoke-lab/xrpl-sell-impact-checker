@@ -3,83 +3,92 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>XRPL Sell Impact Checker</title>
+    <title data-i18n="app.title"></title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="app">
       <header class="app__header">
         <div>
-          <p class="eyebrow">XRPL Sell Impact Checker</p>
-          <h1>Estimate the impact of a sale</h1>
+          <p class="eyebrow" data-i18n="app.eyebrow"></p>
+          <h1 data-i18n="app.tagline"></h1>
         </div>
-        <button class="ghost-button" type="button">Connect Wallet</button>
+        <button class="ghost-button" type="button" data-i18n="header.connect_wallet"></button>
       </header>
 
       <main class="app__main">
         <section class="card" aria-labelledby="inputs-heading">
           <div class="card__header">
-            <h2 id="inputs-heading">Inputs</h2>
+            <h2 id="inputs-heading" data-i18n="sections.inputs"></h2>
             <div class="pill-group">
-              <span class="pill pill--active">Simple</span>
-              <span class="pill">Advanced</span>
+              <span class="pill pill--active" data-i18n="modes.simple"></span>
+              <span class="pill" data-i18n="modes.advanced"></span>
             </div>
           </div>
 
           <div class="grid two-column">
             <label class="field">
-              Token
-              <input type="text" placeholder="e.g. XRP" />
+              <span data-i18n="fields.token.label"></span>
+              <input type="text" data-i18n-placeholder="fields.token.placeholder" />
             </label>
             <label class="field">
-              Sell amount
-              <input type="number" placeholder="0" />
+              <span data-i18n="fields.sell_amount.label"></span>
+              <input type="number" data-i18n-placeholder="fields.sell_amount.placeholder" />
             </label>
             <label class="field">
-              Slippage limit
-              <input type="number" placeholder="0%" />
+              <span data-i18n="fields.slippage_limit.label"></span>
+              <input type="number" data-i18n-placeholder="fields.slippage_limit.placeholder" />
             </label>
             <label class="field">
-              Target price
-              <input type="number" placeholder="$0.00" />
+              <span data-i18n="fields.target_price.label"></span>
+              <input type="number" data-i18n-placeholder="fields.target_price.placeholder" />
             </label>
           </div>
 
           <div class="actions">
-            <button class="primary-button" type="button">Estimate impact</button>
-            <p class="status">Waiting for input...</p>
+            <button class="primary-button" type="button" data-i18n="actions.estimate"></button>
+            <p class="status" data-i18n="status.waiting"></p>
           </div>
         </section>
 
         <section class="grid two-column">
           <article class="card" aria-labelledby="result-summary">
             <div class="card__header">
-              <h2 id="result-summary">Result summary</h2>
+              <h2 id="result-summary" data-i18n="sections.results_summary"></h2>
             </div>
             <div class="result-grid">
               <div>
-                <p class="label">Estimated avg price</p>
-                <p class="value">--</p>
+                <p class="label" data-i18n="results.avg_price.label"></p>
+                <p class="value" data-i18n="common.placeholder"></p>
               </div>
               <div>
-                <p class="label">Price impact</p>
-                <p class="value">--</p>
+                <p class="label" data-i18n="results.price_impact.label"></p>
+                <p class="value" data-i18n="common.placeholder"></p>
               </div>
               <div>
-                <p class="label">Liquidity used</p>
-                <p class="value">--</p>
+                <p class="label" data-i18n="results.liquidity_used.label"></p>
+                <p class="value" data-i18n="common.placeholder"></p>
               </div>
             </div>
           </article>
 
           <article class="card" aria-labelledby="result-details">
             <div class="card__header">
-              <h2 id="result-details">Execution details</h2>
+              <h2 id="result-details" data-i18n="sections.execution_details"></h2>
             </div>
             <ul class="list">
-              <li>Order count: --</li>
-              <li>Best price: --</li>
-              <li>Worst price: --</li>
+              <li>
+                <span data-i18n="details.order_count"></span>:
+                <span data-i18n="common.placeholder"></span>
+              </li>
+              <li>
+                <span data-i18n="details.best_price"></span>:
+                <span data-i18n="common.placeholder"></span>
+              </li>
+              <li>
+                <span data-i18n="details.worst_price"></span>:
+                <span data-i18n="common.placeholder"></span>
+              </li>
             </ul>
           </article>
         </section>
@@ -87,49 +96,55 @@
         <section class="grid two-column">
           <article class="card" aria-labelledby="graph-depth">
             <div class="card__header">
-              <h2 id="graph-depth">Depth curve</h2>
+              <h2 id="graph-depth" data-i18n="sections.depth_curve"></h2>
             </div>
-            <div class="graph-placeholder">Graph area</div>
+            <div class="graph-placeholder" data-i18n="graphs.placeholder"></div>
           </article>
 
           <article class="card" aria-labelledby="graph-impact">
             <div class="card__header">
-              <h2 id="graph-impact">Impact curve</h2>
+              <h2 id="graph-impact" data-i18n="sections.impact_curve"></h2>
             </div>
-            <div class="graph-placeholder">Graph area</div>
+            <div class="graph-placeholder" data-i18n="graphs.placeholder"></div>
           </article>
         </section>
 
         <section class="card" aria-labelledby="faq-heading">
           <div class="card__header">
-            <h2 id="faq-heading">FAQ</h2>
+            <h2 id="faq-heading" data-i18n="sections.faq"></h2>
           </div>
           <div class="stack">
-            <p><strong>How is the estimate calculated?</strong> This is a placeholder for the pricing model.</p>
-            <p><strong>Can I use advanced controls?</strong> Toggle Advanced to reveal deeper settings.</p>
+            <p>
+              <strong data-i18n="faq.q1"></strong>
+              <span data-i18n="faq.a1"></span>
+            </p>
+            <p>
+              <strong data-i18n="faq.q2"></strong>
+              <span data-i18n="faq.a2"></span>
+            </p>
           </div>
         </section>
 
         <section class="card" aria-labelledby="disclaimer-heading">
           <div class="card__header">
-            <h2 id="disclaimer-heading">Disclaimer</h2>
+            <h2 id="disclaimer-heading" data-i18n="sections.disclaimer"></h2>
           </div>
-          <p>This tool provides estimates only and does not constitute financial advice.</p>
+          <p data-i18n="disclaimer.text"></p>
         </section>
 
         <section class="card" aria-labelledby="sources-heading">
           <div class="card__header">
-            <h2 id="sources-heading">Data sources</h2>
+            <h2 id="sources-heading" data-i18n="sections.sources"></h2>
           </div>
           <ul class="list">
-            <li>XRPL DEX order books</li>
-            <li>On-ledger trade history</li>
-            <li>External price feeds (optional)</li>
+            <li data-i18n="sources.xrpl"></li>
+            <li data-i18n="sources.trades"></li>
+            <li data-i18n="sources.feeds"></li>
           </ul>
         </section>
       </main>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>
