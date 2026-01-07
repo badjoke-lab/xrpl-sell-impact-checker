@@ -39,16 +39,20 @@ const applyTranslations = () => {
 applyTranslations();
 
 const statusLine = document.querySelector(".status");
-const statusDebugLine = document.querySelector(".status-debug");
 const statusEndpointLine = document.querySelector(".status-endpoint");
 const errorBanner = document.querySelector(".error-banner");
 const estimateButton = document.querySelector(".primary-button");
 const currencyInput = document.querySelector("#token-input");
 const issuerInput = document.querySelector("#issuer-input");
 const amountInput = document.querySelector("#sell-amount-input");
+const resultSellability = document.querySelector('[data-result="sellability"]');
+const resultReceive = document.querySelector('[data-result="receive"]');
+const resultSlippage = document.querySelector('[data-result="slippage"]');
+const resultSlippageHelp = document.querySelector('[data-result="slippage-help"]');
+const resultWhyLine = document.querySelector('[data-result="why"]');
+const resultWarning = document.querySelector('[data-result="warning"]');
 
 let currentEndpointIndex = 0;
-let lastOffersCount = null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -66,22 +70,6 @@ const setError = (message) => {
   errorBanner.hidden = !message;
 };
 
-const setDebugLine = (count, endpointLabel) => {
-  if (!statusDebugLine) {
-    return;
-  }
-
-  if (count === null || count === undefined) {
-    statusDebugLine.textContent = "";
-    return;
-  }
-
-  statusDebugLine.textContent = t("status.fetched_offers", {
-    count,
-    endpointLabel,
-  });
-};
-
 const setEndpointNotice = (message) => {
   if (!statusEndpointLine) {
     return;
@@ -91,17 +79,91 @@ const setEndpointNotice = (message) => {
   statusEndpointLine.hidden = !message;
 };
 
+const formatNumber = (value, options = {}) =>
+  new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 6,
+    ...options,
+  }).format(value);
+
+const formatPercent = (value) =>
+  `${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)}%`;
+
+const setResultText = (element, text) => {
+  if (element) {
+    element.textContent = text;
+  }
+};
+
+const resetResults = () => {
+  const placeholder = t("common.placeholder");
+  setResultText(resultSellability, placeholder);
+  setResultText(resultReceive, placeholder);
+  setResultText(resultSlippage, placeholder);
+  setResultText(resultSlippageHelp, t("results.slippage.help"));
+  setResultText(resultWhyLine, "");
+  if (resultWarning) {
+    resultWarning.hidden = true;
+    resultWarning.textContent = "";
+  }
+};
+
+const getOfferAmount = (offer, key) => {
+  const fundedKey = `${key}_funded`;
+  const fundedKeyCamel = `${key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())}Funded`;
+  if (Object.prototype.hasOwnProperty.call(offer, fundedKey)) {
+    return offer[fundedKey];
+  }
+  if (Object.prototype.hasOwnProperty.call(offer, fundedKeyCamel)) {
+    return offer[fundedKeyCamel];
+  }
+  return offer?.[key] ?? null;
+};
+
+const parseAmount = (amount) => {
+  if (amount === null || amount === undefined) {
+    return 0;
+  }
+
+  if (typeof amount === "string") {
+    const parsed = Number(amount);
+    return Number.isFinite(parsed) ? parsed / 1_000_000 : 0;
+  }
+
+  if (typeof amount === "number") {
+    return Number.isFinite(amount) ? amount : 0;
+  }
+
+  if (typeof amount === "object" && "value" in amount) {
+    const parsed = Number(amount.value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+};
+
 const normalizeOffers = (offers) => {
   if (!Array.isArray(offers)) {
     return [];
   }
 
-  return offers.map((offer) => ({
-    account: offer?.Account ?? offer?.account ?? null,
-    takerGets: offer?.taker_gets ?? null,
-    takerPays: offer?.taker_pays ?? null,
-    quality: offer?.quality ?? null,
-  }));
+  return offers.map((offer) => {
+    const takerGets = getOfferAmount(offer, "taker_gets");
+    const takerPays = getOfferAmount(offer, "taker_pays");
+    const availableTokenAmount = parseAmount(takerGets);
+    const availableXrpAmount = parseAmount(takerPays);
+    const price =
+      availableTokenAmount > 0 ? availableXrpAmount / availableTokenAmount : 0;
+
+    return {
+      account: offer?.Account ?? offer?.account ?? null,
+      price,
+      availableTokenAmount,
+      availableXrpAmount,
+    };
+  });
 };
 
 const fetchWithTimeout = async (url, options, timeoutMs) => {
@@ -223,6 +285,112 @@ const fetchBookOffers = async ({ currency, issuer, amount, limit = DEFAULT_LIMIT
   };
 };
 
+const sortOffersByPrice = (offers) =>
+  [...offers].sort((a, b) => b.price - a.price);
+
+const simulateSellIntoOrderbook = ({ sellAmount, offers }) => {
+  const requestedToken = sellAmount;
+  let filledToken = 0;
+  let receiveXrp = 0;
+  let topConsumedOffersCount = 0;
+
+  for (const offer of offers) {
+    if (filledToken >= requestedToken) {
+      break;
+    }
+
+    if (
+      !Number.isFinite(offer.availableTokenAmount) ||
+      !Number.isFinite(offer.availableXrpAmount) ||
+      offer.availableTokenAmount <= 0 ||
+      offer.availableXrpAmount <= 0 ||
+      offer.price <= 0
+    ) {
+      continue;
+    }
+
+    const remaining = requestedToken - filledToken;
+    const tokenToSell = Math.min(remaining, offer.availableTokenAmount);
+    if (tokenToSell <= 0) {
+      continue;
+    }
+
+    const xrpFromOffer =
+      (tokenToSell / offer.availableTokenAmount) * offer.availableXrpAmount;
+
+    filledToken += tokenToSell;
+    receiveXrp += xrpFromOffer;
+    topConsumedOffersCount += 1;
+  }
+
+  const fillRate = requestedToken > 0 ? filledToken / requestedToken : 0;
+  const effectivePrice = filledToken > 0 ? receiveXrp / filledToken : 0;
+
+  return {
+    filledToken,
+    requestedToken,
+    fillRate,
+    receiveXrp,
+    effectivePrice,
+    topConsumedOffersCount,
+  };
+};
+
+const updateResultsSummary = ({ simulation, bestPrice, currency }) => {
+  const hasLiquidity = simulation.filledToken > 0;
+  const isFullFill = hasLiquidity && simulation.filledToken >= simulation.requestedToken;
+  const isPartialFill =
+    hasLiquidity && simulation.filledToken < simulation.requestedToken;
+
+  if (!hasLiquidity) {
+    setResultText(resultSellability, t("results.sellability.none"));
+  } else if (isPartialFill) {
+    setResultText(
+      resultSellability,
+      t("results.sellability.partial_value", {
+        filled: formatNumber(simulation.filledToken),
+        requested: formatNumber(simulation.requestedToken),
+        currency,
+      })
+    );
+  } else {
+    setResultText(resultSellability, t("results.sellability.full"));
+  }
+
+  if (resultWarning) {
+    if (isPartialFill) {
+      resultWarning.textContent = t("results.sellability.partial_warning");
+      resultWarning.hidden = false;
+    } else {
+      resultWarning.hidden = true;
+      resultWarning.textContent = "";
+    }
+  }
+
+  setResultText(
+    resultReceive,
+    t("results.receive.value", {
+      amount: formatNumber(simulation.receiveXrp, {
+        maximumFractionDigits: 6,
+      }),
+      currency: "XRP",
+    })
+  );
+
+  if (isFullFill && bestPrice > 0 && simulation.effectivePrice > 0) {
+    const slippagePct = ((bestPrice - simulation.effectivePrice) / bestPrice) * 100;
+    setResultText(resultSlippage, formatPercent(slippagePct));
+  } else {
+    setResultText(resultSlippage, t("common.not_available"));
+  }
+
+  setResultText(resultSlippageHelp, t("results.slippage.help"));
+  setResultText(
+    resultWhyLine,
+    t("results.why_line", { count: simulation.topConsumedOffersCount })
+  );
+};
+
 const validateInputs = ({ currency, issuer, amount }) => {
   if (!currency) {
     return t("errors.currency_required");
@@ -261,6 +429,7 @@ estimateButton?.addEventListener("click", async () => {
   setStatus("status.validating");
   setError(null);
   setEndpointNotice(null);
+  resetResults();
 
   const validationError = validateInputs({ currency, issuer, amount: amountValue });
   if (validationError) {
@@ -294,20 +463,25 @@ estimateButton?.addEventListener("click", async () => {
       })
     );
 
-    lastOffersCount = offers.length;
-    setDebugLine(lastOffersCount, endpointLabel);
+    setStatus("status.simulating");
+
+    const sortedOffers = sortOffersByPrice(offers);
+    const bestPrice = sortedOffers.find((offer) => offer.price > 0)?.price ?? 0;
+    const simulation = simulateSellIntoOrderbook({
+      sellAmount: amountValue,
+      offers: sortedOffers,
+    });
+
+    updateResultsSummary({
+      simulation,
+      bestPrice,
+      currency,
+    });
+
     setStatus("status.done");
   } catch (error) {
     setStatus("status.error");
     setError(t("errors.fetch_failed"));
-    if (lastOffersCount !== null) {
-      const endpointLabel = t(ENDPOINTS[currentEndpointIndex].labelKey);
-      setDebugLine(lastOffersCount, endpointLabel);
-      setEndpointNotice(
-        t("status.endpoint_in_use", {
-          endpointLabel,
-        })
-      );
-    }
+    resetResults();
   }
 });

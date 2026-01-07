@@ -53,7 +53,6 @@
             <button class="primary-button" type="button" data-i18n="actions.estimate"></button>
             <p class="error-banner" hidden></p>
             <p class="status" data-i18n="status.waiting"></p>
-            <p class="status-debug"></p>
             <p class="status-endpoint" hidden></p>
           </div>
         </section>
@@ -63,20 +62,24 @@
             <div class="card__header">
               <h2 id="result-summary" data-i18n="sections.results_summary"></h2>
             </div>
-            <div class="result-grid">
-              <div>
-                <p class="label" data-i18n="results.avg_price.label"></p>
-                <p class="value" data-i18n="common.placeholder"></p>
+            <div class="result-stack">
+              <div class="result-row">
+                <p class="label" data-i18n="results.sellability.label"></p>
+                <p class="value" data-result="sellability" data-i18n="common.placeholder"></p>
               </div>
-              <div>
-                <p class="label" data-i18n="results.price_impact.label"></p>
-                <p class="value" data-i18n="common.placeholder"></p>
+              <div class="result-row">
+                <p class="label" data-i18n="results.receive.label"></p>
+                <p class="value" data-result="receive" data-i18n="common.placeholder"></p>
+                <p class="subvalue" data-i18n="results.receive.fiat_pending"></p>
               </div>
-              <div>
-                <p class="label" data-i18n="results.liquidity_used.label"></p>
-                <p class="value" data-i18n="common.placeholder"></p>
+              <div class="result-row">
+                <p class="label" data-i18n="results.slippage.label"></p>
+                <p class="value" data-result="slippage" data-i18n="common.placeholder"></p>
+                <p class="help" data-result="slippage-help" data-i18n="results.slippage.help"></p>
               </div>
             </div>
+            <p class="why-line" data-result="why"></p>
+            <p class="warning-banner" data-result="warning" hidden></p>
           </article>
 
           <article class="card" aria-labelledby="result-details">
