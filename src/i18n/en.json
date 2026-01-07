@@ -53,6 +53,7 @@
     "validating": "Validating...",
     "validation_failed": "Validation failed.",
     "fetching": "Fetching order book...",
+    "simulating": "Simulating fills...",
     "done": "Done.",
     "error": "Unable to fetch order book.",
     "fetched_offers": "Fetched {count} offers from {endpointLabel}.",
@@ -60,15 +61,23 @@
     "endpoint_in_use": "Using {endpointLabel} endpoint."
   },
   "results": {
-    "avg_price": {
-      "label": "Estimated avg price"
+    "sellability": {
+      "label": "Sellability",
+      "full": "Full",
+      "none": "No liquidity",
+      "partial_value": "Partial ({filled} / {requested} {currency})",
+      "partial_warning": "Warning: Only partial liquidity is available at current prices."
     },
-    "price_impact": {
-      "label": "Price impact"
+    "receive": {
+      "label": "You receive",
+      "value": "{amount} {currency}",
+      "fiat_pending": "Fiat: pending"
     },
-    "liquidity_used": {
-      "label": "Liquidity used"
-    }
+    "slippage": {
+      "label": "Slippage (est.)",
+      "help": "Compared to the best available offer. Shown for full fills only."
+    },
+    "why_line": "This sell consumes top {count} offers."
   },
   "details": {
     "order_count": "Order count",
@@ -96,7 +105,8 @@
     "estimate": "Estimate",
     "loading": "Loading",
     "done": "Done",
-    "placeholder": "--"
+    "placeholder": "--",
+    "not_available": "N/A"
   },
   "errors": {
     "amount_required": "Enter a sell amount greater than zero.",
