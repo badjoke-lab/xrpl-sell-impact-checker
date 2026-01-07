@@ -4,6 +4,8 @@
 **Fiat換算は常時併記**、**Slippageという語は残し一文説明を併記**、**閾値は切替（1/2/5/10/20%）**、グラフは有効箇所に採用。  
 無料運営を成立させるための方式（クライアント直結／フェイルオーバー／キャッシュ／フォールバック）も本書に統合する。
 
+**Note:** v1 is English-only, but translation-ready (i18n scaffold).
+
 ---
 
 # XRPL Sell Impact Checker（MVP）完成後の全挙動（無料運営ベスト方式 追記版）
