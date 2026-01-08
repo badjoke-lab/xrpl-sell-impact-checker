@@ -310,6 +310,97 @@ h2 {
   font-weight: 600;
 }
 
+.chart {
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 8px;
+  min-height: 200px;
+  display: flex;
+  align-items: stretch;
+}
+
+.chart__svg {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+
+.chart__help {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.chart__note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #b45309;
+}
+
+.chart__summary {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.chart__axis {
+  stroke: #cbd5f5;
+  stroke-width: 1;
+}
+
+.chart__grid {
+  stroke: #e2e8f0;
+  stroke-width: 1;
+}
+
+.chart__line {
+  fill: none;
+  stroke: #2563eb;
+  stroke-width: 2.5;
+}
+
+.chart__fill {
+  fill: rgba(37, 99, 235, 0.15);
+}
+
+.chart__marker {
+  fill: #0f172a;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.chart__marker--secondary {
+  fill: #16a34a;
+}
+
+.chart__marker--alert {
+  fill: #f59e0b;
+}
+
+.chart__line--accent {
+  stroke: #16a34a;
+  stroke-dasharray: 4 4;
+}
+
+.chart__line--alert {
+  stroke: #f59e0b;
+  stroke-dasharray: 4 4;
+}
+
+.chart__area--consumed {
+  fill: rgba(37, 99, 235, 0.2);
+}
+
+.chart__area--remaining {
+  fill: rgba(148, 163, 184, 0.25);
+}
+
+.chart__label {
+  font-size: 0.7rem;
+  fill: #64748b;
+}
+
 .stack {
   display: grid;
   gap: 12px;

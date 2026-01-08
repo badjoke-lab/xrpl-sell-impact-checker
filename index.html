@@ -179,14 +179,38 @@
             <div class="card__header">
               <h2 id="graph-depth" data-i18n="sections.depth_curve"></h2>
             </div>
-            <div class="graph-placeholder" data-i18n="graphs.placeholder"></div>
+            <p class="chart__help" data-i18n="graphs.depth.helper"></p>
+            <div class="chart" data-chart="depth">
+              <svg
+                id="depth-chart"
+                class="chart__svg"
+                viewBox="0 0 320 200"
+                preserveAspectRatio="none"
+                data-i18n-aria-label="graphs.depth.aria_label"
+                role="img"
+              ></svg>
+            </div>
+            <p class="chart__note" data-result="depth-note" hidden></p>
+            <p class="chart__summary" data-result="depth-summary"></p>
           </article>
 
           <article class="card" aria-labelledby="graph-impact">
             <div class="card__header">
               <h2 id="graph-impact" data-i18n="sections.impact_curve"></h2>
             </div>
-            <div class="graph-placeholder" data-i18n="graphs.placeholder"></div>
+            <p class="chart__help" data-i18n="graphs.impact.helper"></p>
+            <div class="chart" data-chart="impact">
+              <svg
+                id="impact-chart"
+                class="chart__svg"
+                viewBox="0 0 320 200"
+                preserveAspectRatio="none"
+                data-i18n-aria-label="graphs.impact.aria_label"
+                role="img"
+              ></svg>
+            </div>
+            <p class="chart__note" data-result="impact-note" hidden></p>
+            <p class="chart__summary" data-result="impact-summary"></p>
           </article>
         </section>
 
