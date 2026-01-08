@@ -3,11 +3,11 @@ import { loadDictionary, t } from "./src/i18n/index.js";
 const ENDPOINTS = [
   {
     labelKey: "endpoints.primary.label",
-    url: "https://s1.ripple.com:51234",
+    url: "wss://s1.ripple.com:51233",
   },
   {
     labelKey: "endpoints.secondary.label",
-    url: "https://s2.ripple.com:51234",
+    url: "wss://s2.ripple.com:51233",
   },
 ];
 
@@ -219,6 +219,12 @@ const formatPercent = (
     minimumFractionDigits,
     maximumFractionDigits,
   }).format(value)}%`;
+
+let requestIdCounter = 0;
+const nextRequestId = () => {
+  requestIdCounter += 1;
+  return requestIdCounter;
+};
 
 const CHART_DIMENSIONS = {
   width: 320,
@@ -829,61 +835,119 @@ const normalizeOffers = (offers) => {
   });
 };
 
-const fetchWithTimeout = async (url, options, timeoutMs) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+const isRetryableError = (error) =>
+  error?.code === "timeout" || error?.code === "network";
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    return response;
-  } catch (error) {
-    if (error.name === "AbortError") {
+const requestBookOffers = async ({ endpointUrl, payload }) =>
+  new Promise((resolve, reject) => {
+    let settled = false;
+    const socket = new WebSocket(endpointUrl);
+    const timeoutId = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       const timeoutError = new Error("Request timed out");
       timeoutError.code = "timeout";
-      throw timeoutError;
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-};
+      try {
+        socket.close();
+      } catch (closeError) {
+        // ignore close errors
+      }
+      reject(timeoutError);
+    }, REQUEST_TIMEOUT_MS);
 
-const isRetryableError = (error, response) => {
-  if (response?.status >= 500) {
-    return true;
-  }
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      socket.removeEventListener("open", onOpen);
+      socket.removeEventListener("message", onMessage);
+      socket.removeEventListener("error", onError);
+      socket.removeEventListener("close", onClose);
+    };
 
-  if (error?.code === "timeout") {
-    return true;
-  }
+    const fail = (error, code = "network") => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      const resolvedError =
+        error instanceof Error ? error : new Error("Network error");
+      if (!resolvedError.code) {
+        resolvedError.code = code;
+      }
+      try {
+        socket.close();
+      } catch (closeError) {
+        // ignore close errors
+      }
+      reject(resolvedError);
+    };
 
-  return error instanceof TypeError;
-};
+    const onOpen = () => {
+      try {
+        socket.send(JSON.stringify(payload));
+      } catch (error) {
+        fail(error, "network");
+      }
+    };
 
-const requestBookOffers = async ({ endpointUrl, payload }) => {
-  const response = await fetchWithTimeout(
-    endpointUrl,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-    REQUEST_TIMEOUT_MS
-  );
+    const onMessage = (event) => {
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch (error) {
+        fail(error, "parse");
+        return;
+      }
 
-  if (!response.ok) {
-    const error = new Error(`HTTP ${response.status}`);
-    error.response = response;
-    throw error;
-  }
+      if (data?.id !== payload.id) {
+        return;
+      }
 
-  return response.json();
-};
+      if (data?.status === "error" || data?.result?.error) {
+        const rpcError = new Error(
+          data?.error_message ||
+            data?.result?.error_message ||
+            "Request failed"
+        );
+        rpcError.code = "rpc";
+        rpcError.response = data;
+        fail(rpcError, "rpc");
+        return;
+      }
+
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      try {
+        socket.close();
+      } catch (closeError) {
+        // ignore close errors
+      }
+      resolve(data);
+    };
+
+    const onError = () => {
+      fail(new Error("WebSocket error"), "network");
+    };
+
+    const onClose = () => {
+      if (settled) {
+        return;
+      }
+      const closeError = new Error("Connection closed");
+      closeError.code = "network";
+      fail(closeError, "network");
+    };
+
+    socket.addEventListener("open", onOpen);
+    socket.addEventListener("message", onMessage);
+    socket.addEventListener("error", onError);
+    socket.addEventListener("close", onClose);
+  });
 
 const requestWithRetry = async ({ endpointUrl, payload, attempts = 2 }) => {
   let lastError = null;
@@ -893,9 +957,8 @@ const requestWithRetry = async ({ endpointUrl, payload, attempts = 2 }) => {
       const response = await requestBookOffers({ endpointUrl, payload });
       return response;
     } catch (error) {
-      const response = error?.response;
       lastError = error;
-      if (attempt < attempts - 1 && isRetryableError(error, response)) {
+      if (attempt < attempts - 1 && isRetryableError(error)) {
         await sleep(RETRY_BACKOFF_MS);
         continue;
       }
@@ -909,14 +972,11 @@ const requestWithRetry = async ({ endpointUrl, payload, attempts = 2 }) => {
 const fetchBookOffers = async ({ currency, issuer, amount, limit = DEFAULT_LIMIT }) => {
   const takerGets = currency === "XRP" ? "XRP" : { currency, issuer };
   const payload = {
-    method: "book_offers",
-    params: [
-      {
-        taker_gets: takerGets,
-        taker_pays: "XRP",
-        limit,
-      },
-    ],
+    id: nextRequestId(),
+    command: "book_offers",
+    taker_gets: takerGets,
+    taker_pays: "XRP",
+    limit,
   };
 
   let response = null;
@@ -930,7 +990,7 @@ const fetchBookOffers = async ({ currency, issuer, amount, limit = DEFAULT_LIMIT
     });
     endpointIndex = 0;
   } catch (error) {
-    if (!isRetryableError(error, error?.response)) {
+    if (!isRetryableError(error)) {
       throw error;
     }
     response = await requestWithRetry({
@@ -2218,7 +2278,9 @@ estimateButton?.addEventListener("click", async () => {
     setStatus("status.done");
   } catch (error) {
     setStatus("status.error");
-    setError(t("errors.fetch_failed"));
+    const errorKey =
+      error?.code === "timeout" ? "errors.fetch_timeout" : "errors.fetch_failed";
+    setError(t(errorKey));
     resetResults();
   }
 });
