@@ -44,6 +44,7 @@
     "impact_threshold": {
       "label": "Impact threshold",
       "helper": "Max sell under X% uses this threshold.",
+      "helper_dynamic": "Max sell under {threshold} uses this threshold.",
       "option_1": "1%",
       "option_2": "2%",
       "option_5": "5%",
@@ -91,9 +92,18 @@
       "fiat_loading": "Fetching...",
       "fiat_unavailable": "Unavailable",
       "fiat_warning": "Fiat pricing is unavailable right now. XRPL results are still accurate.",
-      "rate_line": "1 XRP = {rate} (Fetched at {time})",
-      "rate_line_stale": "1 XRP = {rate} (Fetched at {time}, stale)",
-      "rate_unavailable": "1 XRP = -- (Rate unavailable)"
+      "rate_line": "1 XRP = {rate} ({status} at {time})",
+      "rate_unavailable": "1 XRP = -- (Rate unavailable)",
+      "rate_status": {
+        "live": "live",
+        "cached": "cached",
+        "stale": "stale"
+      }
+    },
+    "freshness": {
+      "label": "Freshness",
+      "fetched_at": "XRPL data fetched at {time}",
+      "endpoint": "Endpoint: {endpointLabel}"
     },
     "slippage": {
       "label": "Slippage (est.)",
@@ -120,6 +130,14 @@
     "worst_price": "Worst price"
   },
   "graphs": {
+    "empty": {
+      "no_liquidity": "No liquidity"
+    },
+    "liquidity_end": "Liquidity ends here",
+    "legend": {
+      "your_amount": "Your amount",
+      "max_under": "Max under {threshold}"
+    },
     "placeholder": "Graph area",
     "impact": {
       "helper": "Receive curve shows how proceeds change as sell size grows.",
@@ -128,7 +146,9 @@
       "axis_receive": "Receive",
       "axis_receive_fiat": "Receive ({fiat})",
       "axis_receive_xrp": "Receive (XRP)",
+      "note_no_liquidity": "No liquidity available for this pair.",
       "note_insufficient": "Insufficient liquidity: curve ends at available depth.",
+      "note_insufficient_fiat_unavailable": "Liquidity ends early and fiat is unavailable; chart is in XRP.",
       "note_fiat_unavailable": "Fiat rate unavailable; chart is scaled in XRP.",
       "summary_empty": "Run an estimate to see the receive curve.",
       "summary": "Selling {sell} {currency} yields about {receive}.",
@@ -140,7 +160,10 @@
       "aria_label": "Order book depth and consumed liquidity",
       "axis_sell": "Cumulative sell",
       "axis_receive": "Cumulative receive (XRP)",
+      "note_no_liquidity": "No liquidity available for this pair.",
       "note_exhausted": "Order book exhausted before the full sell amount.",
+      "note_exhausted_fiat_unavailable": "Liquidity ends early; fiat is unavailable, depth remains in XRP.",
+      "note_fiat_unavailable": "Fiat rate unavailable; depth remains in XRP.",
       "summary_empty": "Run an estimate to see order book depth.",
       "summary": "Depth covers {total} {currency} (≈ {receive} total). Current sell uses {filled} {currency}.",
       "summary_partial": "Only {filled} of {requested} {currency} fills (≈ {receive}).",
