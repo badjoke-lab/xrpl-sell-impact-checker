@@ -16,6 +16,12 @@ const RETRY_BACKOFF_MS = 400;
 const DEFAULT_LIMIT = 50;
 const FIAT_STORAGE_KEY = "fiat-currency";
 const DEFAULT_FIAT = "USD";
+const SHARE_URL_DEBOUNCE_MS = 200;
+const MAX_AMOUNT = 1_000_000_000;
+const LIMIT_MIN = 1;
+const LIMIT_MAX = 200;
+const THRESHOLD_VALUES = new Set([1, 2, 5, 10, 20]);
+const FIAT_VALUES = new Set(["USD", "JPY"]);
 
 const getTranslationOrFallback = (key, fallback = "…") => {
   const value = t(key);
@@ -97,6 +103,9 @@ const limitInput = document.querySelector("#limit-input");
 const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
 const impactThresholdSelect = document.querySelector("#impact-threshold-select");
 const limitNote = document.querySelector("#limit-note");
+const copyLinkButton = document.querySelector("#copy-link");
+const shareLoadNote = document.querySelector("#share-load-note");
+const shareToast = document.querySelector("#share-toast");
 const fieldErrors = {
   currency: document.querySelector('[data-error-for="currency"]'),
   issuer: document.querySelector('[data-error-for="issuer"]'),
@@ -137,6 +146,9 @@ let lastFetchedAt = null;
 let lastEndpointLabel = "";
 let chartUpdateTimer = null;
 let pendingChartPayload = null;
+let shareUrlTimer = null;
+let shareToastTimer = null;
+let isApplyingShareParams = false;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -267,6 +279,74 @@ const formatTime = (timestamp) =>
     second: "2-digit",
   }).format(new Date(timestamp));
 
+const clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const sanitizeCurrency = (value) => {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const upper = trimmed.toUpperCase();
+  const isHexCurrency = /^[A-F0-9]{40}$/.test(upper);
+  const isShortCurrency = /^[A-Z0-9]{3}$/.test(upper);
+  if (!isHexCurrency && !isShortCurrency) {
+    return null;
+  }
+  return upper;
+};
+
+const sanitizeIssuer = (value) => {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const issuerLooksValid = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(trimmed);
+  return issuerLooksValid ? trimmed : null;
+};
+
+const sanitizeAmount = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  const clamped = clampNumber(parsed, 0, MAX_AMOUNT);
+  if (clamped <= 0) {
+    return null;
+  }
+  return clamped;
+};
+
+const sanitizeLimit = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  const clamped = clampNumber(Math.round(parsed), LIMIT_MIN, LIMIT_MAX);
+  return clamped;
+};
+
+const sanitizeThreshold = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || !THRESHOLD_VALUES.has(parsed)) {
+    return null;
+  }
+  return parsed;
+};
+
+const sanitizeFiat = (value) => {
+  if (!value) {
+    return null;
+  }
+  const upper = value.trim().toUpperCase();
+  return FIAT_VALUES.has(upper) ? upper : null;
+};
+
 const setResultText = (element, text) => {
   if (element) {
     element.textContent = text;
@@ -302,6 +382,223 @@ const updateMaxSellLabel = (thresholdPct) => {
       }),
     })
   );
+};
+
+const setShareLoadNote = (visible) => {
+  if (!shareLoadNote) {
+    return;
+  }
+  shareLoadNote.hidden = !visible;
+};
+
+const showShareToast = (message) => {
+  if (!shareToast) {
+    return;
+  }
+  if (shareToastTimer) {
+    clearTimeout(shareToastTimer);
+  }
+  shareToast.textContent = message || "";
+  shareToast.hidden = !message;
+  if (message) {
+    shareToastTimer = setTimeout(() => {
+      shareToast.hidden = true;
+      shareToast.textContent = "";
+    }, 2000);
+  }
+};
+
+const getShareInputState = () => {
+  const currency = sanitizeCurrency(currencyInput?.value || "");
+  const amount = sanitizeAmount(amountInput?.value);
+  const threshold = sanitizeThreshold(impactThresholdSelect?.value);
+  const fiat = sanitizeFiat(fiatCurrencySelect?.value);
+  const limitRaw = limitInput?.value;
+  const limit =
+    limitRaw === "" || limitRaw === null || limitRaw === undefined
+      ? null
+      : sanitizeLimit(limitRaw);
+  const issuer = sanitizeIssuer(issuerInput?.value || "");
+  return {
+    currency,
+    issuer,
+    amount,
+    limit,
+    threshold,
+    fiat,
+  };
+};
+
+const buildShareParams = () => {
+  const params = new URLSearchParams();
+  const { currency, issuer, amount, limit, threshold, fiat } = getShareInputState();
+  const hasPrimary = Boolean(currency || amount);
+  if (!hasPrimary) {
+    return params;
+  }
+  if (currency) {
+    params.set("currency", currency);
+  }
+  if (currency && currency !== "XRP" && issuer) {
+    params.set("issuer", issuer);
+  }
+  if (amount) {
+    params.set("amount", String(amount));
+  }
+  const resolvedLimit = limit ?? DEFAULT_LIMIT;
+  params.set("limit", String(resolvedLimit));
+  const resolvedThreshold = threshold ?? getImpactThresholdPct();
+  if (resolvedThreshold) {
+    params.set("threshold", String(resolvedThreshold));
+  }
+  const resolvedFiat = fiat ?? DEFAULT_FIAT;
+  if (resolvedFiat) {
+    params.set("fiat", resolvedFiat);
+  }
+  return params;
+};
+
+const updateShareUrl = () => {
+  const params = buildShareParams();
+  const url = new URL(window.location.href);
+  const search = params.toString();
+  url.search = search ? `?${search}` : "";
+  history.replaceState(null, "", url);
+};
+
+const scheduleShareUrlUpdate = ({ immediate = false } = {}) => {
+  if (isApplyingShareParams) {
+    return;
+  }
+  if (shareUrlTimer) {
+    clearTimeout(shareUrlTimer);
+    shareUrlTimer = null;
+  }
+  if (immediate) {
+    updateShareUrl();
+    return;
+  }
+  shareUrlTimer = setTimeout(() => {
+    shareUrlTimer = null;
+    updateShareUrl();
+  }, SHARE_URL_DEBOUNCE_MS);
+};
+
+const copyToClipboard = async (value) => {
+  if (!value) {
+    return false;
+  }
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch (error) {
+      // Fall back to legacy approach.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "absolute";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, value.length);
+  let success = false;
+  try {
+    success = document.execCommand("copy");
+  } catch (error) {
+    success = false;
+  } finally {
+    document.body.removeChild(textarea);
+  }
+  return success;
+};
+
+const applyShareParamsFromUrl = () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.size === 0) {
+    return;
+  }
+
+  let hadInvalidParam = false;
+  const currencyParam = params.get("currency");
+  const issuerParam = params.get("issuer");
+  const amountParam = params.get("amount");
+  const limitParam = params.get("limit");
+  const thresholdParam = params.get("threshold");
+  const fiatParam = params.get("fiat");
+
+  const currency = currencyParam ? sanitizeCurrency(currencyParam) : null;
+  if (currencyParam && !currency) {
+    hadInvalidParam = true;
+  }
+
+  const amount = amountParam ? sanitizeAmount(amountParam) : null;
+  if (amountParam && !amount) {
+    hadInvalidParam = true;
+  }
+
+  const limit = limitParam ? sanitizeLimit(limitParam) : null;
+  if (limitParam && !limit) {
+    hadInvalidParam = true;
+  }
+
+  const threshold = thresholdParam ? sanitizeThreshold(thresholdParam) : null;
+  if (thresholdParam && !threshold) {
+    hadInvalidParam = true;
+  }
+
+  const fiat = fiatParam ? sanitizeFiat(fiatParam) : null;
+  if (fiatParam && !fiat) {
+    hadInvalidParam = true;
+  }
+
+  let issuer = issuerParam ? sanitizeIssuer(issuerParam) : null;
+  if (issuerParam && !issuer) {
+    hadInvalidParam = true;
+  }
+
+  if (currency === "XRP") {
+    issuer = null;
+  }
+
+  isApplyingShareParams = true;
+  if (currencyInput && currency) {
+    currencyInput.value = currency;
+  }
+  if (amountInput && amount) {
+    amountInput.value = String(amount);
+  }
+  if (limitInput && limit) {
+    limitInput.value = String(limit);
+  }
+  if (impactThresholdSelect && threshold) {
+    impactThresholdSelect.value = String(threshold);
+    updateMaxSellLabel(threshold);
+    updateImpactThresholdHelp(threshold);
+  }
+  if (fiatCurrencySelect && fiat) {
+    fiatCurrencySelect.value = fiat;
+    try {
+      localStorage.setItem(FIAT_STORAGE_KEY, fiat);
+    } catch (error) {
+      // Ignore storage failures.
+    }
+  }
+  if (issuerInput) {
+    issuerInput.value = issuer || "";
+  }
+  isApplyingShareParams = false;
+
+  const hasValidScenario =
+    Boolean(currency && amount) && (currency === "XRP" || Boolean(issuer));
+  if (!hadInvalidParam && hasValidScenario) {
+    setShareLoadNote(true);
+  }
+
+  scheduleShareUrlUpdate({ immediate: true });
 };
 
 const setFiatWarning = (message) => {
@@ -1697,6 +1994,17 @@ const initFiatSelection = () => {
 };
 
 initFiatSelection();
+applyShareParamsFromUrl();
+
+const handleShareInputChange = () => {
+  setShareLoadNote(false);
+  scheduleShareUrlUpdate();
+};
+
+currencyInput?.addEventListener("input", handleShareInputChange);
+issuerInput?.addEventListener("input", handleShareInputChange);
+amountInput?.addEventListener("input", handleShareInputChange);
+limitInput?.addEventListener("input", handleShareInputChange);
 
 fiatCurrencySelect?.addEventListener("change", () => {
   if (fiatCurrencySelect) {
@@ -1728,6 +2036,8 @@ fiatCurrencySelect?.addEventListener("change", () => {
       result: lastMaxSellResult,
     });
   }
+  setShareLoadNote(false);
+  scheduleShareUrlUpdate();
 });
 
 impactThresholdSelect?.addEventListener("change", () => {
@@ -1756,6 +2066,8 @@ impactThresholdSelect?.addEventListener("change", () => {
     maxSellResult: lastMaxSellResult,
     currency: lastCurrency,
   });
+  setShareLoadNote(false);
+  scheduleShareUrlUpdate();
 });
 
 tryExampleButton?.addEventListener("click", () => {
@@ -1770,7 +2082,15 @@ tryExampleButton?.addEventListener("click", () => {
   }
   clearFieldErrors();
   setError(null);
+  setShareLoadNote(false);
+  scheduleShareUrlUpdate({ immediate: true });
   estimateButton?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
+copyLinkButton?.addEventListener("click", async () => {
+  scheduleShareUrlUpdate({ immediate: true });
+  const success = await copyToClipboard(window.location.href);
+  showShareToast(t(success ? "status.copy_success" : "status.copy_failed"));
 });
 
 estimateButton?.addEventListener("click", async () => {
