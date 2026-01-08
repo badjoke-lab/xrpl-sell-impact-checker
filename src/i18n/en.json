@@ -86,7 +86,14 @@
     "receive": {
       "label": "You receive",
       "value": "{amount} {currency}",
-      "fiat_pending": "Fiat: pending"
+      "with_fiat": "{amount} XRP (≈ {fiat})",
+      "fiat_pending": "Fiat: pending",
+      "fiat_loading": "Fetching...",
+      "fiat_unavailable": "Unavailable",
+      "fiat_warning": "Fiat pricing is unavailable right now. XRPL results are still accurate.",
+      "rate_line": "1 XRP = {rate} (Fetched at {time})",
+      "rate_line_stale": "1 XRP = {rate} (Fetched at {time}, stale)",
+      "rate_unavailable": "1 XRP = -- (Rate unavailable)"
     },
     "slippage": {
       "label": "Slippage (est.)",

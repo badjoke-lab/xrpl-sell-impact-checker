@@ -85,6 +85,7 @@ const currencyInput = document.querySelector("#currency-input");
 const issuerInput = document.querySelector("#issuer-input");
 const amountInput = document.querySelector("#sell-amount-input");
 const limitInput = document.querySelector("#limit-input");
+const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
 const limitNote = document.querySelector("#limit-note");
 const fieldErrors = {
   currency: document.querySelector('[data-error-for="currency"]'),
@@ -95,12 +96,15 @@ const fieldErrors = {
 const resultSellability = document.querySelector('[data-result="sellability"]');
 const resultFilledLine = document.querySelector('[data-result="filled-line"]');
 const resultReceive = document.querySelector('[data-result="receive"]');
+const resultFiatRate = document.querySelector('[data-result="fiat-rate"]');
+const resultFiatWarning = document.querySelector('[data-result="fiat-warning"]');
 const resultSlippage = document.querySelector('[data-result="slippage"]');
 const resultSlippageHelp = document.querySelector('[data-result="slippage-help"]');
 const resultWhyLine = document.querySelector('[data-result="why"]');
 const resultWarning = document.querySelector('[data-result="warning"]');
 
 let currentEndpointIndex = 0;
+let lastReceiveXrp = 0;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -165,10 +169,43 @@ const formatPercent = (
     maximumFractionDigits,
   }).format(value)}%`;
 
+const FIAT_CACHE_TTL_MS = 120000;
+const FIAT_RATE_SOURCE = "coingecko";
+const fiatCache = new Map();
+
+const formatFiatAmount = (value, fiat) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: fiat,
+    maximumFractionDigits: fiat === "JPY" ? 0 : 2,
+  }).format(value);
+
+const formatFiatRate = (value, fiat) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: fiat,
+    maximumFractionDigits: fiat === "JPY" ? 2 : 4,
+  }).format(value);
+
+const formatTime = (timestamp) =>
+  new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(timestamp));
+
 const setResultText = (element, text) => {
   if (element) {
     element.textContent = text;
   }
+};
+
+const setFiatWarning = (message) => {
+  if (!resultFiatWarning) {
+    return;
+  }
+  resultFiatWarning.textContent = message || "";
+  resultFiatWarning.hidden = !message;
 };
 
 const resetResults = () => {
@@ -179,10 +216,125 @@ const resetResults = () => {
   setResultText(resultSlippage, placeholder);
   setResultText(resultSlippageHelp, getTranslationOrFallback("results.slippage.help"));
   setResultText(resultWhyLine, "");
+  setResultText(resultFiatRate, t("results.receive.fiat_pending"));
+  setFiatWarning(null);
+  lastReceiveXrp = 0;
   if (resultWarning) {
     resultWarning.hidden = true;
     resultWarning.textContent = "";
   }
+};
+
+const getFiatCacheKey = (fiat) => `xrp-fiat-rate:${fiat}`;
+
+const readFiatCache = (fiat) => {
+  if (fiatCache.has(fiat)) {
+    return fiatCache.get(fiat);
+  }
+
+  try {
+    const raw = localStorage.getItem(getFiatCacheKey(fiat));
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.rate !== "number") {
+      return null;
+    }
+    fiatCache.set(fiat, parsed);
+    return parsed;
+  } catch (error) {
+    return null;
+  }
+};
+
+const writeFiatCache = (fiat, payload) => {
+  fiatCache.set(fiat, payload);
+  try {
+    localStorage.setItem(getFiatCacheKey(fiat), JSON.stringify(payload));
+  } catch (error) {
+    // Ignore storage failures.
+  }
+};
+
+const fetchXrpFiatRate = async (fiat) => {
+  const cached = readFiatCache(fiat);
+  const now = Date.now();
+
+  if (cached && now - cached.fetchedAt < FIAT_CACHE_TTL_MS) {
+    return { ...cached, isStale: false };
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=${fiat.toLowerCase()}`
+    );
+    if (!response.ok) {
+      throw new Error(`Fiat HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    const rate = data?.ripple?.[fiat.toLowerCase()];
+    if (!Number.isFinite(rate)) {
+      throw new Error("Fiat rate missing");
+    }
+    const payload = {
+      rate,
+      fetchedAt: now,
+      source: FIAT_RATE_SOURCE,
+    };
+    writeFiatCache(fiat, payload);
+    return { ...payload, isStale: false };
+  } catch (error) {
+    if (cached) {
+      return { ...cached, isStale: true };
+    }
+    return null;
+  }
+};
+
+const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
+  const fiat = fiatCurrencySelect?.value || "JPY";
+  lastReceiveXrp = receiveXrp;
+  const formattedXrp = formatNumber(receiveXrp, { maximumFractionDigits: 6 });
+
+  if (fiatRate && Number.isFinite(fiatRate.rate)) {
+    const fiatAmount = formatFiatAmount(receiveXrp * fiatRate.rate, fiat);
+    setResultText(
+      resultReceive,
+      t("results.receive.with_fiat", {
+        amount: formattedXrp,
+        fiat: fiatAmount,
+      })
+    );
+    const rateLineKey = fiatRate.isStale
+      ? "results.receive.rate_line_stale"
+      : "results.receive.rate_line";
+    setResultText(
+      resultFiatRate,
+      t(rateLineKey, {
+        rate: formatFiatRate(fiatRate.rate, fiat),
+        time: formatTime(fiatRate.fetchedAt),
+      })
+    );
+    setFiatWarning(null);
+    return;
+  }
+
+  setResultText(
+    resultReceive,
+    t("results.receive.with_fiat", {
+      amount: formattedXrp,
+      fiat: t("results.receive.fiat_unavailable"),
+    })
+  );
+  setResultText(resultFiatRate, t("results.receive.rate_unavailable"));
+  setFiatWarning(t("results.receive.fiat_warning"));
+};
+
+const refreshFiatEstimate = async (receiveXrp) => {
+  const fiat = fiatCurrencySelect?.value || "JPY";
+  const fiatRate = await fetchXrpFiatRate(fiat);
+  updateFiatDisplay({ receiveXrp, fiatRate });
 };
 
 const getOfferAmount = (offer, key) => {
@@ -449,15 +601,18 @@ const updateResultsSummary = ({ simulation, bestPrice }) => {
     }
   }
 
+  const formattedXrp = formatNumber(simulation.receiveXrp, {
+    maximumFractionDigits: 6,
+  });
   setResultText(
     resultReceive,
-    t("results.receive.value", {
-      amount: formatNumber(simulation.receiveXrp, {
-        maximumFractionDigits: 6,
-      }),
-      currency: "XRP",
+    t("results.receive.with_fiat", {
+      amount: formattedXrp,
+      fiat: t("results.receive.fiat_loading"),
     })
   );
+  setResultText(resultFiatRate, t("results.receive.fiat_pending"));
+  setFiatWarning(null);
 
   if (isFullFill && bestPrice > 0 && simulation.effectivePrice > 0) {
     const rawSlippagePct = ((bestPrice - simulation.effectivePrice) / bestPrice) * 100;
@@ -543,6 +698,22 @@ bindFieldClear(currencyInput, "currency");
 bindFieldClear(issuerInput, "issuer");
 bindFieldClear(amountInput, "amount");
 bindFieldClear(limitInput, "limit");
+
+fiatCurrencySelect?.addEventListener("change", () => {
+  if (!lastReceiveXrp) {
+    return;
+  }
+  setResultText(
+    resultReceive,
+    t("results.receive.with_fiat", {
+      amount: formatNumber(lastReceiveXrp, { maximumFractionDigits: 6 }),
+      fiat: t("results.receive.fiat_loading"),
+    })
+  );
+  setResultText(resultFiatRate, t("results.receive.fiat_pending"));
+  setFiatWarning(null);
+  void refreshFiatEstimate(lastReceiveXrp);
+});
 
 tryExampleButton?.addEventListener("click", () => {
   if (currencyInput) {
@@ -638,6 +809,7 @@ estimateButton?.addEventListener("click", async () => {
       simulation,
       bestPrice,
     });
+    void refreshFiatEstimate(simulation.receiveXrp);
 
     setStatus("status.done");
   } catch (error) {
