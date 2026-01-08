@@ -42,9 +42,18 @@ const statusLine = document.querySelector(".status");
 const statusEndpointLine = document.querySelector(".status-endpoint");
 const errorBanner = document.querySelector(".error-banner");
 const estimateButton = document.querySelector(".primary-button");
-const currencyInput = document.querySelector("#token-input");
+const tryExampleButton = document.querySelector("#try-example");
+const currencyInput = document.querySelector("#currency-input");
 const issuerInput = document.querySelector("#issuer-input");
 const amountInput = document.querySelector("#sell-amount-input");
+const limitInput = document.querySelector("#limit-input");
+const limitNote = document.querySelector("#limit-note");
+const fieldErrors = {
+  currency: document.querySelector('[data-error-for="currency"]'),
+  issuer: document.querySelector('[data-error-for="issuer"]'),
+  amount: document.querySelector('[data-error-for="amount"]'),
+  limit: document.querySelector('[data-error-for="limit"]'),
+};
 const resultSellability = document.querySelector('[data-result="sellability"]');
 const resultReceive = document.querySelector('[data-result="receive"]');
 const resultSlippage = document.querySelector('[data-result="slippage"]');
@@ -77,6 +86,29 @@ const setEndpointNotice = (message) => {
 
   statusEndpointLine.textContent = message || "";
   statusEndpointLine.hidden = !message;
+};
+
+const setFieldError = (key, message) => {
+  const element = fieldErrors[key];
+  if (!element) {
+    return;
+  }
+
+  element.textContent = message || "";
+  element.hidden = !message;
+};
+
+const setLimitNote = (message) => {
+  if (!limitNote) {
+    return;
+  }
+  limitNote.textContent = message || "";
+  limitNote.hidden = !message;
+};
+
+const clearFieldErrors = () => {
+  Object.keys(fieldErrors).forEach((key) => setFieldError(key, null));
+  setLimitNote(null);
 };
 
 const formatNumber = (value, options = {}) =>
@@ -391,50 +423,125 @@ const updateResultsSummary = ({ simulation, bestPrice, currency }) => {
   );
 };
 
-const validateInputs = ({ currency, issuer, amount }) => {
+const validateInputs = ({ currency, issuer, amount, limit }) => {
+  const errors = {};
+
   if (!currency) {
-    return t("errors.currency_required");
-  }
+    errors.currency = t("errors.currency_required");
+  } else {
+    const isHexCurrency = /^[a-fA-F0-9]{40}$/.test(currency);
+    const isShortCurrency = /^[A-Za-z0-9]{3}$/.test(currency);
 
-  const isHexCurrency = /^[a-fA-F0-9]{40}$/.test(currency);
-  const isShortCurrency = /^[A-Za-z0-9]{3}$/.test(currency);
-
-  if (!isHexCurrency && !isShortCurrency) {
-    return t("errors.currency_invalid");
+    if (!isHexCurrency && !isShortCurrency) {
+      errors.currency = t("errors.currency_invalid");
+    }
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
-    return t("errors.amount_required");
+    errors.amount = t("errors.amount_required");
   }
 
-  if (currency !== "XRP") {
+  if (!errors.currency && currency !== "XRP") {
     if (!issuer) {
-      return t("errors.issuer_required");
-    }
-    const issuerLooksValid = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(issuer);
-    if (!issuerLooksValid) {
-      return t("errors.issuer_invalid");
+      errors.issuer = t("errors.issuer_required");
+    } else {
+      const issuerLooksValid = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(issuer);
+      if (!issuerLooksValid) {
+        errors.issuer = t("errors.issuer_invalid");
+      }
     }
   }
 
-  return null;
+  let normalizedLimit = limit;
+  let limitWasAutofixed = false;
+
+  if (limit !== null && limit !== undefined && limit !== "") {
+    if (!Number.isFinite(limit) || limit <= 0) {
+      errors.limit = t("errors.limit_invalid");
+      normalizedLimit = DEFAULT_LIMIT;
+      limitWasAutofixed = true;
+    }
+  } else {
+    normalizedLimit = DEFAULT_LIMIT;
+  }
+
+  return {
+    errors,
+    normalizedLimit,
+    limitWasAutofixed,
+  };
 };
+
+const bindFieldClear = (input, key) => {
+  if (!input) {
+    return;
+  }
+  input.addEventListener("input", () => {
+    setFieldError(key, null);
+    if (key === "limit") {
+      setLimitNote(null);
+    }
+  });
+};
+
+bindFieldClear(currencyInput, "currency");
+bindFieldClear(issuerInput, "issuer");
+bindFieldClear(amountInput, "amount");
+bindFieldClear(limitInput, "limit");
+
+tryExampleButton?.addEventListener("click", () => {
+  if (currencyInput) {
+    currencyInput.value = "DEM";
+  }
+  if (issuerInput) {
+    issuerInput.value = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+  }
+  if (amountInput) {
+    amountInput.value = "1000";
+  }
+  clearFieldErrors();
+  setError(null);
+  estimateButton?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
 
 estimateButton?.addEventListener("click", async () => {
   const currencyRaw = currencyInput?.value?.trim() || "";
   const currency = currencyRaw.toUpperCase();
   const issuer = issuerInput?.value?.trim() || "";
   const amountValue = amountInput?.value ? Number(amountInput.value) : 0;
+  const limitValue =
+    limitInput?.value === "" || limitInput?.value === undefined
+      ? ""
+      : Number(limitInput?.value);
 
   setStatus("status.validating");
   setError(null);
   setEndpointNotice(null);
+  clearFieldErrors();
   resetResults();
 
-  const validationError = validateInputs({ currency, issuer, amount: amountValue });
-  if (validationError) {
+  const { errors, normalizedLimit, limitWasAutofixed } = validateInputs({
+    currency,
+    issuer,
+    amount: amountValue,
+    limit: limitValue,
+  });
+
+  Object.entries(errors).forEach(([key, message]) => {
+    if (message) {
+      setFieldError(key, message);
+    }
+  });
+
+  if (limitWasAutofixed) {
+    if (limitInput) {
+      limitInput.value = String(DEFAULT_LIMIT);
+    }
+    setLimitNote(t("notes.limit_autofix", { limit: DEFAULT_LIMIT }));
+  }
+
+  if (Object.keys(errors).length > 0) {
     setStatus("status.validation_failed");
-    setError(validationError);
     return;
   }
 
@@ -446,7 +553,7 @@ estimateButton?.addEventListener("click", async () => {
       currency,
       issuer,
       amount: amountValue,
-      limit: DEFAULT_LIMIT,
+      limit: normalizedLimit,
     });
 
     currentEndpointIndex = endpointIndex;

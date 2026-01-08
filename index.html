@@ -28,28 +28,90 @@
 
           <div class="grid two-column">
             <label class="field">
-              <span data-i18n="fields.token.label"></span>
-              <input id="token-input" type="text" data-i18n-placeholder="fields.token.placeholder" />
+              <span class="field__label" data-i18n="fields.currency.label"></span>
+              <input
+                id="currency-input"
+                type="text"
+                data-i18n-placeholder="fields.currency.placeholder"
+                aria-describedby="currency-error"
+              />
+              <p class="field__error" id="currency-error" data-error-for="currency" hidden></p>
             </label>
             <label class="field">
-              <span data-i18n="fields.issuer.label"></span>
-              <input id="issuer-input" type="text" data-i18n-placeholder="fields.issuer.placeholder" />
+              <span class="field__label" data-i18n="fields.issuer.label"></span>
+              <input
+                id="issuer-input"
+                type="text"
+                data-i18n-placeholder="fields.issuer.placeholder"
+                aria-describedby="issuer-help issuer-error"
+              />
+              <p class="field__help" id="issuer-help" data-i18n="fields.issuer.helper"></p>
+              <p class="field__error" id="issuer-error" data-error-for="issuer" hidden></p>
             </label>
             <label class="field">
-              <span data-i18n="fields.sell_amount.label"></span>
-              <input id="sell-amount-input" type="number" data-i18n-placeholder="fields.sell_amount.placeholder" />
+              <span class="field__label" data-i18n="fields.amount.label"></span>
+              <input
+                id="sell-amount-input"
+                type="number"
+                min="0"
+                step="any"
+                data-i18n-placeholder="fields.amount.placeholder"
+                aria-describedby="amount-error"
+              />
+              <p class="field__error" id="amount-error" data-error-for="amount" hidden></p>
             </label>
             <label class="field">
-              <span data-i18n="fields.slippage_limit.label"></span>
-              <input type="number" data-i18n-placeholder="fields.slippage_limit.placeholder" />
-            </label>
-            <label class="field">
-              <span data-i18n="fields.target_price.label"></span>
-              <input type="number" data-i18n-placeholder="fields.target_price.placeholder" />
+              <span class="field__label" data-i18n="fields.orderbook_limit.label"></span>
+              <input
+                id="limit-input"
+                type="number"
+                min="1"
+                step="1"
+                value="50"
+                data-i18n-placeholder="fields.orderbook_limit.placeholder"
+                aria-describedby="limit-error limit-note"
+              />
+              <p class="field__error" id="limit-error" data-error-for="limit" hidden></p>
+              <p class="field__note" id="limit-note" hidden></p>
             </label>
           </div>
 
+          <details class="advanced">
+            <summary data-i18n="sections.advanced_controls"></summary>
+            <div class="grid two-column">
+              <label class="field">
+                <span class="field__label" data-i18n="fields.impact_threshold.label"></span>
+                <select id="impact-threshold-select" aria-describedby="impact-threshold-help">
+                  <option value="1" data-i18n="fields.impact_threshold.option_1"></option>
+                  <option value="2" data-i18n="fields.impact_threshold.option_2"></option>
+                  <option value="5" data-i18n="fields.impact_threshold.option_5" selected></option>
+                  <option value="10" data-i18n="fields.impact_threshold.option_10"></option>
+                  <option value="20" data-i18n="fields.impact_threshold.option_20"></option>
+                </select>
+                <p
+                  class="field__help"
+                  id="impact-threshold-help"
+                  data-i18n="fields.impact_threshold.helper"
+                ></p>
+              </label>
+              <label class="field">
+                <span class="field__label" data-i18n="fields.fiat_currency.label"></span>
+                <select id="fiat-currency-select" aria-describedby="fiat-currency-help">
+                  <option value="JPY" data-i18n="fields.fiat_currency.option_jpy" selected></option>
+                  <option value="USD" data-i18n="fields.fiat_currency.option_usd"></option>
+                </select>
+                <p
+                  class="field__help"
+                  id="fiat-currency-help"
+                  data-i18n="fields.fiat_currency.helper"
+                ></p>
+              </label>
+            </div>
+          </details>
+
           <div class="actions">
+            <button class="secondary-button" type="button" id="try-example" data-i18n="actions.try_example"></button>
+            <p class="field__help" data-i18n="actions.try_example_note"></p>
             <button class="primary-button" type="button" data-i18n="actions.estimate"></button>
             <p class="error-banner" hidden></p>
             <p class="status" data-i18n="status.waiting"></p>
