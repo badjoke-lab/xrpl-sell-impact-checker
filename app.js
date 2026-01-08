@@ -86,6 +86,7 @@ const issuerInput = document.querySelector("#issuer-input");
 const amountInput = document.querySelector("#sell-amount-input");
 const limitInput = document.querySelector("#limit-input");
 const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
+const impactThresholdSelect = document.querySelector("#impact-threshold-select");
 const limitNote = document.querySelector("#limit-note");
 const fieldErrors = {
   currency: document.querySelector('[data-error-for="currency"]'),
@@ -102,9 +103,15 @@ const resultSlippage = document.querySelector('[data-result="slippage"]');
 const resultSlippageHelp = document.querySelector('[data-result="slippage-help"]');
 const resultWhyLine = document.querySelector('[data-result="why"]');
 const resultWarning = document.querySelector('[data-result="warning"]');
+const resultMaxSellLabel = document.querySelector('[data-result="max-sell-label"]');
+const resultMaxSellValue = document.querySelector('[data-result="max-sell-value"]');
+const resultMaxSellNote = document.querySelector('[data-result="max-sell-note"]');
 
 let currentEndpointIndex = 0;
 let lastReceiveXrp = 0;
+let lastSortedOffers = null;
+let lastBestPrice = 0;
+let lastCurrency = "";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -200,6 +207,24 @@ const setResultText = (element, text) => {
   }
 };
 
+const getImpactThresholdPct = () => {
+  const raw = impactThresholdSelect?.value;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const updateMaxSellLabel = (thresholdPct) => {
+  setResultText(
+    resultMaxSellLabel,
+    t("results.max_sell.label", {
+      threshold: formatPercent(thresholdPct, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }),
+    })
+  );
+};
+
 const setFiatWarning = (message) => {
   if (!resultFiatWarning) {
     return;
@@ -219,6 +244,12 @@ const resetResults = () => {
   setResultText(resultFiatRate, t("results.receive.fiat_pending"));
   setFiatWarning(null);
   lastReceiveXrp = 0;
+  lastSortedOffers = null;
+  lastBestPrice = 0;
+  lastCurrency = "";
+  updateMaxSellLabel(getImpactThresholdPct());
+  setResultText(resultMaxSellValue, placeholder);
+  setResultText(resultMaxSellNote, "");
   if (resultWarning) {
     resultWarning.hidden = true;
     resultWarning.textContent = "";
@@ -565,6 +596,152 @@ const simulateSellIntoOrderbook = ({ sellAmount, offers }) => {
   };
 };
 
+const computeMaxSellUnderThreshold = ({
+  offers,
+  thresholdPct,
+  referencePrice,
+  maxIterations = 24,
+}) => {
+  if (!Array.isArray(offers) || offers.length === 0) {
+    return { status: "not_available" };
+  }
+
+  if (!Number.isFinite(referencePrice) || referencePrice <= 0) {
+    return { status: "not_available" };
+  }
+
+  const validOffers = offers.filter(
+    (offer) =>
+      Number.isFinite(offer.availableTokenAmount) &&
+      Number.isFinite(offer.availableXrpAmount) &&
+      offer.availableTokenAmount > 0 &&
+      offer.availableXrpAmount > 0 &&
+      offer.price > 0
+  );
+
+  const totalLiquidity = validOffers.reduce(
+    (sum, offer) => sum + offer.availableTokenAmount,
+    0
+  );
+
+  if (!Number.isFinite(totalLiquidity) || totalLiquidity <= 0) {
+    return { status: "not_available" };
+  }
+
+  const fullSimulation = simulateSellIntoOrderbook({
+    sellAmount: totalLiquidity,
+    offers: validOffers,
+  });
+  const canFullyFill =
+    fullSimulation.requestedToken > 0 &&
+    fullSimulation.filledToken >= fullSimulation.requestedToken;
+
+  if (!canFullyFill) {
+    return { status: "not_available" };
+  }
+
+  let low = 0;
+  let high = totalLiquidity;
+  let lastOkSimulation = simulateSellIntoOrderbook({ sellAmount: 0, offers: validOffers });
+  let lastOkAmount = 0;
+
+  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    const mid = (low + high) / 2;
+    if (mid <= 0) {
+      low = mid;
+      continue;
+    }
+
+    const simulation = simulateSellIntoOrderbook({
+      sellAmount: mid,
+      offers: validOffers,
+    });
+    const isFullFill =
+      simulation.requestedToken > 0 &&
+      simulation.filledToken >= simulation.requestedToken;
+
+    let isOk = false;
+    if (isFullFill && simulation.effectivePrice > 0) {
+      const rawSlippagePct =
+        ((referencePrice - simulation.effectivePrice) / referencePrice) * 100;
+      const slippagePct = Math.max(0, rawSlippagePct);
+      isOk = slippagePct <= thresholdPct;
+    }
+
+    if (isOk) {
+      low = mid;
+      lastOkSimulation = simulation;
+      lastOkAmount = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  return {
+    status: "available",
+    maxSellAmount: lastOkAmount,
+    simulation: lastOkSimulation,
+  };
+};
+
+const updateMaxSellResults = async ({ offers, thresholdPct, referencePrice, currency }) => {
+  updateMaxSellLabel(thresholdPct);
+
+  if (!offers || offers.length === 0) {
+    setResultText(resultMaxSellValue, t("results.max_sell.not_available"));
+    setResultText(resultMaxSellNote, "");
+    return;
+  }
+
+  const result = computeMaxSellUnderThreshold({
+    offers,
+    thresholdPct,
+    referencePrice,
+  });
+
+  if (result.status !== "available") {
+    setResultText(resultMaxSellValue, t("results.max_sell.not_available"));
+    setResultText(resultMaxSellNote, "");
+    return;
+  }
+
+  const tokenAmount = formatNumber(result.maxSellAmount, { maximumFractionDigits: 6 });
+  const xrpAmount = formatNumber(result.simulation.receiveXrp, {
+    maximumFractionDigits: 6,
+  });
+  const fiat = fiatCurrencySelect?.value || "JPY";
+  const fiatRate = await fetchXrpFiatRate(fiat);
+
+  if (fiatRate && Number.isFinite(fiatRate.rate)) {
+    const fiatAmount = formatFiatAmount(result.simulation.receiveXrp * fiatRate.rate, fiat);
+    setResultText(
+      resultMaxSellValue,
+      t("results.max_sell.value_with_fiat", {
+        amount: tokenAmount,
+        currency,
+        fiat: fiatAmount,
+      })
+    );
+    setResultText(
+      resultMaxSellNote,
+      t("results.max_sell.xrp_line", {
+        amount: xrpAmount,
+      })
+    );
+    return;
+  }
+
+  setResultText(
+    resultMaxSellValue,
+    t("results.max_sell.value_with_xrp", {
+      amount: tokenAmount,
+      currency,
+      xrp: xrpAmount,
+    })
+  );
+  setResultText(resultMaxSellNote, t("results.max_sell.fiat_unavailable"));
+};
+
 const updateResultsSummary = ({ simulation, bestPrice }) => {
   const hasLiquidity = simulation.filledToken > 0;
   const isFullFill = hasLiquidity && simulation.filledToken >= simulation.requestedToken;
@@ -698,6 +875,7 @@ bindFieldClear(currencyInput, "currency");
 bindFieldClear(issuerInput, "issuer");
 bindFieldClear(amountInput, "amount");
 bindFieldClear(limitInput, "limit");
+updateMaxSellLabel(getImpactThresholdPct());
 
 fiatCurrencySelect?.addEventListener("change", () => {
   if (!lastReceiveXrp) {
@@ -713,6 +891,27 @@ fiatCurrencySelect?.addEventListener("change", () => {
   setResultText(resultFiatRate, t("results.receive.fiat_pending"));
   setFiatWarning(null);
   void refreshFiatEstimate(lastReceiveXrp);
+  if (lastSortedOffers && lastBestPrice > 0) {
+    void updateMaxSellResults({
+      offers: lastSortedOffers,
+      thresholdPct: getImpactThresholdPct(),
+      referencePrice: lastBestPrice,
+      currency: lastCurrency,
+    });
+  }
+});
+
+impactThresholdSelect?.addEventListener("change", () => {
+  updateMaxSellLabel(getImpactThresholdPct());
+  if (!lastSortedOffers || lastBestPrice <= 0) {
+    return;
+  }
+  void updateMaxSellResults({
+    offers: lastSortedOffers,
+    thresholdPct: getImpactThresholdPct(),
+    referencePrice: lastBestPrice,
+    currency: lastCurrency,
+  });
 });
 
 tryExampleButton?.addEventListener("click", () => {
@@ -810,6 +1009,15 @@ estimateButton?.addEventListener("click", async () => {
       bestPrice,
     });
     void refreshFiatEstimate(simulation.receiveXrp);
+    lastSortedOffers = sortedOffers;
+    lastBestPrice = bestPrice;
+    lastCurrency = currency;
+    void updateMaxSellResults({
+      offers: sortedOffers,
+      thresholdPct: getImpactThresholdPct(),
+      referencePrice: bestPrice,
+      currency,
+    });
 
     setStatus("status.done");
   } catch (error) {
