@@ -1,4 +1,4 @@
-import { t } from "./src/i18n/index.js";
+import { loadDictionary, t } from "./src/i18n/index.js";
 
 const ENDPOINTS = [
   {
@@ -15,28 +15,66 @@ const REQUEST_TIMEOUT_MS = 8000;
 const RETRY_BACKOFF_MS = 400;
 const DEFAULT_LIMIT = 50;
 
+const getTranslationOrFallback = (key, fallback = "…") => {
+  const value = t(key);
+  if (!value || value.startsWith("[[")) {
+    return fallback;
+  }
+  return value;
+};
+
 const applyTranslations = () => {
   document.querySelectorAll("[data-i18n]").forEach((element) => {
     const { i18n } = element.dataset;
-    element.textContent = t(i18n);
+    element.textContent = getTranslationOrFallback(i18n);
   });
 
   document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
     const key = element.dataset.i18nPlaceholder;
     if ("placeholder" in element) {
-      element.placeholder = t(key);
+      element.placeholder = getTranslationOrFallback(key);
     }
   });
 
   document.querySelectorAll("[data-i18n-value]").forEach((element) => {
     const key = element.dataset.i18nValue;
     if ("value" in element) {
-      element.value = t(key);
+      element.value = getTranslationOrFallback(key);
     }
   });
 };
 
-applyTranslations();
+const i18nErrorBanner = document.querySelector("#i18n-error-banner");
+
+const showI18nError = () => {
+  if (!i18nErrorBanner) {
+    return;
+  }
+  const message = getTranslationOrFallback(
+    "errors.i18n_failed",
+    "Translations failed to load. Please refresh the page."
+  );
+  i18nErrorBanner.textContent = message;
+  i18nErrorBanner.hidden = false;
+};
+
+const initI18n = async () => {
+  applyTranslations();
+  try {
+    const url = await loadDictionary();
+    applyTranslations();
+    if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+      console.info("i18n loaded", url.href);
+    }
+  } catch (error) {
+    applyTranslations();
+    showI18nError();
+  }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  void initI18n();
+});
 
 const statusLine = document.querySelector(".status");
 const statusEndpointLine = document.querySelector(".status-endpoint");
@@ -130,11 +168,11 @@ const setResultText = (element, text) => {
 };
 
 const resetResults = () => {
-  const placeholder = t("common.placeholder");
+  const placeholder = getTranslationOrFallback("common.placeholder", "…");
   setResultText(resultSellability, placeholder);
   setResultText(resultReceive, placeholder);
   setResultText(resultSlippage, placeholder);
-  setResultText(resultSlippageHelp, t("results.slippage.help"));
+  setResultText(resultSlippageHelp, getTranslationOrFallback("results.slippage.help"));
   setResultText(resultWhyLine, "");
   if (resultWarning) {
     resultWarning.hidden = true;

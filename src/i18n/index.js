@@ -1,9 +1,6 @@
-import en from "./en.json";
-
 export const DEFAULT_LANG = "en";
 
 const dictionaries = {
-  en,
 };
 
 const findValue = (dictionary, key) => {
@@ -37,4 +34,15 @@ export const t = (key, params) => {
   }
 
   return interpolate(value, params);
+};
+
+export const loadDictionary = async () => {
+  const url = new URL("./en.json", import.meta.url);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Unable to load dictionary (${response.status})`);
+  }
+  const data = await response.json();
+  dictionaries[DEFAULT_LANG] = data;
+  return url;
 };
