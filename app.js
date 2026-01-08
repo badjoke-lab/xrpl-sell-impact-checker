@@ -2,17 +2,25 @@ import { loadDictionary, t } from "./src/i18n/index.js";
 
 const ENDPOINTS = [
   {
-    labelKey: "endpoints.primary.label",
-    url: "wss://s1.ripple.com:51233",
+    labelKey: "endpoints.xrplcluster.label",
+    url: "wss://xrplcluster.com/",
   },
   {
-    labelKey: "endpoints.secondary.label",
-    url: "wss://s2.ripple.com:51233",
+    labelKey: "endpoints.xrplws.label",
+    url: "wss://xrpl.ws/",
+  },
+  {
+    labelKey: "endpoints.s1.label",
+    url: "wss://s1.ripple.com/",
+  },
+  {
+    labelKey: "endpoints.s2.label",
+    url: "wss://s2.ripple.com/",
   },
 ];
 
-const REQUEST_TIMEOUT_MS = 8000;
-const RETRY_BACKOFF_MS = 400;
+const CONNECT_TIMEOUT_MS = 4000;
+const REQUEST_TIMEOUT_MS = 6000;
 const DEFAULT_LIMIT = 50;
 const FIAT_STORAGE_KEY = "fiat-currency";
 const DEFAULT_FIAT = "USD";
@@ -116,6 +124,12 @@ const resultSellability = document.querySelector('[data-result="sellability"]');
 const resultFilledLine = document.querySelector('[data-result="filled-line"]');
 const resultDataFetched = document.querySelector('[data-result="data-fetched"]');
 const resultEndpoint = document.querySelector('[data-result="endpoint"]');
+const resultEndpointDetails = document.querySelector(
+  '[data-result="endpoint-details"]'
+);
+const resultOrderCount = document.querySelector('[data-result="order-count"]');
+const resultBestPrice = document.querySelector('[data-result="best-price"]');
+const resultWorstPrice = document.querySelector('[data-result="worst-price"]');
 const resultReceive = document.querySelector('[data-result="receive"]');
 const resultFiatRate = document.querySelector('[data-result="fiat-rate"]');
 const resultFiatWarning = document.querySelector('[data-result="fiat-warning"]');
@@ -149,8 +163,6 @@ let pendingChartPayload = null;
 let shareUrlTimer = null;
 let shareToastTimer = null;
 let isApplyingShareParams = false;
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const setStatus = (key, params) => {
   if (statusLine) {
@@ -621,6 +633,10 @@ const resetResults = () => {
   setResultText(resultFilledLine, placeholder);
   setResultText(resultDataFetched, placeholder);
   setResultText(resultEndpoint, placeholder);
+  setResultText(resultEndpointDetails, placeholder);
+  setResultText(resultOrderCount, placeholder);
+  setResultText(resultBestPrice, placeholder);
+  setResultText(resultWorstPrice, placeholder);
   setResultText(resultReceive, placeholder);
   setResultText(resultSlippage, placeholder);
   setResultText(resultSlippageHelp, getTranslationOrFallback("results.slippage.help"));
@@ -835,37 +851,31 @@ const normalizeOffers = (offers) => {
   });
 };
 
-const isRetryableError = (error) =>
-  error?.code === "timeout" || error?.code === "network";
-
 const requestBookOffers = async ({ endpointUrl, payload }) =>
   new Promise((resolve, reject) => {
     let settled = false;
+    let opened = false;
+    let requestTimeoutId = null;
     const socket = new WebSocket(endpointUrl);
-    const timeoutId = setTimeout(() => {
+    const connectTimeoutId = setTimeout(() => {
       if (settled) {
         return;
       }
-      settled = true;
-      const timeoutError = new Error("Request timed out");
-      timeoutError.code = "timeout";
-      try {
-        socket.close();
-      } catch (closeError) {
-        // ignore close errors
-      }
-      reject(timeoutError);
-    }, REQUEST_TIMEOUT_MS);
+      const connectError = new Error("Connection timed out");
+      connectError.code = "connect_failed";
+      fail(connectError);
+    }, CONNECT_TIMEOUT_MS);
 
     const cleanup = () => {
-      clearTimeout(timeoutId);
+      clearTimeout(connectTimeoutId);
+      clearTimeout(requestTimeoutId);
       socket.removeEventListener("open", onOpen);
       socket.removeEventListener("message", onMessage);
       socket.removeEventListener("error", onError);
       socket.removeEventListener("close", onClose);
     };
 
-    const fail = (error, code = "network") => {
+    const fail = (error) => {
       if (settled) {
         return;
       }
@@ -873,9 +883,6 @@ const requestBookOffers = async ({ endpointUrl, payload }) =>
       cleanup();
       const resolvedError =
         error instanceof Error ? error : new Error("Network error");
-      if (!resolvedError.code) {
-        resolvedError.code = code;
-      }
       try {
         socket.close();
       } catch (closeError) {
@@ -884,11 +891,27 @@ const requestBookOffers = async ({ endpointUrl, payload }) =>
       reject(resolvedError);
     };
 
+    const startRequestTimeout = () => {
+      requestTimeoutId = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        const timeoutError = new Error("Request timed out");
+        timeoutError.code = "timeout";
+        fail(timeoutError);
+      }, REQUEST_TIMEOUT_MS);
+    };
+
     const onOpen = () => {
+      opened = true;
+      clearTimeout(connectTimeoutId);
+      startRequestTimeout();
       try {
         socket.send(JSON.stringify(payload));
       } catch (error) {
-        fail(error, "network");
+        const sendError = error instanceof Error ? error : new Error("Send failed");
+        sendError.code = "connect_failed";
+        fail(sendError);
       }
     };
 
@@ -897,7 +920,9 @@ const requestBookOffers = async ({ endpointUrl, payload }) =>
       try {
         data = JSON.parse(event.data);
       } catch (error) {
-        fail(error, "parse");
+        const parseError = error instanceof Error ? error : new Error("Parse failed");
+        parseError.code = "rpc_error";
+        fail(parseError);
         return;
       }
 
@@ -911,9 +936,9 @@ const requestBookOffers = async ({ endpointUrl, payload }) =>
             data?.result?.error_message ||
             "Request failed"
         );
-        rpcError.code = "rpc";
+        rpcError.code = "rpc_error";
         rpcError.response = data;
-        fail(rpcError, "rpc");
+        fail(rpcError);
         return;
       }
 
@@ -931,7 +956,9 @@ const requestBookOffers = async ({ endpointUrl, payload }) =>
     };
 
     const onError = () => {
-      fail(new Error("WebSocket error"), "network");
+      const wsError = new Error("WebSocket error");
+      wsError.code = opened ? "connect_failed" : "connect_failed";
+      fail(wsError);
     };
 
     const onClose = () => {
@@ -939,8 +966,8 @@ const requestBookOffers = async ({ endpointUrl, payload }) =>
         return;
       }
       const closeError = new Error("Connection closed");
-      closeError.code = "network";
-      fail(closeError, "network");
+      closeError.code = "connect_failed";
+      fail(closeError);
     };
 
     socket.addEventListener("open", onOpen);
@@ -948,26 +975,6 @@ const requestBookOffers = async ({ endpointUrl, payload }) =>
     socket.addEventListener("error", onError);
     socket.addEventListener("close", onClose);
   });
-
-const requestWithRetry = async ({ endpointUrl, payload, attempts = 2 }) => {
-  let lastError = null;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      const response = await requestBookOffers({ endpointUrl, payload });
-      return response;
-    } catch (error) {
-      lastError = error;
-      if (attempt < attempts - 1 && isRetryableError(error)) {
-        await sleep(RETRY_BACKOFF_MS);
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  throw lastError;
-};
 
 const fetchBookOffers = async ({ currency, issuer, amount, limit = DEFAULT_LIMIT }) => {
   const takerGets = currency === "XRP" ? "XRP" : { currency, issuer };
@@ -979,33 +986,34 @@ const fetchBookOffers = async ({ currency, issuer, amount, limit = DEFAULT_LIMIT
     limit,
   };
 
-  let response = null;
-  let endpointIndex = 0;
+  const attemptedEndpoints = [];
+  const errors = [];
 
-  try {
-    response = await requestWithRetry({
-      endpointUrl: ENDPOINTS[0].url,
-      payload,
-      attempts: 2,
-    });
-    endpointIndex = 0;
-  } catch (error) {
-    if (!isRetryableError(error)) {
-      throw error;
+  for (let index = 0; index < ENDPOINTS.length; index += 1) {
+    const endpoint = ENDPOINTS[index];
+    attemptedEndpoints.push(endpoint);
+    try {
+      const response = await requestBookOffers({
+        endpointUrl: endpoint.url,
+        payload,
+      });
+      const offers = normalizeOffers(response?.result?.offers);
+      return {
+        offers,
+        endpointIndex: index,
+        attemptedEndpoints,
+      };
+    } catch (error) {
+      errors.push(error);
     }
-    response = await requestWithRetry({
-      endpointUrl: ENDPOINTS[1].url,
-      payload,
-      attempts: 1,
-    });
-    endpointIndex = 1;
   }
 
-  const offers = normalizeOffers(response?.result?.offers);
-  return {
-    offers,
-    endpointIndex,
-  };
+  const errorCodes = errors.map((error) => error?.code).filter(Boolean);
+  const allRpc = errorCodes.length > 0 && errorCodes.every((code) => code === "rpc_error");
+  const anyTimeout = errorCodes.some((code) => code === "timeout");
+  const combinedError = new Error("All endpoints failed");
+  combinedError.code = allRpc ? "rpc_error" : anyTimeout ? "timeout" : "connect_failed";
+  throw combinedError;
 };
 
 const sortOffersByPrice = (offers) =>
@@ -1779,6 +1787,53 @@ const updateResultsSummary = ({ simulation, bestPrice }) => {
   );
 };
 
+const updateExecutionDetails = ({
+  offers,
+  bestPrice,
+  worstPrice,
+  attemptedEndpoints,
+}) => {
+  const orderCount = Array.isArray(offers) ? offers.length : null;
+  if (Number.isFinite(orderCount)) {
+    setResultText(resultOrderCount, formatNumber(orderCount));
+  } else {
+    setResultText(
+      resultOrderCount,
+      getTranslationOrFallback("common.placeholder", "…")
+    );
+  }
+
+  if (orderCount > 0 && Number.isFinite(bestPrice) && bestPrice > 0) {
+    setResultText(
+      resultBestPrice,
+      formatNumber(bestPrice, { maximumFractionDigits: 8 })
+    );
+  } else {
+    setResultText(resultBestPrice, t("common.not_available"));
+  }
+
+  if (orderCount > 0 && Number.isFinite(worstPrice) && worstPrice > 0) {
+    setResultText(
+      resultWorstPrice,
+      formatNumber(worstPrice, { maximumFractionDigits: 8 })
+    );
+  } else {
+    setResultText(resultWorstPrice, t("common.not_available"));
+  }
+
+  if (Array.isArray(attemptedEndpoints) && attemptedEndpoints.length > 0) {
+    const endpointTrail = attemptedEndpoints
+      .map((endpoint) => `${t(endpoint.labelKey)} (${endpoint.url})`)
+      .join(" → ");
+    setResultText(resultEndpointDetails, endpointTrail);
+  } else {
+    setResultText(
+      resultEndpointDetails,
+      getTranslationOrFallback("common.placeholder", "…")
+    );
+  }
+};
+
 function setChartNote(element, message) {
   if (!element) {
     return;
@@ -2198,7 +2253,7 @@ estimateButton?.addEventListener("click", async () => {
 
   try {
     const previousEndpointIndex = currentEndpointIndex;
-    const { offers, endpointIndex } = await fetchBookOffers({
+    const { offers, endpointIndex, attemptedEndpoints } = await fetchBookOffers({
       currency,
       issuer,
       amount: amountValue,
@@ -2237,6 +2292,10 @@ estimateButton?.addEventListener("click", async () => {
 
     const sortedOffers = sortOffersByPrice(offers);
     const bestPrice = sortedOffers.find((offer) => offer.price > 0)?.price ?? 0;
+    const worstPrice =
+      sortedOffers.length > 0
+        ? sortedOffers[sortedOffers.length - 1]?.price ?? 0
+        : 0;
     const simulation = simulateSellIntoOrderbook({
       sellAmount: amountValue,
       offers: sortedOffers,
@@ -2245,6 +2304,12 @@ estimateButton?.addEventListener("click", async () => {
     updateResultsSummary({
       simulation,
       bestPrice,
+    });
+    updateExecutionDetails({
+      offers: sortedOffers,
+      bestPrice,
+      worstPrice,
+      attemptedEndpoints,
     });
     void refreshFiatEstimate(simulation.receiveXrp);
     lastSortedOffers = sortedOffers;
@@ -2279,7 +2344,9 @@ estimateButton?.addEventListener("click", async () => {
   } catch (error) {
     setStatus("status.error");
     const errorKey =
-      error?.code === "timeout" ? "errors.fetch_timeout" : "errors.fetch_failed";
+      error?.code === "rpc_error"
+        ? "errors.fetch_failed"
+        : "errors.network_unreachable";
     setError(t(errorKey));
     resetResults();
   }
