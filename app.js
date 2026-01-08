@@ -93,6 +93,7 @@ const fieldErrors = {
   limit: document.querySelector('[data-error-for="limit"]'),
 };
 const resultSellability = document.querySelector('[data-result="sellability"]');
+const resultFilledLine = document.querySelector('[data-result="filled-line"]');
 const resultReceive = document.querySelector('[data-result="receive"]');
 const resultSlippage = document.querySelector('[data-result="slippage"]');
 const resultSlippageHelp = document.querySelector('[data-result="slippage-help"]');
@@ -155,10 +156,13 @@ const formatNumber = (value, options = {}) =>
     ...options,
   }).format(value);
 
-const formatPercent = (value) =>
+const formatPercent = (
+  value,
+  { minimumFractionDigits = 1, maximumFractionDigits = 2 } = {}
+) =>
   `${new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits,
+    maximumFractionDigits,
   }).format(value)}%`;
 
 const setResultText = (element, text) => {
@@ -170,6 +174,7 @@ const setResultText = (element, text) => {
 const resetResults = () => {
   const placeholder = getTranslationOrFallback("common.placeholder", "…");
   setResultText(resultSellability, placeholder);
+  setResultText(resultFilledLine, placeholder);
   setResultText(resultReceive, placeholder);
   setResultText(resultSlippage, placeholder);
   setResultText(resultSlippageHelp, getTranslationOrFallback("results.slippage.help"));
@@ -394,42 +399,49 @@ const simulateSellIntoOrderbook = ({ sellAmount, offers }) => {
   }
 
   const fillRate = requestedToken > 0 ? filledToken / requestedToken : 0;
+  const fillRatePct = fillRate * 100;
   const effectivePrice = filledToken > 0 ? receiveXrp / filledToken : 0;
 
   return {
     filledToken,
     requestedToken,
     fillRate,
+    fillRatePct,
     receiveXrp,
     effectivePrice,
     topConsumedOffersCount,
   };
 };
 
-const updateResultsSummary = ({ simulation, bestPrice, currency }) => {
+const updateResultsSummary = ({ simulation, bestPrice }) => {
   const hasLiquidity = simulation.filledToken > 0;
   const isFullFill = hasLiquidity && simulation.filledToken >= simulation.requestedToken;
   const isPartialFill =
     hasLiquidity && simulation.filledToken < simulation.requestedToken;
+  const filledLine = t("results.sellability.filled_line", {
+    filled: formatNumber(simulation.filledToken),
+    requested: formatNumber(simulation.requestedToken),
+    pct: formatPercent(simulation.fillRatePct),
+  });
 
   if (!hasLiquidity) {
     setResultText(resultSellability, t("results.sellability.none"));
   } else if (isPartialFill) {
-    setResultText(
-      resultSellability,
-      t("results.sellability.partial_value", {
-        filled: formatNumber(simulation.filledToken),
-        requested: formatNumber(simulation.requestedToken),
-        currency,
-      })
-    );
+    setResultText(resultSellability, t("results.sellability.partial"));
   } else {
     setResultText(resultSellability, t("results.sellability.full"));
   }
 
+  setResultText(resultFilledLine, filledLine);
+
   if (resultWarning) {
     if (isPartialFill) {
-      resultWarning.textContent = t("results.sellability.partial_warning");
+      resultWarning.textContent = t("results.warnings.partial", {
+        pct: formatPercent(simulation.fillRatePct),
+      });
+      resultWarning.hidden = false;
+    } else if (!hasLiquidity) {
+      resultWarning.textContent = t("results.warnings.none");
       resultWarning.hidden = false;
     } else {
       resultWarning.hidden = true;
@@ -448,8 +460,13 @@ const updateResultsSummary = ({ simulation, bestPrice, currency }) => {
   );
 
   if (isFullFill && bestPrice > 0 && simulation.effectivePrice > 0) {
-    const slippagePct = ((bestPrice - simulation.effectivePrice) / bestPrice) * 100;
+    const rawSlippagePct = ((bestPrice - simulation.effectivePrice) / bestPrice) * 100;
+    const slippagePct = Math.max(0, rawSlippagePct);
     setResultText(resultSlippage, formatPercent(slippagePct));
+    if (resultWarning && slippagePct >= 10) {
+      resultWarning.textContent = t("results.warnings.high_slippage");
+      resultWarning.hidden = false;
+    }
   } else {
     setResultText(resultSlippage, t("common.not_available"));
   }
@@ -620,7 +637,6 @@ estimateButton?.addEventListener("click", async () => {
     updateResultsSummary({
       simulation,
       bestPrice,
-      currency,
     });
 
     setStatus("status.done");

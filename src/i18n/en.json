@@ -80,8 +80,8 @@
       "label": "Sellability",
       "full": "Full",
       "none": "No liquidity",
-      "partial_value": "Partial ({filled} / {requested} {currency})",
-      "partial_warning": "Warning: Only partial liquidity is available at current prices."
+      "partial": "Partial",
+      "filled_line": "Filled {filled} / {requested} ({pct})"
     },
     "receive": {
       "label": "You receive",
@@ -90,9 +90,14 @@
     },
     "slippage": {
       "label": "Slippage (est.)",
-      "help": "Compared to the best available offer. Shown for full fills only."
+      "help": "When the book is thin, larger sells worsen the rate and reduce proceeds."
     },
-    "why_line": "This sell consumes top {count} offers."
+    "why_line": "This sell consumes top {count} offers.",
+    "warnings": {
+      "partial": "Warning: Only {pct}% can be sold.",
+      "none": "No liquidity found. Check issuer/currency.",
+      "high_slippage": "Caution: Estimated slippage exceeds 10%."
+    }
   },
   "details": {
     "order_count": "Order count",
