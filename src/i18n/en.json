@@ -124,14 +124,15 @@
     "why_line": "This sell consumes top {count} offers.",
     "warnings": {
       "partial": "Warning: Only {pct}% can be sold.",
-      "none": "No liquidity found. Check issuer/currency.",
+      "none": "No liquidity.",
       "high_slippage": "Caution: Estimated slippage exceeds 10%."
     }
   },
   "details": {
     "order_count": "Order count",
     "best_price": "Best price",
-    "worst_price": "Worst price"
+    "worst_price": "Worst price",
+    "endpoint_tried": "Endpoint tried"
   },
   "graphs": {
     "empty": {
@@ -204,17 +205,24 @@
     "limit_invalid": "Limit must be a positive number.",
     "fetch_failed": "Unable to reach the order book. Please try again.",
     "fetch_timeout": "Order book request timed out. Please try again.",
+    "network_unreachable": "Network cannot reach XRPL nodes (try different network / retry).",
     "i18n_failed": "Translations failed to load. Please refresh the page."
   },
   "notes": {
     "limit_autofix": "Limit reset to the default of {limit}."
   },
   "endpoints": {
-    "primary": {
-      "label": "Primary"
+    "xrplcluster": {
+      "label": "XRPL Cluster"
     },
-    "secondary": {
-      "label": "Secondary"
+    "xrplws": {
+      "label": "XRPL WS"
+    },
+    "s1": {
+      "label": "Ripple S1"
+    },
+    "s2": {
+      "label": "Ripple S2"
     }
   }
 }
