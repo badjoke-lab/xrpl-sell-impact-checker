@@ -3,15 +3,16 @@ import { loadDictionary, t } from "./src/i18n/index.js";
 const ENDPOINTS = [
   {
     id: "primary",
-    url: "https://xrplcluster.com/",
+    url: "wss://s1.ripple.com:51233",
     labelKey: "endpoints.primary.label",
   },
   {
     id: "secondary",
-    url: "https://xrpl.ws/",
+    url: "wss://s2.ripple.com:51233",
     labelKey: "endpoints.secondary.label",
   },
 ];
+
 
 
 const CONNECT_TIMEOUT_MS = 4000;
