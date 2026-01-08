@@ -2,22 +2,17 @@ import { loadDictionary, t } from "./src/i18n/index.js";
 
 const ENDPOINTS = [
   {
-    labelKey: "endpoints.xrplcluster.label",
-    url: "wss://xrplcluster.com/",
+    id: "primary",
+    url: "https://xrplcluster.com/",
+    labelKey: "endpoints.primary.label",
   },
   {
-    labelKey: "endpoints.xrplws.label",
-    url: "wss://xrpl.ws/",
-  },
-  {
-    labelKey: "endpoints.s1.label",
-    url: "wss://s1.ripple.com/",
-  },
-  {
-    labelKey: "endpoints.s2.label",
-    url: "wss://s2.ripple.com/",
+    id: "secondary",
+    url: "https://xrpl.ws/",
+    labelKey: "endpoints.secondary.label",
   },
 ];
+
 
 const CONNECT_TIMEOUT_MS = 4000;
 const REQUEST_TIMEOUT_MS = 6000;
