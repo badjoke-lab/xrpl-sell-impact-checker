@@ -14,6 +14,8 @@ const ENDPOINTS = [
 const REQUEST_TIMEOUT_MS = 8000;
 const RETRY_BACKOFF_MS = 400;
 const DEFAULT_LIMIT = 50;
+const FIAT_STORAGE_KEY = "fiat-currency";
+const DEFAULT_FIAT = "USD";
 
 const getTranslationOrFallback = (key, fallback = "…") => {
   const value = t(key);
@@ -103,6 +105,8 @@ const fieldErrors = {
 };
 const resultSellability = document.querySelector('[data-result="sellability"]');
 const resultFilledLine = document.querySelector('[data-result="filled-line"]');
+const resultDataFetched = document.querySelector('[data-result="data-fetched"]');
+const resultEndpoint = document.querySelector('[data-result="endpoint"]');
 const resultReceive = document.querySelector('[data-result="receive"]');
 const resultFiatRate = document.querySelector('[data-result="fiat-rate"]');
 const resultFiatWarning = document.querySelector('[data-result="fiat-warning"]');
@@ -128,6 +132,11 @@ let lastCurrency = "";
 let lastFiatRate = null;
 let lastSimulation = null;
 let lastMaxSellResult = null;
+let lastOffersHash = "";
+let lastFetchedAt = null;
+let lastEndpointLabel = "";
+let chartUpdateTimer = null;
+let pendingChartPayload = null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -180,6 +189,13 @@ const clearFieldErrors = () => {
 const formatNumber = (value, options = {}) =>
   new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 6,
+    ...options,
+  }).format(value);
+
+const formatCompactNumber = (value, options = {}) =>
+  new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
     ...options,
   }).format(value);
 
@@ -263,6 +279,19 @@ const getImpactThresholdPct = () => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const updateImpactThresholdHelp = (thresholdPct) => {
+  const helper = document.querySelector("#impact-threshold-help");
+  if (!helper) {
+    return;
+  }
+  helper.textContent = t("fields.impact_threshold.helper_dynamic", {
+    threshold: formatPercent(thresholdPct, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }),
+  });
+};
+
 const updateMaxSellLabel = (thresholdPct) => {
   setResultText(
     resultMaxSellLabel,
@@ -287,6 +316,8 @@ const resetResults = () => {
   const placeholder = getTranslationOrFallback("common.placeholder", "…");
   setResultText(resultSellability, placeholder);
   setResultText(resultFilledLine, placeholder);
+  setResultText(resultDataFetched, placeholder);
+  setResultText(resultEndpoint, placeholder);
   setResultText(resultReceive, placeholder);
   setResultText(resultSlippage, placeholder);
   setResultText(resultSlippageHelp, getTranslationOrFallback("results.slippage.help"));
@@ -298,6 +329,7 @@ const resetResults = () => {
   lastBestPrice = 0;
   lastCurrency = "";
   updateMaxSellLabel(getImpactThresholdPct());
+  updateImpactThresholdHelp(getImpactThresholdPct());
   setResultText(resultMaxSellValue, placeholder);
   setResultText(resultMaxSellNote, "");
   if (resultWarning) {
@@ -307,7 +339,13 @@ const resetResults = () => {
   lastFiatRate = null;
   lastSimulation = null;
   lastMaxSellResult = null;
-  updateCharts({ offers: null, simulation: null, maxSellResult: null, currency: "" });
+  lastOffersHash = "";
+  lastFetchedAt = null;
+  lastEndpointLabel = "";
+  scheduleChartsUpdate(
+    { offers: null, simulation: null, maxSellResult: null, currency: "" },
+    { immediate: true }
+  );
 };
 
 const getFiatCacheKey = (fiat) => `xrp-fiat-rate:${fiat}`;
@@ -347,7 +385,7 @@ const fetchXrpFiatRate = async (fiat) => {
   const now = Date.now();
 
   if (cached && now - cached.fetchedAt < FIAT_CACHE_TTL_MS) {
-    return { ...cached, isStale: false };
+    return { ...cached, isStale: false, status: "cached" };
   }
 
   try {
@@ -368,17 +406,17 @@ const fetchXrpFiatRate = async (fiat) => {
       source: FIAT_RATE_SOURCE,
     };
     writeFiatCache(fiat, payload);
-    return { ...payload, isStale: false };
+    return { ...payload, isStale: false, status: "live" };
   } catch (error) {
     if (cached) {
-      return { ...cached, isStale: true };
+      return { ...cached, isStale: true, status: "stale" };
     }
     return null;
   }
 };
 
 const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
-  const fiat = fiatCurrencySelect?.value || "JPY";
+  const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
   lastReceiveXrp = receiveXrp;
   lastFiatRate = fiatRate;
   const formattedXrp = formatNumber(receiveXrp, { maximumFractionDigits: 6 });
@@ -392,19 +430,18 @@ const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
         fiat: fiatAmount,
       })
     );
-    const rateLineKey = fiatRate.isStale
-      ? "results.receive.rate_line_stale"
-      : "results.receive.rate_line";
+    const statusLabel = t(`results.receive.rate_status.${fiatRate.status ?? "live"}`);
     setResultText(
       resultFiatRate,
-      t(rateLineKey, {
+      t("results.receive.rate_line", {
         rate: formatFiatRate(fiatRate.rate, fiat),
         time: formatTime(fiatRate.fetchedAt),
+        status: statusLabel,
       })
     );
     setFiatWarning(null);
     if (lastSortedOffers && lastSimulation) {
-      updateCharts({
+      scheduleChartsUpdate({
         offers: lastSortedOffers,
         simulation: lastSimulation,
         maxSellResult: lastMaxSellResult,
@@ -424,7 +461,7 @@ const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
   setResultText(resultFiatRate, t("results.receive.rate_unavailable"));
   setFiatWarning(t("results.receive.fiat_warning"));
   if (lastSortedOffers && lastSimulation) {
-    updateCharts({
+    scheduleChartsUpdate({
       offers: lastSortedOffers,
       simulation: lastSimulation,
       maxSellResult: lastMaxSellResult,
@@ -434,7 +471,7 @@ const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
 };
 
 const refreshFiatEstimate = async (receiveXrp) => {
-  const fiat = fiatCurrencySelect?.value || "JPY";
+  const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
   const fiatRate = await fetchXrpFiatRate(fiat);
   updateFiatDisplay({ receiveXrp, fiatRate });
 };
@@ -793,6 +830,23 @@ const buildImpactSamples = ({ offers, sellAmount, sampleCount = 20 }) => {
   return { samples: points, totalLiquidity };
 };
 
+const getOffersHash = (offers) => {
+  if (!Array.isArray(offers) || offers.length === 0) {
+    return "empty";
+  }
+  const rounded = (value) =>
+    Number.isFinite(value) ? Math.round(value * 1e6) : 0;
+  let hash = 7;
+  for (const offer of offers) {
+    hash = (hash * 31 + rounded(offer.availableTokenAmount)) % 1_000_000_007;
+    hash = (hash * 31 + rounded(offer.availableXrpAmount)) % 1_000_000_007;
+    hash = (hash * 31 + rounded(offer.price)) % 1_000_000_007;
+  }
+  return String(hash);
+};
+
+const impactSampleCache = new Map();
+
 const buildDepthSeries = ({ offers }) => {
   const validOffers = filterValidOffers(offers);
   const points = [{ token: 0, xrp: 0 }];
@@ -891,6 +945,92 @@ const renderChartFrame = ({ svg, xLabel, yLabel }) => {
   ).textContent = xLabel;
 };
 
+const renderAxisTicks = ({ svg, maxX, maxY }) => {
+  const { width, height, padding } = CHART_DIMENSIONS;
+  const axisLeft = padding.left;
+  const axisRight = width - padding.right;
+  const axisTop = padding.top;
+  const axisBottom = height - padding.bottom;
+  const tickCount = 2;
+
+  for (let i = 0; i <= tickCount; i += 1) {
+    const value = (maxY / tickCount) * i;
+    const y = scaleValue(value, 0, maxY, axisBottom, axisTop);
+    svg.appendChild(
+      createSvgElement("text", {
+        x: axisLeft - 6,
+        y,
+        class: "chart__tick",
+        "text-anchor": "end",
+        "dominant-baseline": "middle",
+      })
+    ).textContent = formatCompactNumber(value, {
+      maximumFractionDigits: value < 1 ? 2 : 1,
+    });
+  }
+
+  for (let i = 0; i <= tickCount; i += 1) {
+    const value = (maxX / tickCount) * i;
+    const x = scaleValue(value, 0, maxX, axisLeft, axisRight);
+    svg.appendChild(
+      createSvgElement("text", {
+        x,
+        y: axisBottom + 14,
+        class: "chart__tick",
+        "text-anchor": i === 0 ? "start" : i === tickCount ? "end" : "middle",
+      })
+    ).textContent = formatCompactNumber(value, {
+      maximumFractionDigits: value < 1 ? 2 : 1,
+    });
+  }
+};
+
+const renderChartLegend = ({ svg, labels }) => {
+  if (!labels || labels.length === 0) {
+    return;
+  }
+  const { width, padding } = CHART_DIMENSIONS;
+  const startX = width - padding.right - 4;
+  const startY = padding.top + 6;
+  const lineHeight = 14;
+
+  labels.forEach((label, index) => {
+    const y = startY + index * lineHeight;
+    svg.appendChild(
+      createSvgElement("circle", {
+        cx: startX - 52,
+        cy: y - 4,
+        r: 3.5,
+        class: label.className,
+      })
+    );
+    svg.appendChild(
+      createSvgElement("text", {
+        x: startX,
+        y,
+        class: "chart__legend",
+        "text-anchor": "end",
+      })
+    ).textContent = label.text;
+  });
+};
+
+const renderEmptyState = ({ svg, message }) => {
+  if (!svg) {
+    return;
+  }
+  const { width, height } = CHART_DIMENSIONS;
+  svg.appendChild(
+    createSvgElement("text", {
+      x: width / 2,
+      y: height / 2,
+      class: "chart__empty",
+      "text-anchor": "middle",
+      "dominant-baseline": "middle",
+    })
+  ).textContent = message;
+};
+
 const renderImpactChart = ({
   svg,
   samples,
@@ -899,6 +1039,7 @@ const renderImpactChart = ({
   isPartial,
   fiatRate,
   fiat,
+  thresholdPct,
 }) => {
   if (!svg) {
     return;
@@ -917,6 +1058,7 @@ const renderImpactChart = ({
       xLabel: t("graphs.impact.axis_sell"),
       yLabel: t("graphs.impact.axis_receive"),
     });
+    renderEmptyState({ svg, message: t("graphs.empty.no_liquidity") });
     return;
   }
 
@@ -937,6 +1079,7 @@ const renderImpactChart = ({
       ? t("graphs.impact.axis_receive_fiat", { fiat })
       : t("graphs.impact.axis_receive_xrp"),
   });
+  renderAxisTicks({ svg, maxX, maxY });
 
   const path = samples
     .map((point, index) => {
@@ -963,6 +1106,13 @@ const renderImpactChart = ({
   svg.appendChild(createSvgElement("path", { d: fillPath, class: "chart__fill" }));
   svg.appendChild(createSvgElement("path", { d: path, class: "chart__line" }));
 
+  const legendItems = [
+    {
+      text: t("graphs.legend.your_amount"),
+      className: "chart__legend-marker chart__marker",
+    },
+  ];
+
   if (maxPoint && Number.isFinite(maxPoint.sellAmount)) {
     const x = scaleValue(maxPoint.sellAmount, 0, maxX, axisLeft, axisRight);
     svg.appendChild(
@@ -982,6 +1132,15 @@ const renderImpactChart = ({
         class: "chart__marker chart__marker--secondary",
       })
     );
+    legendItems.push({
+      text: t("graphs.legend.max_under", {
+        threshold: formatPercent(thresholdPct, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        }),
+      }),
+      className: "chart__legend-marker chart__marker chart__marker--secondary",
+    });
   }
 
   if (currentPoint && Number.isFinite(currentPoint.sellAmount)) {
@@ -995,7 +1154,28 @@ const renderImpactChart = ({
         class: `chart__marker${isPartial ? " chart__marker--alert" : ""}`,
       })
     );
+    if (isPartial) {
+      svg.appendChild(
+        createSvgElement("line", {
+          x1: x,
+          y1: axisTop,
+          x2: x,
+          y2: axisBottom,
+          class: "chart__line--alert",
+        })
+      );
+      svg.appendChild(
+        createSvgElement("text", {
+          x: Math.min(x + 6, axisRight - 4),
+          y: axisTop + 12,
+          class: "chart__note-inline",
+          "text-anchor": x + 6 > axisRight - 4 ? "end" : "start",
+        })
+      ).textContent = t("graphs.liquidity_end");
+    }
   }
+
+  renderChartLegend({ svg, labels: legendItems });
 };
 
 const renderDepthChart = ({ svg, depthSeries, consumedSeries, isPartial }) => {
@@ -1016,6 +1196,7 @@ const renderDepthChart = ({ svg, depthSeries, consumedSeries, isPartial }) => {
       xLabel: t("graphs.depth.axis_sell"),
       yLabel: t("graphs.depth.axis_receive"),
     });
+    renderEmptyState({ svg, message: t("graphs.empty.no_liquidity") });
     return;
   }
 
@@ -1027,6 +1208,7 @@ const renderDepthChart = ({ svg, depthSeries, consumedSeries, isPartial }) => {
     xLabel: t("graphs.depth.axis_sell"),
     yLabel: t("graphs.depth.axis_receive"),
   });
+  renderAxisTicks({ svg, maxX, maxY });
 
   const stepPath = depthSeries.points
     .map((point, index) => {
@@ -1094,6 +1276,14 @@ const renderDepthChart = ({ svg, depthSeries, consumedSeries, isPartial }) => {
           class: "chart__line--alert",
         })
       );
+      svg.appendChild(
+        createSvgElement("text", {
+          x: Math.min(markerX + 6, axisRight - 4),
+          y: axisTop + 12,
+          class: "chart__note-inline",
+          "text-anchor": markerX + 6 > axisRight - 4 ? "end" : "start",
+        })
+      ).textContent = t("graphs.liquidity_end");
     }
   }
 };
@@ -1131,7 +1321,7 @@ const updateMaxSellResults = async ({
   const xrpAmount = formatNumber(result.simulation.receiveXrp, {
     maximumFractionDigits: 6,
   });
-  const fiat = fiatCurrencySelect?.value || "JPY";
+  const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
   const fiatRate = await fetchXrpFiatRate(fiat);
 
   if (fiatRate && Number.isFinite(fiatRate.rate)) {
@@ -1240,7 +1430,7 @@ function setChartNote(element, message) {
   element.hidden = !message;
 }
 
-function updateCharts({ offers, simulation, maxSellResult, currency }) {
+function renderCharts({ offers, simulation, maxSellResult, currency }) {
   if (!impactChart || !depthChart) {
     return;
   }
@@ -1255,7 +1445,7 @@ function updateCharts({ offers, simulation, maxSellResult, currency }) {
     return;
   }
 
-  const fiat = fiatCurrencySelect?.value || "JPY";
+  const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
   const rate = lastFiatRate?.rate ?? null;
   const hasFiat = Number.isFinite(rate);
   const isPartial = simulation.filledToken < simulation.requestedToken;
@@ -1265,14 +1455,22 @@ function updateCharts({ offers, simulation, maxSellResult, currency }) {
         amount: formatNumber(simulation.receiveXrp, { maximumFractionDigits: 6 }),
       });
 
-  const { samples, totalLiquidity } = buildImpactSamples({
-    offers,
-    sellAmount: simulation.requestedToken,
-    sampleCount: 20,
-  });
+  const thresholdPct = getImpactThresholdPct();
+  const offersHash = lastOffersHash || getOffersHash(offers);
+  const sampleCacheKey = `${offersHash}:${fiat}:${thresholdPct}:${simulation.requestedToken}`;
+  let cachedSample = impactSampleCache.get(sampleCacheKey);
+  if (!cachedSample) {
+    cachedSample = buildImpactSamples({
+      offers,
+      sellAmount: simulation.requestedToken,
+      sampleCount: 24,
+    });
+    impactSampleCache.set(sampleCacheKey, cachedSample);
+  }
+  const { samples, totalLiquidity } = cachedSample;
   if (samples.length === 0 || totalLiquidity <= 0) {
     renderImpactChart({ svg: impactChart, samples: [] });
-    setChartNote(impactChartNote, t("graphs.impact.note_insufficient"));
+    setChartNote(impactChartNote, t("graphs.impact.note_no_liquidity"));
     setResultText(impactChartSummary, t("graphs.impact.summary_empty"));
   }
   const currentSellAmount = isPartial ? simulation.filledToken : simulation.requestedToken;
@@ -1297,10 +1495,16 @@ function updateCharts({ offers, simulation, maxSellResult, currency }) {
       isPartial,
       fiatRate: lastFiatRate,
       fiat,
+      thresholdPct,
     });
 
     if (simulation.filledToken <= 0 || isPartial) {
-      setChartNote(impactChartNote, t("graphs.impact.note_insufficient"));
+      setChartNote(
+        impactChartNote,
+        !hasFiat
+          ? t("graphs.impact.note_insufficient_fiat_unavailable")
+          : t("graphs.impact.note_insufficient")
+      );
     } else if (!hasFiat) {
       setChartNote(impactChartNote, t("graphs.impact.note_fiat_unavailable"));
     } else {
@@ -1339,7 +1543,7 @@ function updateCharts({ offers, simulation, maxSellResult, currency }) {
 
   if (!depthSeries.hasLiquidity) {
     renderDepthChart({ svg: depthChart, depthSeries: { points: [] } });
-    setChartNote(depthChartNote, t("graphs.depth.note_exhausted"));
+    setChartNote(depthChartNote, t("graphs.depth.note_no_liquidity"));
     setResultText(depthChartSummary, t("graphs.depth.summary_empty"));
     return;
   }
@@ -1352,7 +1556,14 @@ function updateCharts({ offers, simulation, maxSellResult, currency }) {
   });
 
   if (isPartial) {
-    setChartNote(depthChartNote, t("graphs.depth.note_exhausted"));
+    setChartNote(
+      depthChartNote,
+      !hasFiat
+        ? t("graphs.depth.note_exhausted_fiat_unavailable")
+        : t("graphs.depth.note_exhausted")
+    );
+  } else if (!hasFiat) {
+    setChartNote(depthChartNote, t("graphs.depth.note_fiat_unavailable"));
   } else {
     setChartNote(depthChartNote, null);
   }
@@ -1382,6 +1593,25 @@ function updateCharts({ offers, simulation, maxSellResult, currency }) {
     );
   }
 }
+
+const scheduleChartsUpdate = (payload, { immediate = false } = {}) => {
+  pendingChartPayload = payload;
+  if (immediate) {
+    if (chartUpdateTimer) {
+      clearTimeout(chartUpdateTimer);
+      chartUpdateTimer = null;
+    }
+    renderCharts(payload);
+    return;
+  }
+  if (chartUpdateTimer) {
+    return;
+  }
+  chartUpdateTimer = setTimeout(() => {
+    chartUpdateTimer = null;
+    renderCharts(pendingChartPayload);
+  }, 120);
+};
 
 const validateInputs = ({ currency, issuer, amount, limit }) => {
   const errors = {};
@@ -1449,8 +1679,33 @@ bindFieldClear(issuerInput, "issuer");
 bindFieldClear(amountInput, "amount");
 bindFieldClear(limitInput, "limit");
 updateMaxSellLabel(getImpactThresholdPct());
+updateImpactThresholdHelp(getImpactThresholdPct());
+
+const initFiatSelection = () => {
+  if (!fiatCurrencySelect) {
+    return;
+  }
+  try {
+    const stored = localStorage.getItem(FIAT_STORAGE_KEY);
+    const preferred = stored || DEFAULT_FIAT;
+    if (preferred) {
+      fiatCurrencySelect.value = preferred;
+    }
+  } catch (error) {
+    fiatCurrencySelect.value = DEFAULT_FIAT;
+  }
+};
+
+initFiatSelection();
 
 fiatCurrencySelect?.addEventListener("change", () => {
+  if (fiatCurrencySelect) {
+    try {
+      localStorage.setItem(FIAT_STORAGE_KEY, fiatCurrencySelect.value);
+    } catch (error) {
+      // Ignore storage failures.
+    }
+  }
   if (!lastReceiveXrp) {
     return;
   }
@@ -1478,6 +1733,7 @@ fiatCurrencySelect?.addEventListener("change", () => {
 impactThresholdSelect?.addEventListener("change", () => {
   const thresholdPct = getImpactThresholdPct();
   updateMaxSellLabel(thresholdPct);
+  updateImpactThresholdHelp(thresholdPct);
   if (!lastSortedOffers || lastBestPrice <= 0 || !lastSimulation) {
     return;
   }
@@ -1494,7 +1750,7 @@ impactThresholdSelect?.addEventListener("change", () => {
     currency: lastCurrency,
     result,
   });
-  updateCharts({
+  scheduleChartsUpdate({
     offers: lastSortedOffers,
     simulation: lastSimulation,
     maxSellResult: lastMaxSellResult,
@@ -1571,6 +1827,20 @@ estimateButton?.addEventListener("click", async () => {
 
     currentEndpointIndex = endpointIndex;
     const endpointLabel = t(ENDPOINTS[endpointIndex].labelKey);
+    lastFetchedAt = Date.now();
+    lastEndpointLabel = endpointLabel;
+    setResultText(
+      resultDataFetched,
+      t("results.freshness.fetched_at", {
+        time: formatTime(lastFetchedAt),
+      })
+    );
+    setResultText(
+      resultEndpoint,
+      t("results.freshness.endpoint", {
+        endpointLabel,
+      })
+    );
 
     const endpointNoticeKey =
       endpointIndex !== previousEndpointIndex
@@ -1598,6 +1868,7 @@ estimateButton?.addEventListener("click", async () => {
     });
     void refreshFiatEstimate(simulation.receiveXrp);
     lastSortedOffers = sortedOffers;
+    lastOffersHash = getOffersHash(sortedOffers);
     lastBestPrice = bestPrice;
     lastCurrency = currency;
     lastSimulation = simulation;
@@ -1614,12 +1885,15 @@ estimateButton?.addEventListener("click", async () => {
       currency,
       result: maxSellResult,
     });
-    updateCharts({
-      offers: sortedOffers,
-      simulation,
-      maxSellResult,
-      currency,
-    });
+    scheduleChartsUpdate(
+      {
+        offers: sortedOffers,
+        simulation,
+        maxSellResult,
+        currency,
+      },
+      { immediate: true }
+    );
 
     setStatus("status.done");
   } catch (error) {
