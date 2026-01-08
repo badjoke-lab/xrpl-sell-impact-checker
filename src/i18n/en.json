@@ -120,7 +120,32 @@
     "worst_price": "Worst price"
   },
   "graphs": {
-    "placeholder": "Graph area"
+    "placeholder": "Graph area",
+    "impact": {
+      "helper": "Receive curve shows how proceeds change as sell size grows.",
+      "aria_label": "Sell amount versus receive in fiat curve",
+      "axis_sell": "Sell amount",
+      "axis_receive": "Receive",
+      "axis_receive_fiat": "Receive ({fiat})",
+      "axis_receive_xrp": "Receive (XRP)",
+      "note_insufficient": "Insufficient liquidity: curve ends at available depth.",
+      "note_fiat_unavailable": "Fiat rate unavailable; chart is scaled in XRP.",
+      "summary_empty": "Run an estimate to see the receive curve.",
+      "summary": "Selling {sell} {currency} yields about {receive}.",
+      "summary_partial": "Only {filled} of {requested} {currency} fills, yielding about {receive}.",
+      "receive_xrp": "{amount} XRP"
+    },
+    "depth": {
+      "helper": "Depth shows cumulative liquidity and which offers your sell consumes.",
+      "aria_label": "Order book depth and consumed liquidity",
+      "axis_sell": "Cumulative sell",
+      "axis_receive": "Cumulative receive (XRP)",
+      "note_exhausted": "Order book exhausted before the full sell amount.",
+      "summary_empty": "Run an estimate to see order book depth.",
+      "summary": "Depth covers {total} {currency} (≈ {receive} total). Current sell uses {filled} {currency}.",
+      "summary_partial": "Only {filled} of {requested} {currency} fills (≈ {receive}).",
+      "receive_xrp": "{amount} XRP"
+    }
   },
   "faq": {
     "q1": "How is the estimate calculated?",

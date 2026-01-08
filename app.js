@@ -42,6 +42,11 @@ const applyTranslations = () => {
       element.value = getTranslationOrFallback(key);
     }
   });
+
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+    const key = element.dataset.i18nAriaLabel;
+    element.setAttribute("aria-label", getTranslationOrFallback(key));
+  });
 };
 
 const i18nErrorBanner = document.querySelector("#i18n-error-banner");
@@ -73,7 +78,9 @@ const initI18n = async () => {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  void initI18n();
+  void initI18n().finally(() => {
+    resetResults();
+  });
 });
 
 const statusLine = document.querySelector(".status");
@@ -106,12 +113,21 @@ const resultWarning = document.querySelector('[data-result="warning"]');
 const resultMaxSellLabel = document.querySelector('[data-result="max-sell-label"]');
 const resultMaxSellValue = document.querySelector('[data-result="max-sell-value"]');
 const resultMaxSellNote = document.querySelector('[data-result="max-sell-note"]');
+const impactChart = document.querySelector("#impact-chart");
+const depthChart = document.querySelector("#depth-chart");
+const impactChartNote = document.querySelector('[data-result="impact-note"]');
+const depthChartNote = document.querySelector('[data-result="depth-note"]');
+const impactChartSummary = document.querySelector('[data-result="impact-summary"]');
+const depthChartSummary = document.querySelector('[data-result="depth-summary"]');
 
 let currentEndpointIndex = 0;
 let lastReceiveXrp = 0;
 let lastSortedOffers = null;
 let lastBestPrice = 0;
 let lastCurrency = "";
+let lastFiatRate = null;
+let lastSimulation = null;
+let lastMaxSellResult = null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -175,6 +191,40 @@ const formatPercent = (
     minimumFractionDigits,
     maximumFractionDigits,
   }).format(value)}%`;
+
+const CHART_DIMENSIONS = {
+  width: 320,
+  height: 200,
+  padding: { top: 16, right: 16, bottom: 28, left: 40 },
+};
+
+const createSvgElement = (tag, attributes = {}) => {
+  const element = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  Object.entries(attributes).forEach(([key, value]) => {
+    element.setAttribute(key, value);
+  });
+  return element;
+};
+
+const clearSvg = (svg) => {
+  if (!svg) {
+    return;
+  }
+  while (svg.firstChild) {
+    svg.removeChild(svg.firstChild);
+  }
+};
+
+const scaleValue = (value, domainMin, domainMax, rangeMin, rangeMax) => {
+  if (!Number.isFinite(value)) {
+    return rangeMin;
+  }
+  if (domainMax === domainMin) {
+    return (rangeMin + rangeMax) / 2;
+  }
+  const ratio = (value - domainMin) / (domainMax - domainMin);
+  return rangeMin + ratio * (rangeMax - rangeMin);
+};
 
 const FIAT_CACHE_TTL_MS = 120000;
 const FIAT_RATE_SOURCE = "coingecko";
@@ -254,6 +304,10 @@ const resetResults = () => {
     resultWarning.hidden = true;
     resultWarning.textContent = "";
   }
+  lastFiatRate = null;
+  lastSimulation = null;
+  lastMaxSellResult = null;
+  updateCharts({ offers: null, simulation: null, maxSellResult: null, currency: "" });
 };
 
 const getFiatCacheKey = (fiat) => `xrp-fiat-rate:${fiat}`;
@@ -326,6 +380,7 @@ const fetchXrpFiatRate = async (fiat) => {
 const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
   const fiat = fiatCurrencySelect?.value || "JPY";
   lastReceiveXrp = receiveXrp;
+  lastFiatRate = fiatRate;
   const formattedXrp = formatNumber(receiveXrp, { maximumFractionDigits: 6 });
 
   if (fiatRate && Number.isFinite(fiatRate.rate)) {
@@ -348,6 +403,14 @@ const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
       })
     );
     setFiatWarning(null);
+    if (lastSortedOffers && lastSimulation) {
+      updateCharts({
+        offers: lastSortedOffers,
+        simulation: lastSimulation,
+        maxSellResult: lastMaxSellResult,
+        currency: lastCurrency,
+      });
+    }
     return;
   }
 
@@ -360,6 +423,14 @@ const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
   );
   setResultText(resultFiatRate, t("results.receive.rate_unavailable"));
   setFiatWarning(t("results.receive.fiat_warning"));
+  if (lastSortedOffers && lastSimulation) {
+    updateCharts({
+      offers: lastSortedOffers,
+      simulation: lastSimulation,
+      maxSellResult: lastMaxSellResult,
+      currency: lastCurrency,
+    });
+  }
 };
 
 const refreshFiatEstimate = async (receiveXrp) => {
@@ -546,6 +617,18 @@ const fetchBookOffers = async ({ currency, issuer, amount, limit = DEFAULT_LIMIT
 const sortOffersByPrice = (offers) =>
   [...offers].sort((a, b) => b.price - a.price);
 
+const filterValidOffers = (offers) =>
+  Array.isArray(offers)
+    ? offers.filter(
+        (offer) =>
+          Number.isFinite(offer.availableTokenAmount) &&
+          Number.isFinite(offer.availableXrpAmount) &&
+          offer.availableTokenAmount > 0 &&
+          offer.availableXrpAmount > 0 &&
+          offer.price > 0
+      )
+    : [];
+
 const simulateSellIntoOrderbook = ({ sellAmount, offers }) => {
   const requestedToken = sellAmount;
   let filledToken = 0;
@@ -610,14 +693,7 @@ const computeMaxSellUnderThreshold = ({
     return { status: "not_available" };
   }
 
-  const validOffers = offers.filter(
-    (offer) =>
-      Number.isFinite(offer.availableTokenAmount) &&
-      Number.isFinite(offer.availableXrpAmount) &&
-      offer.availableTokenAmount > 0 &&
-      offer.availableXrpAmount > 0 &&
-      offer.price > 0
-  );
+  const validOffers = filterValidOffers(offers);
 
   const totalLiquidity = validOffers.reduce(
     (sum, offer) => sum + offer.availableTokenAmount,
@@ -684,7 +760,351 @@ const computeMaxSellUnderThreshold = ({
   };
 };
 
-const updateMaxSellResults = async ({ offers, thresholdPct, referencePrice, currency }) => {
+const buildImpactSamples = ({ offers, sellAmount, sampleCount = 20 }) => {
+  const validOffers = filterValidOffers(offers);
+  const totalLiquidity = validOffers.reduce(
+    (sum, offer) => sum + offer.availableTokenAmount,
+    0
+  );
+
+  if (!Number.isFinite(totalLiquidity) || totalLiquidity <= 0) {
+    return { samples: [], totalLiquidity };
+  }
+
+  const cap = Math.min(Math.max(sellAmount * 2, sellAmount), totalLiquidity);
+  const points = [];
+  const totalPoints = Math.max(2, Math.min(sampleCount, 30));
+
+  for (let index = 0; index < totalPoints; index += 1) {
+    const ratio = totalPoints === 1 ? 0 : index / (totalPoints - 1);
+    const amount = cap * ratio;
+    const simulation = simulateSellIntoOrderbook({
+      sellAmount: amount,
+      offers: validOffers,
+    });
+    points.push({
+      sellAmount: amount,
+      receiveXrp: simulation.receiveXrp,
+      filledToken: simulation.filledToken,
+      isPartial: simulation.filledToken < simulation.requestedToken,
+    });
+  }
+
+  return { samples: points, totalLiquidity };
+};
+
+const buildDepthSeries = ({ offers }) => {
+  const validOffers = filterValidOffers(offers);
+  const points = [{ token: 0, xrp: 0 }];
+  let totalToken = 0;
+  let totalXrp = 0;
+
+  validOffers.forEach((offer) => {
+    totalToken += offer.availableTokenAmount;
+    totalXrp += offer.availableXrpAmount;
+    points.push({ token: totalToken, xrp: totalXrp });
+  });
+
+  return { points, totalToken, totalXrp, hasLiquidity: totalToken > 0 };
+};
+
+const buildConsumedDepth = ({ offers, sellAmount }) => {
+  const validOffers = filterValidOffers(offers);
+  const points = [{ token: 0, xrp: 0 }];
+  let remaining = sellAmount;
+  let cumulativeToken = 0;
+  let cumulativeXrp = 0;
+
+  for (const offer of validOffers) {
+    if (remaining <= 0) {
+      break;
+    }
+    const tokenToSell = Math.min(remaining, offer.availableTokenAmount);
+    if (tokenToSell <= 0) {
+      continue;
+    }
+    const xrpFromOffer =
+      (tokenToSell / offer.availableTokenAmount) * offer.availableXrpAmount;
+    cumulativeToken += tokenToSell;
+    cumulativeXrp += xrpFromOffer;
+    points.push({ token: cumulativeToken, xrp: cumulativeXrp });
+    remaining -= tokenToSell;
+  }
+
+  return { points, filledToken: cumulativeToken, receiveXrp: cumulativeXrp };
+};
+
+const renderChartFrame = ({ svg, xLabel, yLabel }) => {
+  const { width, height, padding } = CHART_DIMENSIONS;
+  const axisLeft = padding.left;
+  const axisRight = width - padding.right;
+  const axisTop = padding.top;
+  const axisBottom = height - padding.bottom;
+
+  svg.appendChild(
+    createSvgElement("line", {
+      x1: axisLeft,
+      y1: axisTop,
+      x2: axisLeft,
+      y2: axisBottom,
+      class: "chart__axis",
+    })
+  );
+  svg.appendChild(
+    createSvgElement("line", {
+      x1: axisLeft,
+      y1: axisBottom,
+      x2: axisRight,
+      y2: axisBottom,
+      class: "chart__axis",
+    })
+  );
+
+  [0.25, 0.5, 0.75].forEach((ratio) => {
+    const y = axisTop + (axisBottom - axisTop) * ratio;
+    svg.appendChild(
+      createSvgElement("line", {
+        x1: axisLeft,
+        y1: y,
+        x2: axisRight,
+        y2: y,
+        class: "chart__grid",
+      })
+    );
+  });
+
+  svg.appendChild(
+    createSvgElement("text", {
+      x: axisLeft,
+      y: axisTop - 4,
+      class: "chart__label",
+    })
+  ).textContent = yLabel;
+
+  svg.appendChild(
+    createSvgElement("text", {
+      x: axisRight,
+      y: height - 6,
+      class: "chart__label",
+      "text-anchor": "end",
+    })
+  ).textContent = xLabel;
+};
+
+const renderImpactChart = ({
+  svg,
+  samples,
+  currentPoint,
+  maxPoint,
+  isPartial,
+  fiatRate,
+  fiat,
+}) => {
+  if (!svg) {
+    return;
+  }
+  clearSvg(svg);
+
+  const { width, height, padding } = CHART_DIMENSIONS;
+  const axisLeft = padding.left;
+  const axisRight = width - padding.right;
+  const axisTop = padding.top;
+  const axisBottom = height - padding.bottom;
+
+  if (!samples || samples.length === 0) {
+    renderChartFrame({
+      svg,
+      xLabel: t("graphs.impact.axis_sell"),
+      yLabel: t("graphs.impact.axis_receive"),
+    });
+    return;
+  }
+
+  const maxX = Math.max(
+    ...samples.map((point) => point.sellAmount),
+    currentPoint?.sellAmount ?? 0,
+    maxPoint?.sellAmount ?? 0
+  );
+  const rate = fiatRate?.rate ?? null;
+  const hasFiat = Number.isFinite(rate);
+  const values = samples.map((point) => point.receiveXrp * (hasFiat ? rate : 1));
+  const maxY = Math.max(...values, currentPoint?.receiveValue ?? 0, 1);
+
+  renderChartFrame({
+    svg,
+    xLabel: t("graphs.impact.axis_sell"),
+    yLabel: hasFiat
+      ? t("graphs.impact.axis_receive_fiat", { fiat })
+      : t("graphs.impact.axis_receive_xrp"),
+  });
+
+  const path = samples
+    .map((point, index) => {
+      const x = scaleValue(point.sellAmount, 0, maxX, axisLeft, axisRight);
+      const y = scaleValue(
+        point.receiveXrp * (hasFiat ? rate : 1),
+        0,
+        maxY,
+        axisBottom,
+        axisTop
+      );
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
+
+  const fillPath = `${path} L ${scaleValue(
+    samples[samples.length - 1].sellAmount,
+    0,
+    maxX,
+    axisLeft,
+    axisRight
+  )} ${axisBottom} L ${axisLeft} ${axisBottom} Z`;
+
+  svg.appendChild(createSvgElement("path", { d: fillPath, class: "chart__fill" }));
+  svg.appendChild(createSvgElement("path", { d: path, class: "chart__line" }));
+
+  if (maxPoint && Number.isFinite(maxPoint.sellAmount)) {
+    const x = scaleValue(maxPoint.sellAmount, 0, maxX, axisLeft, axisRight);
+    svg.appendChild(
+      createSvgElement("line", {
+        x1: x,
+        y1: axisTop,
+        x2: x,
+        y2: axisBottom,
+        class: "chart__line--accent",
+      })
+    );
+    svg.appendChild(
+      createSvgElement("circle", {
+        cx: x,
+        cy: scaleValue(maxPoint.receiveValue, 0, maxY, axisBottom, axisTop),
+        r: 4.5,
+        class: "chart__marker chart__marker--secondary",
+      })
+    );
+  }
+
+  if (currentPoint && Number.isFinite(currentPoint.sellAmount)) {
+    const x = scaleValue(currentPoint.sellAmount, 0, maxX, axisLeft, axisRight);
+    const y = scaleValue(currentPoint.receiveValue, 0, maxY, axisBottom, axisTop);
+    svg.appendChild(
+      createSvgElement("circle", {
+        cx: x,
+        cy: y,
+        r: 5,
+        class: `chart__marker${isPartial ? " chart__marker--alert" : ""}`,
+      })
+    );
+  }
+};
+
+const renderDepthChart = ({ svg, depthSeries, consumedSeries, isPartial }) => {
+  if (!svg) {
+    return;
+  }
+  clearSvg(svg);
+
+  const { width, height, padding } = CHART_DIMENSIONS;
+  const axisLeft = padding.left;
+  const axisRight = width - padding.right;
+  const axisTop = padding.top;
+  const axisBottom = height - padding.bottom;
+
+  if (!depthSeries || depthSeries.points.length <= 1) {
+    renderChartFrame({
+      svg,
+      xLabel: t("graphs.depth.axis_sell"),
+      yLabel: t("graphs.depth.axis_receive"),
+    });
+    return;
+  }
+
+  const maxX = Math.max(depthSeries.totalToken, consumedSeries?.filledToken ?? 0, 1);
+  const maxY = Math.max(depthSeries.totalXrp, consumedSeries?.receiveXrp ?? 0, 1);
+
+  renderChartFrame({
+    svg,
+    xLabel: t("graphs.depth.axis_sell"),
+    yLabel: t("graphs.depth.axis_receive"),
+  });
+
+  const stepPath = depthSeries.points
+    .map((point, index) => {
+      const x = scaleValue(point.token, 0, maxX, axisLeft, axisRight);
+      const y = scaleValue(point.xrp, 0, maxY, axisBottom, axisTop);
+      if (index === 0) {
+        return `M ${x} ${y}`;
+      }
+      const prev = depthSeries.points[index - 1];
+      const prevX = scaleValue(prev.token, 0, maxX, axisLeft, axisRight);
+      const prevY = scaleValue(prev.xrp, 0, maxY, axisBottom, axisTop);
+      return `L ${prevX} ${y} L ${x} ${y}`;
+    })
+    .join(" ");
+
+  const fullAreaPath = `${stepPath} L ${axisRight} ${axisBottom} L ${axisLeft} ${axisBottom} Z`;
+  svg.appendChild(
+    createSvgElement("path", { d: fullAreaPath, class: "chart__area--remaining" })
+  );
+  svg.appendChild(createSvgElement("path", { d: stepPath, class: "chart__line" }));
+
+  if (consumedSeries && consumedSeries.points.length > 1) {
+    const consumedPath = consumedSeries.points
+      .map((point, index) => {
+        const x = scaleValue(point.token, 0, maxX, axisLeft, axisRight);
+        const y = scaleValue(point.xrp, 0, maxY, axisBottom, axisTop);
+        if (index === 0) {
+          return `M ${x} ${y}`;
+        }
+        const prev = consumedSeries.points[index - 1];
+        const prevX = scaleValue(prev.token, 0, maxX, axisLeft, axisRight);
+        return `L ${prevX} ${y} L ${x} ${y}`;
+      })
+      .join(" ");
+    const consumedArea = `${consumedPath} L ${scaleValue(
+      consumedSeries.points[consumedSeries.points.length - 1].token,
+      0,
+      maxX,
+      axisLeft,
+      axisRight
+    )} ${axisBottom} L ${axisLeft} ${axisBottom} Z`;
+    svg.appendChild(
+      createSvgElement("path", { d: consumedArea, class: "chart__area--consumed" })
+    );
+    svg.appendChild(createSvgElement("path", { d: consumedPath, class: "chart__line" }));
+
+    const lastPoint = consumedSeries.points[consumedSeries.points.length - 1];
+    const markerX = scaleValue(lastPoint.token, 0, maxX, axisLeft, axisRight);
+    const markerY = scaleValue(lastPoint.xrp, 0, maxY, axisBottom, axisTop);
+    svg.appendChild(
+      createSvgElement("circle", {
+        cx: markerX,
+        cy: markerY,
+        r: 5,
+        class: `chart__marker${isPartial ? " chart__marker--alert" : ""}`,
+      })
+    );
+    if (isPartial) {
+      svg.appendChild(
+        createSvgElement("line", {
+          x1: markerX,
+          y1: axisTop,
+          x2: markerX,
+          y2: axisBottom,
+          class: "chart__line--alert",
+        })
+      );
+    }
+  }
+};
+
+const updateMaxSellResults = async ({
+  offers,
+  thresholdPct,
+  referencePrice,
+  currency,
+  result: precomputedResult,
+}) => {
   updateMaxSellLabel(thresholdPct);
 
   if (!offers || offers.length === 0) {
@@ -693,11 +1113,13 @@ const updateMaxSellResults = async ({ offers, thresholdPct, referencePrice, curr
     return;
   }
 
-  const result = computeMaxSellUnderThreshold({
-    offers,
-    thresholdPct,
-    referencePrice,
-  });
+  const result =
+    precomputedResult ??
+    computeMaxSellUnderThreshold({
+      offers,
+      thresholdPct,
+      referencePrice,
+    });
 
   if (result.status !== "available") {
     setResultText(resultMaxSellValue, t("results.max_sell.not_available"));
@@ -810,6 +1232,157 @@ const updateResultsSummary = ({ simulation, bestPrice }) => {
   );
 };
 
+function setChartNote(element, message) {
+  if (!element) {
+    return;
+  }
+  element.textContent = message || "";
+  element.hidden = !message;
+}
+
+function updateCharts({ offers, simulation, maxSellResult, currency }) {
+  if (!impactChart || !depthChart) {
+    return;
+  }
+
+  if (!offers || offers.length === 0 || !simulation) {
+    renderImpactChart({ svg: impactChart, samples: [] });
+    renderDepthChart({ svg: depthChart, depthSeries: { points: [] } });
+    setChartNote(impactChartNote, null);
+    setChartNote(depthChartNote, null);
+    setResultText(impactChartSummary, t("graphs.impact.summary_empty"));
+    setResultText(depthChartSummary, t("graphs.depth.summary_empty"));
+    return;
+  }
+
+  const fiat = fiatCurrencySelect?.value || "JPY";
+  const rate = lastFiatRate?.rate ?? null;
+  const hasFiat = Number.isFinite(rate);
+  const isPartial = simulation.filledToken < simulation.requestedToken;
+  const receiveLabel = hasFiat
+    ? formatFiatAmount(simulation.receiveXrp * rate, fiat)
+    : t("graphs.impact.receive_xrp", {
+        amount: formatNumber(simulation.receiveXrp, { maximumFractionDigits: 6 }),
+      });
+
+  const { samples, totalLiquidity } = buildImpactSamples({
+    offers,
+    sellAmount: simulation.requestedToken,
+    sampleCount: 20,
+  });
+  if (samples.length === 0 || totalLiquidity <= 0) {
+    renderImpactChart({ svg: impactChart, samples: [] });
+    setChartNote(impactChartNote, t("graphs.impact.note_insufficient"));
+    setResultText(impactChartSummary, t("graphs.impact.summary_empty"));
+  }
+  const currentSellAmount = isPartial ? simulation.filledToken : simulation.requestedToken;
+  const currentReceiveValue = simulation.receiveXrp * (hasFiat ? rate : 1);
+  const maxPoint =
+    maxSellResult?.status === "available"
+      ? {
+          sellAmount: maxSellResult.maxSellAmount,
+          receiveValue: maxSellResult.simulation.receiveXrp * (hasFiat ? rate : 1),
+        }
+      : null;
+
+  if (samples.length > 0 && totalLiquidity > 0) {
+    renderImpactChart({
+      svg: impactChart,
+      samples,
+      currentPoint: {
+        sellAmount: currentSellAmount,
+        receiveValue: currentReceiveValue,
+      },
+      maxPoint,
+      isPartial,
+      fiatRate: lastFiatRate,
+      fiat,
+    });
+
+    if (simulation.filledToken <= 0 || isPartial) {
+      setChartNote(impactChartNote, t("graphs.impact.note_insufficient"));
+    } else if (!hasFiat) {
+      setChartNote(impactChartNote, t("graphs.impact.note_fiat_unavailable"));
+    } else {
+      setChartNote(impactChartNote, null);
+    }
+
+    if (isPartial) {
+      setResultText(
+        impactChartSummary,
+        t("graphs.impact.summary_partial", {
+          filled: formatNumber(simulation.filledToken, { maximumFractionDigits: 6 }),
+          requested: formatNumber(simulation.requestedToken, {
+            maximumFractionDigits: 6,
+          }),
+          currency,
+          receive: receiveLabel,
+        })
+      );
+    } else {
+      setResultText(
+        impactChartSummary,
+        t("graphs.impact.summary", {
+          sell: formatNumber(simulation.requestedToken, { maximumFractionDigits: 6 }),
+          currency,
+          receive: receiveLabel,
+        })
+      );
+    }
+  }
+
+  const depthSeries = buildDepthSeries({ offers });
+  const consumedSeries = buildConsumedDepth({
+    offers,
+    sellAmount: simulation.requestedToken,
+  });
+
+  if (!depthSeries.hasLiquidity) {
+    renderDepthChart({ svg: depthChart, depthSeries: { points: [] } });
+    setChartNote(depthChartNote, t("graphs.depth.note_exhausted"));
+    setResultText(depthChartSummary, t("graphs.depth.summary_empty"));
+    return;
+  }
+
+  renderDepthChart({
+    svg: depthChart,
+    depthSeries,
+    consumedSeries,
+    isPartial,
+  });
+
+  if (isPartial) {
+    setChartNote(depthChartNote, t("graphs.depth.note_exhausted"));
+  } else {
+    setChartNote(depthChartNote, null);
+  }
+
+  const totalReceiveLabel = t("graphs.depth.receive_xrp", {
+    amount: formatNumber(depthSeries.totalXrp, { maximumFractionDigits: 6 }),
+  });
+  if (isPartial) {
+    setResultText(
+      depthChartSummary,
+      t("graphs.depth.summary_partial", {
+        filled: formatNumber(simulation.filledToken, { maximumFractionDigits: 6 }),
+        requested: formatNumber(simulation.requestedToken, { maximumFractionDigits: 6 }),
+        currency,
+        receive: receiveLabel,
+      })
+    );
+  } else {
+    setResultText(
+      depthChartSummary,
+      t("graphs.depth.summary", {
+        total: formatNumber(depthSeries.totalToken, { maximumFractionDigits: 6 }),
+        currency,
+        receive: totalReceiveLabel,
+        filled: formatNumber(simulation.filledToken, { maximumFractionDigits: 6 }),
+      })
+    );
+  }
+}
+
 const validateInputs = ({ currency, issuer, amount, limit }) => {
   const errors = {};
 
@@ -897,19 +1470,34 @@ fiatCurrencySelect?.addEventListener("change", () => {
       thresholdPct: getImpactThresholdPct(),
       referencePrice: lastBestPrice,
       currency: lastCurrency,
+      result: lastMaxSellResult,
     });
   }
 });
 
 impactThresholdSelect?.addEventListener("change", () => {
-  updateMaxSellLabel(getImpactThresholdPct());
-  if (!lastSortedOffers || lastBestPrice <= 0) {
+  const thresholdPct = getImpactThresholdPct();
+  updateMaxSellLabel(thresholdPct);
+  if (!lastSortedOffers || lastBestPrice <= 0 || !lastSimulation) {
     return;
   }
+  const result = computeMaxSellUnderThreshold({
+    offers: lastSortedOffers,
+    thresholdPct,
+    referencePrice: lastBestPrice,
+  });
+  lastMaxSellResult = result;
   void updateMaxSellResults({
     offers: lastSortedOffers,
-    thresholdPct: getImpactThresholdPct(),
+    thresholdPct,
     referencePrice: lastBestPrice,
+    currency: lastCurrency,
+    result,
+  });
+  updateCharts({
+    offers: lastSortedOffers,
+    simulation: lastSimulation,
+    maxSellResult: lastMaxSellResult,
     currency: lastCurrency,
   });
 });
@@ -1012,10 +1600,24 @@ estimateButton?.addEventListener("click", async () => {
     lastSortedOffers = sortedOffers;
     lastBestPrice = bestPrice;
     lastCurrency = currency;
+    lastSimulation = simulation;
+    const maxSellResult = computeMaxSellUnderThreshold({
+      offers: sortedOffers,
+      thresholdPct: getImpactThresholdPct(),
+      referencePrice: bestPrice,
+    });
+    lastMaxSellResult = maxSellResult;
     void updateMaxSellResults({
       offers: sortedOffers,
       thresholdPct: getImpactThresholdPct(),
       referencePrice: bestPrice,
+      currency,
+      result: maxSellResult,
+    });
+    updateCharts({
+      offers: sortedOffers,
+      simulation,
+      maxSellResult,
       currency,
     });
 
