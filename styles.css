@@ -110,11 +110,66 @@ h2 {
   color: #475569;
 }
 
-.field input {
+.field input,
+.field select {
   border-radius: 10px;
   border: 1px solid #cbd5f5;
   padding: 10px 12px;
   font-size: 1rem;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.field__label {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.field__help {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.field__error {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #b91c1c;
+}
+
+.field__note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #b45309;
+}
+
+.advanced {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #1e293b;
+  list-style: none;
+}
+
+.advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced summary::after {
+  content: "▾";
+  float: right;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.advanced[open] summary::after {
+  content: "▴";
 }
 
 .actions {
@@ -131,6 +186,16 @@ h2 {
   background: #2563eb;
   color: #ffffff;
   font-weight: 600;
+  width: 100%;
+}
+
+.secondary-button {
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #ffffff;
+  font-weight: 600;
+  color: #1e293b;
   width: 100%;
 }
 
@@ -255,14 +320,5 @@ h2 {
   .app__header {
     flex-direction: row;
     align-items: center;
-  }
-
-  .actions {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .primary-button {
-    width: auto;
   }
 }

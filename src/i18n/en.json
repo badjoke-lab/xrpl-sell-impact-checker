@@ -16,36 +16,51 @@
     "impact_curve": "Impact curve",
     "faq": "FAQ",
     "disclaimer": "Disclaimer",
-    "sources": "Data sources"
+    "sources": "Data sources",
+    "advanced_controls": "Advanced controls"
   },
   "modes": {
     "simple": "Simple",
     "advanced": "Advanced"
   },
   "fields": {
-    "token": {
-      "label": "Token",
-      "placeholder": "e.g. XRP"
+    "currency": {
+      "label": "Currency (required)",
+      "placeholder": "USD (3 letters) or 40-hex"
     },
     "issuer": {
-      "label": "Issuer",
-      "placeholder": "r..."
+      "label": "Issuer (required for non-XRP IOU)",
+      "placeholder": "r........ (XRPL address)",
+      "helper": "Issuer is the token issuer address."
     },
-    "sell_amount": {
-      "label": "Sell amount",
-      "placeholder": "0"
+    "amount": {
+      "label": "Amount (required)",
+      "placeholder": "e.g. 1000"
     },
-    "slippage_limit": {
-      "label": "Slippage limit",
-      "placeholder": "0%"
+    "orderbook_limit": {
+      "label": "Orderbook limit (optional)",
+      "placeholder": "50 / 100 / 200"
     },
-    "target_price": {
-      "label": "Target price",
-      "placeholder": "$0.00"
+    "impact_threshold": {
+      "label": "Impact threshold",
+      "helper": "Max sell under X% uses this threshold.",
+      "option_1": "1%",
+      "option_2": "2%",
+      "option_5": "5%",
+      "option_10": "10%",
+      "option_20": "20%"
+    },
+    "fiat_currency": {
+      "label": "Fiat currency",
+      "helper": "Fiat estimate comes later; XRP is shown now.",
+      "option_jpy": "JPY",
+      "option_usd": "USD"
     }
   },
   "actions": {
-    "estimate": "Estimate impact"
+    "estimate": "Estimate impact",
+    "try_example": "Try example",
+    "try_example_note": "Demo values may fail if liquidity is low."
   },
   "status": {
     "waiting": "Waiting for input...",
@@ -114,7 +129,11 @@
     "currency_invalid": "Currency must be 3 characters or 40 hex.",
     "issuer_required": "Issuer is required for non-XRP tokens.",
     "issuer_invalid": "Issuer must look like a valid XRPL address.",
+    "limit_invalid": "Limit must be a positive number.",
     "fetch_failed": "Unable to reach the order book. Please try again."
+  },
+  "notes": {
+    "limit_autofix": "Limit reset to the default of {limit}."
   },
   "endpoints": {
     "primary": {
