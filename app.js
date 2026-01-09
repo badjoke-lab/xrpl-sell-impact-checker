@@ -980,6 +980,16 @@ const normalizeOffers = (offers) => {
   });
 };
 
+const buildBookOffersUrl = ({ currency, issuer, limit }) => {
+  const url = new URL(BOOK_OFFERS_API, window.location.origin);
+  url.searchParams.set("currency", currency);
+  url.searchParams.set("issuer", issuer ?? "");
+  if (limit !== null && limit !== undefined && limit !== "") {
+    url.searchParams.set("limit", String(limit));
+  }
+  return url.toString();
+};
+
 const requestBookOffers = async ({ payload }) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
@@ -994,11 +1004,10 @@ const requestBookOffers = async ({ payload }) => {
   let rawResponse = null;
 
   try {
+    const requestUrl = buildBookOffersUrl(payload);
     const networkStart = performance.now();
-    const response = await fetch(BOOK_OFFERS_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    const response = await fetch(requestUrl, {
+      method: "GET",
       signal: controller.signal,
     });
     timings.networkMs = performance.now() - networkStart;
@@ -1024,20 +1033,15 @@ const requestBookOffers = async ({ payload }) => {
     rawResponse = data;
     responseSnippet = truncateDebugText(JSON.stringify(data), DEBUG_RESPONSE_LIMIT);
 
-    if (!response.ok || data?.error || data?.result?.error) {
-      const rpcError = new Error(
-        data?.error ||
-          data?.error_message ||
-          data?.result?.error_message ||
-          "Request failed"
-      );
+    if (!response.ok || !data?.ok) {
+      const rpcError = new Error(data?.error || "Request failed");
       rpcError.code = "rpc_error";
       rpcError.response = data;
       rpcError.debugInfo = {
         responseSnippet,
         statusCode,
         timings,
-        debug: data?.debug ?? null,
+        endpointUsed: data?.endpointUsed ?? null,
         rawResponse,
       };
       throw rpcError;
@@ -1049,7 +1053,7 @@ const requestBookOffers = async ({ payload }) => {
         responseSnippet,
         statusCode,
         timings,
-        debug: data?.debug ?? null,
+        endpointUsed: data?.endpointUsed ?? null,
         rawResponse,
       },
     };
@@ -1061,6 +1065,7 @@ const requestBookOffers = async ({ payload }) => {
         responseSnippet: "Request timed out.",
         statusCode,
         timings,
+        endpointUsed: null,
         rawResponse,
       };
       throw timeoutError;
@@ -1074,6 +1079,7 @@ const requestBookOffers = async ({ payload }) => {
       responseSnippet: "Network connection failed.",
       statusCode,
       timings,
+      endpointUsed: null,
       rawResponse,
     };
     throw networkError;
@@ -1102,7 +1108,7 @@ const fetchBookOffers = async ({ currency, issuer, limit = DEFAULT_LIMIT }) => {
       const response = await requestBookOffers({
         payload,
       });
-      const offers = normalizeOffers(response?.data?.result?.offers);
+      const offers = normalizeOffers(response?.data?.offers);
       return {
         offers,
         endpointIndex: 0,
@@ -2396,9 +2402,10 @@ estimateButton?.addEventListener("click", async () => {
     issuer,
     limit: normalizedLimit,
   };
+  const requestUrl = buildBookOffersUrl(requestPayload);
   updateDebugPanel({
     lastRequestTime: formatTime(requestTimestamp),
-    lastRequestUrl: BOOK_OFFERS_API,
+    lastRequestUrl: requestUrl,
     requestPayload,
     responseStatus: "pending",
     endpointTried: null,
@@ -2493,8 +2500,8 @@ estimateButton?.addEventListener("click", async () => {
 
     updateDebugPanel({
       responseStatus: "success",
-      endpointTried: debugInfo?.debug?.upstream?.url ?? null,
-      upstreamStatus: debugInfo?.debug?.upstream?.status ?? null,
+      endpointTried: debugInfo?.endpointUsed ?? null,
+      upstreamStatus: debugInfo?.statusCode ?? null,
       error: null,
       rawResponse: debugInfo?.rawResponse ?? null,
       offersCount: sortedOffers.length,
@@ -2516,8 +2523,8 @@ estimateButton?.addEventListener("click", async () => {
     setError(t(errorKey));
     updateDebugPanel({
       responseStatus: "fail",
-      endpointTried: error?.debugInfo?.debug?.upstream?.url ?? null,
-      upstreamStatus: error?.debugInfo?.debug?.upstream?.status ?? null,
+      endpointTried: error?.debugInfo?.endpointUsed ?? null,
+      upstreamStatus: error?.debugInfo?.statusCode ?? null,
       error: `${errorCode}: ${error?.message || "Request failed"}`,
       rawResponse: error?.debugInfo?.rawResponse ?? null,
       offersCount: null,
