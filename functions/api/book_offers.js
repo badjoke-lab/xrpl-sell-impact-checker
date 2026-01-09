@@ -7,10 +7,12 @@ const CORS_HEADERS = {
 const MAX_BODY_BYTES = 10 * 1024;
 const MAX_LIMIT = 200;
 const XRPL_RPC_DEFAULT = "https://s1.ripple.com:51234/";
+const XRPL_RPC_FALLBACK = "https://s2.ripple.com:51234/";
 const CACHE_TTL_MS = 10 * 1000;
 const CACHE_MAX_ENTRIES = 200;
 const RATE_LIMIT_WINDOW_MS = 10 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
+const DEBUG_BODY_SNIPPET_LIMIT = 600;
 
 const ISSUER_REGEX = /^r[1-9A-HJ-NP-Za-km-z]{25,34}$/;
 const CURRENCY_REGEX = /^[A-Z0-9]{3}$|^[A-F0-9]{40}$/;
@@ -28,12 +30,18 @@ function jsonResponse(status, payload) {
   });
 }
 
-function errorResponse(status, message) {
-  return jsonResponse(status, { error: message });
+function errorResponse(status, message, debug) {
+  return jsonResponse(status, { error: message, debug });
 }
 
-function getUpstreamUrl(env) {
-  return env?.XRPL_RPC_URL || XRPL_RPC_DEFAULT;
+function getUpstreamUrls(env) {
+  const urls = [
+    env?.XRPL_RPC_URL,
+    env?.XRPL_RPC_URL_FALLBACK,
+    XRPL_RPC_DEFAULT,
+    XRPL_RPC_FALLBACK,
+  ].filter(Boolean);
+  return [...new Set(urls)];
 }
 
 function getClientIp(request) {
@@ -117,42 +125,76 @@ export async function onRequest({ request, env }) {
   try {
     payload = JSON.parse(bodyText);
   } catch {
-    return errorResponse(400, "Invalid JSON body");
+    return errorResponse(400, "Invalid JSON body", {
+      timestamp: new Date().toISOString(),
+    });
   }
 
   const { currency, issuer, limit } = payload ?? {};
+  const debug = {
+    timestamp: new Date().toISOString(),
+    input: {
+      currency,
+      issuer,
+      limit,
+    },
+    upstream: null,
+    upstreamBodySnippet: null,
+    failures: [],
+    durationMs: null,
+  };
 
-  if (!currency || !issuer) {
-    return errorResponse(400, "currency and issuer are required");
+  if (!currency) {
+    debug.validationError = "currency_required";
+    return errorResponse(400, "currency is required", debug);
   }
 
   if (!CURRENCY_REGEX.test(currency)) {
-    return errorResponse(400, "Invalid currency format");
+    debug.validationError = "currency_invalid";
+    return errorResponse(400, "Invalid currency format", debug);
   }
 
-  if (!ISSUER_REGEX.test(issuer)) {
-    return errorResponse(400, "Invalid issuer format");
+  const needsIssuer = currency !== "XRP";
+  if (needsIssuer && !issuer) {
+    debug.validationError = "issuer_required";
+    return errorResponse(400, "issuer is required", debug);
+  }
+
+  if (issuer && !ISSUER_REGEX.test(issuer)) {
+    debug.validationError = "issuer_invalid";
+    return errorResponse(400, "Invalid issuer format", debug);
   }
 
   const normalizedLimit = Number(limit ?? 50);
   if (!Number.isInteger(normalizedLimit) || normalizedLimit <= 0) {
-    return errorResponse(400, "limit must be a positive integer");
+    debug.validationError = "limit_invalid";
+    return errorResponse(400, "limit must be a positive integer", debug);
   }
 
   if (normalizedLimit > MAX_LIMIT) {
-    return errorResponse(400, `limit must be <= ${MAX_LIMIT}`);
+    debug.validationError = "limit_exceeded";
+    return errorResponse(400, `limit must be <= ${MAX_LIMIT}`, debug);
   }
+  debug.input.limit = normalizedLimit;
 
   const now = Date.now();
   const clientIp = getClientIp(request);
   if (isRateLimited(clientIp, now)) {
-    return errorResponse(429, "Too many requests. Please slow down and try again.");
+    debug.validationError = "rate_limited";
+    return errorResponse(
+      429,
+      "Too many requests. Please slow down and try again.",
+      debug
+    );
   }
 
   const cacheKey = `${currency}:${issuer}:${normalizedLimit}`;
   const cached = cacheStore.get(cacheKey);
   if (cached && cached.expiresAt > now) {
-    return jsonResponse(cached.status, cached.body);
+    debug.durationMs = Date.now() - now;
+    debug.upstream = cached.upstream ?? null;
+    debug.cache = true;
+    return jsonResponse(cached.status, { ...cached.body, debug });
   }
 
   pruneCache(now);
@@ -161,36 +203,89 @@ export async function onRequest({ request, env }) {
     method: "book_offers",
     params: [
       {
-        taker_gets: { currency, issuer },
+        taker_gets:
+          currency === "XRP" ? { currency: "XRP" } : { currency, issuer },
         taker_pays: { currency: "XRP" },
         limit: normalizedLimit,
       },
     ],
   };
 
-  let upstreamResponse;
-  try {
-    upstreamResponse = await fetch(getUpstreamUrl(env), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(upstreamPayload),
-    });
-  } catch {
-    return errorResponse(502, "Upstream XRPL RPC unreachable");
+  const upstreamUrls = getUpstreamUrls(env);
+  let upstreamResponse = null;
+  let upstreamJson = null;
+  let upstreamText = null;
+  let selectedUpstream = null;
+
+  for (const url of upstreamUrls) {
+    try {
+      upstreamResponse = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(upstreamPayload),
+      });
+    } catch (error) {
+      debug.failures.push({
+        url,
+        error: error instanceof Error ? error.message : "Fetch failed",
+      });
+      upstreamResponse = null;
+      continue;
+    }
+
+    if (!upstreamResponse.ok) {
+      let snippet = null;
+      try {
+        upstreamText = await upstreamResponse.text();
+        snippet = upstreamText.slice(0, DEBUG_BODY_SNIPPET_LIMIT);
+      } catch {
+        snippet = null;
+      }
+      debug.failures.push({
+        url,
+        status: upstreamResponse.status,
+        bodySnippet: snippet,
+      });
+      upstreamResponse = null;
+      continue;
+    }
+
+    try {
+      upstreamText = await upstreamResponse.text();
+      upstreamJson = JSON.parse(upstreamText);
+      selectedUpstream = url;
+      break;
+    } catch (error) {
+      debug.failures.push({
+        url,
+        status: upstreamResponse.status,
+        error: error instanceof Error ? error.message : "Invalid JSON",
+      });
+      upstreamResponse = null;
+      upstreamJson = null;
+    }
   }
 
-  let upstreamJson;
-  try {
-    upstreamJson = await upstreamResponse.json();
-  } catch {
-    return errorResponse(502, "Invalid response from upstream XRPL RPC");
+  if (!upstreamResponse || !selectedUpstream) {
+    debug.durationMs = Date.now() - now;
+    return errorResponse(502, "Upstream XRPL RPC unreachable", debug);
   }
+
+  debug.upstream = {
+    url: selectedUpstream,
+    status: upstreamResponse.status,
+  };
+  debug.upstreamBodySnippet = upstreamText
+    ? upstreamText.slice(0, DEBUG_BODY_SNIPPET_LIMIT)
+    : null;
+  debug.durationMs = Date.now() - now;
 
   cacheStore.set(cacheKey, {
     status: upstreamResponse.status,
     body: upstreamJson,
+    upstream: debug.upstream,
     expiresAt: now + CACHE_TTL_MS,
   });
 
-  return jsonResponse(upstreamResponse.status, upstreamJson);
+  return jsonResponse(upstreamResponse.status, { ...upstreamJson, debug });
 }
