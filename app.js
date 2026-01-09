@@ -18,6 +18,9 @@ const LIMIT_MIN = 1;
 const LIMIT_MAX = 200;
 const THRESHOLD_VALUES = new Set([1, 2, 5, 10, 20]);
 const FIAT_VALUES = new Set(["USD", "JPY"]);
+const DEBUG_QUERY_PARAM = "debug";
+const DEBUG_PAYLOAD_LIMIT = 500;
+const DEBUG_RESPONSE_LIMIT = 600;
 
 const getTranslationOrFallback = (key, fallback = "…") => {
   const value = t(key);
@@ -134,6 +137,18 @@ const impactChartNote = document.querySelector('[data-result="impact-note"]');
 const depthChartNote = document.querySelector('[data-result="depth-note"]');
 const impactChartSummary = document.querySelector('[data-result="impact-summary"]');
 const depthChartSummary = document.querySelector('[data-result="depth-summary"]');
+const debugPanel = document.querySelector("#debug-panel");
+const debugCopyButton = document.querySelector("#debug-copy");
+const debugCopyStatus = document.querySelector('[data-debug="copy-status"]');
+const debugLastRequest = document.querySelector('[data-debug="last-request"]');
+const debugEndpoint = document.querySelector('[data-debug="endpoint"]');
+const debugPayload = document.querySelector('[data-debug="payload"]');
+const debugStatus = document.querySelector('[data-debug="status"]');
+const debugOffersCount = document.querySelector('[data-debug="offers-count"]');
+const debugResponse = document.querySelector('[data-debug="response"]');
+const debugValidateTiming = document.querySelector('[data-debug="validate-ms"]');
+const debugNetworkTiming = document.querySelector('[data-debug="network-ms"]');
+const debugParseTiming = document.querySelector('[data-debug="parse-ms"]');
 
 let currentEndpointIndex = 0;
 let lastReceiveXrp = 0;
@@ -151,6 +166,24 @@ let pendingChartPayload = null;
 let shareUrlTimer = null;
 let shareToastTimer = null;
 let isApplyingShareParams = false;
+const isDebugEnabled = new URLSearchParams(window.location.search).get(DEBUG_QUERY_PARAM) === "1";
+const debugState = {
+  lastRequestTime: null,
+  endpoint: BOOK_OFFERS_API,
+  payload: null,
+  responseStatus: null,
+  responseSnippet: null,
+  offersCount: null,
+  timings: {
+    validateMs: null,
+    networkMs: null,
+    parseMs: null,
+  },
+};
+
+if (debugPanel) {
+  debugPanel.hidden = !isDebugEnabled;
+}
 
 const setStatus = (key, params) => {
   if (statusLine) {
@@ -191,6 +224,84 @@ const setLimitNote = (message) => {
   }
   limitNote.textContent = message || "";
   limitNote.hidden = !message;
+};
+
+const truncateDebugText = (value, limit) => {
+  if (!value) {
+    return "—";
+  }
+  const text = String(value);
+  if (text.length <= limit) {
+    return text;
+  }
+  return `${text.slice(0, limit)}…`;
+};
+
+const formatDebugMs = (value) => {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  return `${Math.round(value)} ms`;
+};
+
+const setDebugValue = (element, value) => {
+  if (!element) {
+    return;
+  }
+  element.textContent = value ?? "—";
+};
+
+const updateDebugPanel = (updates = {}) => {
+  if (!isDebugEnabled || !debugPanel) {
+    return;
+  }
+
+  if (debugPanel.hidden) {
+    debugPanel.hidden = false;
+  }
+
+  if (updates.timings) {
+    debugState.timings = {
+      ...debugState.timings,
+      ...updates.timings,
+    };
+  }
+
+  Object.entries(updates).forEach(([key, value]) => {
+    if (key === "timings") {
+      return;
+    }
+    if (value !== undefined) {
+      debugState[key] = value;
+    }
+  });
+
+  setDebugValue(debugLastRequest, debugState.lastRequestTime);
+  setDebugValue(debugEndpoint, debugState.endpoint);
+  setDebugValue(debugPayload, debugState.payload);
+  setDebugValue(debugStatus, debugState.responseStatus);
+  setDebugValue(debugOffersCount, debugState.offersCount ?? "—");
+  setDebugValue(debugResponse, debugState.responseSnippet);
+  setDebugValue(debugValidateTiming, formatDebugMs(debugState.timings.validateMs));
+  setDebugValue(debugNetworkTiming, formatDebugMs(debugState.timings.networkMs));
+  setDebugValue(debugParseTiming, formatDebugMs(debugState.timings.parseMs));
+};
+
+const buildDebugText = () => {
+  const timingLine = [
+    `validate=${formatDebugMs(debugState.timings.validateMs)}`,
+    `network=${formatDebugMs(debugState.timings.networkMs)}`,
+    `parse=${formatDebugMs(debugState.timings.parseMs)}`,
+  ].join(", ");
+  return [
+    `Last request: ${debugState.lastRequestTime ?? "—"}`,
+    `Endpoint: ${debugState.endpoint ?? "—"}`,
+    `Payload: ${debugState.payload ?? "—"}`,
+    `Status: ${debugState.responseStatus ?? "—"}`,
+    `Offers: ${debugState.offersCount ?? "—"}`,
+    `Response: ${debugState.responseSnippet ?? "—"}`,
+    `Timings: ${timingLine}`,
+  ].join("\n");
 };
 
 const clearFieldErrors = () => {
@@ -844,23 +955,45 @@ const requestBookOffers = async ({ payload }) => {
   const timeoutId = setTimeout(() => {
     controller.abort();
   }, REQUEST_TIMEOUT_MS);
+  const timings = {
+    networkMs: null,
+    parseMs: null,
+  };
+  let responseSnippet = null;
+  let statusCode = null;
 
   try {
+    const networkStart = performance.now();
     const response = await fetch(BOOK_OFFERS_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
+    timings.networkMs = performance.now() - networkStart;
+    statusCode = response.status;
 
     let data;
+    const parseStart = performance.now();
     try {
       data = await response.json();
     } catch (error) {
+      timings.parseMs = performance.now() - parseStart;
+      responseSnippet = "Failed to parse JSON response.";
       const parseError = error instanceof Error ? error : new Error("Parse failed");
       parseError.code = "rpc_error";
+      parseError.debugInfo = {
+        responseSnippet,
+        statusCode,
+        timings,
+      };
       throw parseError;
     }
+    timings.parseMs = performance.now() - parseStart;
+    responseSnippet = truncateDebugText(
+      JSON.stringify(data),
+      DEBUG_RESPONSE_LIMIT
+    );
 
     if (!response.ok || data?.error || data?.result?.error) {
       const rpcError = new Error(
@@ -871,14 +1004,31 @@ const requestBookOffers = async ({ payload }) => {
       );
       rpcError.code = "rpc_error";
       rpcError.response = data;
+      rpcError.debugInfo = {
+        responseSnippet,
+        statusCode,
+        timings,
+      };
       throw rpcError;
     }
 
-    return data;
+    return {
+      data,
+      debugInfo: {
+        responseSnippet,
+        statusCode,
+        timings,
+      },
+    };
   } catch (error) {
     if (error?.name === "AbortError") {
       const timeoutError = new Error("Request timed out");
       timeoutError.code = "timeout";
+      timeoutError.debugInfo = {
+        responseSnippet: "Request timed out.",
+        statusCode,
+        timings,
+      };
       throw timeoutError;
     }
     if (error?.code) {
@@ -886,6 +1036,11 @@ const requestBookOffers = async ({ payload }) => {
     }
     const networkError = error instanceof Error ? error : new Error("Network error");
     networkError.code = "connect_failed";
+    networkError.debugInfo = {
+      responseSnippet: "Network connection failed.",
+      statusCode,
+      timings,
+    };
     throw networkError;
   } finally {
     clearTimeout(timeoutId);
@@ -901,6 +1056,7 @@ const fetchBookOffers = async ({ currency, issuer, limit = DEFAULT_LIMIT }) => {
 
   const attemptedEndpoints = [];
   const errors = [];
+  let lastDebugInfo = null;
 
   for (let attempt = 0; attempt < ORDERBOOK_API_RETRIES; attempt += 1) {
     attemptedEndpoints.push({
@@ -911,13 +1067,15 @@ const fetchBookOffers = async ({ currency, issuer, limit = DEFAULT_LIMIT }) => {
       const response = await requestBookOffers({
         payload,
       });
-      const offers = normalizeOffers(response?.result?.offers);
+      const offers = normalizeOffers(response?.data?.result?.offers);
       return {
         offers,
         endpointIndex: 0,
         attemptedEndpoints,
+        debugInfo: response?.debugInfo ?? null,
       };
     } catch (error) {
+      lastDebugInfo = error?.debugInfo ?? lastDebugInfo;
       errors.push(error);
     }
   }
@@ -927,6 +1085,7 @@ const fetchBookOffers = async ({ currency, issuer, limit = DEFAULT_LIMIT }) => {
   const anyTimeout = errorCodes.some((code) => code === "timeout");
   const combinedError = new Error("All requests failed");
   combinedError.code = allRpc ? "rpc_error" : anyTimeout ? "timeout" : "connect_failed";
+  combinedError.debugInfo = lastDebugInfo;
   throw combinedError;
 };
 
@@ -2126,6 +2285,17 @@ copyLinkButton?.addEventListener("click", async () => {
   showShareToast(t(success ? "status.copy_success" : "status.copy_failed"));
 });
 
+debugCopyButton?.addEventListener("click", async () => {
+  if (!isDebugEnabled) {
+    return;
+  }
+  const success = await copyToClipboard(buildDebugText());
+  if (debugCopyStatus) {
+    debugCopyStatus.textContent = success ? "Debug copied." : "Failed to copy debug.";
+    debugCopyStatus.hidden = false;
+  }
+});
+
 estimateButton?.addEventListener("click", async () => {
   const currencyRaw = currencyInput?.value?.trim() || "";
   const currency = currencyRaw.toUpperCase();
@@ -2141,12 +2311,22 @@ estimateButton?.addEventListener("click", async () => {
   setEndpointNotice(null);
   clearFieldErrors();
   resetResults();
+  if (debugCopyStatus) {
+    debugCopyStatus.hidden = true;
+  }
 
+  const validateStart = performance.now();
   const { errors, normalizedLimit, limitWasAutofixed } = validateInputs({
     currency,
     issuer,
     amount: amountValue,
     limit: limitValue,
+  });
+  const validateMs = performance.now() - validateStart;
+  updateDebugPanel({
+    timings: {
+      validateMs,
+    },
   });
 
   Object.entries(errors).forEach(([key, message]) => {
@@ -2164,13 +2344,35 @@ estimateButton?.addEventListener("click", async () => {
 
   if (Object.keys(errors).length > 0) {
     setStatus("status.validation_failed");
+    updateDebugPanel({
+      responseStatus: "fail",
+      responseSnippet: "Validation failed.",
+      offersCount: null,
+    });
     return;
   }
 
   setStatus("status.fetching");
+  const requestTimestamp = Date.now();
+  const requestPayload = {
+    currency,
+    issuer,
+    limit: normalizedLimit,
+  };
+  updateDebugPanel({
+    lastRequestTime: formatTime(requestTimestamp),
+    endpoint: BOOK_OFFERS_API,
+    payload: truncateDebugText(
+      JSON.stringify(requestPayload),
+      DEBUG_PAYLOAD_LIMIT
+    ),
+    responseStatus: "pending",
+    responseSnippet: "Waiting for response...",
+    offersCount: null,
+  });
 
   try {
-    const { offers, endpointIndex, attemptedEndpoints } = await fetchBookOffers({
+    const { offers, endpointIndex, attemptedEndpoints, debugInfo } = await fetchBookOffers({
       currency,
       issuer,
       limit: normalizedLimit,
@@ -2251,6 +2453,17 @@ estimateButton?.addEventListener("click", async () => {
       { immediate: true }
     );
 
+    updateDebugPanel({
+      responseStatus: "success",
+      responseSnippet:
+        debugInfo?.responseSnippet ??
+        truncateDebugText(`Offers: ${sortedOffers.length}`, DEBUG_RESPONSE_LIMIT),
+      offersCount: sortedOffers.length,
+      timings: {
+        networkMs: debugInfo?.timings?.networkMs ?? null,
+        parseMs: debugInfo?.timings?.parseMs ?? null,
+      },
+    });
     setStatus("status.done");
   } catch (error) {
     setStatus("status.error");
@@ -2261,6 +2474,19 @@ estimateButton?.addEventListener("click", async () => {
         ? "errors.fetch_failed"
         : "errors.network_unreachable";
     setError(t(errorKey));
+    updateDebugPanel({
+      responseStatus: "fail",
+      responseSnippet: truncateDebugText(
+        error?.debugInfo?.responseSnippet ||
+          `${error?.code || "error"}: ${error?.message || "Request failed"}`,
+        DEBUG_RESPONSE_LIMIT
+      ),
+      offersCount: null,
+      timings: {
+        networkMs: error?.debugInfo?.timings?.networkMs ?? null,
+        parseMs: error?.debugInfo?.timings?.parseMs ?? null,
+      },
+    });
     resetResults();
   }
 });

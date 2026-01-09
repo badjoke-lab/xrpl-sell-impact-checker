@@ -186,6 +186,50 @@
           </article>
         </section>
 
+        <details class="card debug-panel" id="debug-panel" hidden>
+          <summary class="debug-panel__summary">Debug panel</summary>
+          <div class="debug-panel__body">
+            <div class="debug-panel__actions">
+              <button class="secondary-button" type="button" id="debug-copy">Copy debug</button>
+              <p class="status status--success" data-debug="copy-status" hidden></p>
+            </div>
+            <div class="debug-panel__table">
+              <div class="debug-panel__row">
+                <span class="debug-panel__key">Last request</span>
+                <span class="debug-panel__value" data-debug="last-request">—</span>
+              </div>
+              <div class="debug-panel__row">
+                <span class="debug-panel__key">Endpoint</span>
+                <span class="debug-panel__value" data-debug="endpoint">—</span>
+              </div>
+              <div class="debug-panel__row">
+                <span class="debug-panel__key">Request payload</span>
+                <pre class="debug-panel__value debug-panel__pre" data-debug="payload">—</pre>
+              </div>
+              <div class="debug-panel__row">
+                <span class="debug-panel__key">Response status</span>
+                <span class="debug-panel__value" data-debug="status">—</span>
+              </div>
+              <div class="debug-panel__row">
+                <span class="debug-panel__key">Offers count</span>
+                <span class="debug-panel__value" data-debug="offers-count">—</span>
+              </div>
+              <div class="debug-panel__row">
+                <span class="debug-panel__key">Response detail</span>
+                <pre class="debug-panel__value debug-panel__pre" data-debug="response">—</pre>
+              </div>
+              <div class="debug-panel__row">
+                <span class="debug-panel__key">Timings</span>
+                <div class="debug-panel__timings">
+                  <span>validate <strong data-debug="validate-ms">—</strong></span>
+                  <span>network <strong data-debug="network-ms">—</strong></span>
+                  <span>parse <strong data-debug="parse-ms">—</strong></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+
         <section class="grid two-column">
           <article class="card" aria-labelledby="graph-depth">
             <div class="card__header">

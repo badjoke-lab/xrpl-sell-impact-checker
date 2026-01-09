@@ -443,6 +443,92 @@ h2 {
   gap: 12px;
 }
 
+.debug-panel {
+  border: 1px solid #e2e8f0;
+}
+
+.debug-panel__summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #1e293b;
+  list-style: none;
+}
+
+.debug-panel__summary::-webkit-details-marker {
+  display: none;
+}
+
+.debug-panel__summary::after {
+  content: "▾";
+  float: right;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.debug-panel[open] .debug-panel__summary::after {
+  content: "▴";
+}
+
+.debug-panel__body {
+  display: grid;
+  gap: 16px;
+  overflow-x: auto;
+}
+
+.debug-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.debug-panel__actions .secondary-button {
+  width: auto;
+}
+
+.debug-panel__table {
+  display: grid;
+  gap: 12px;
+  min-width: 320px;
+}
+
+.debug-panel__row {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 12px;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.debug-panel__key {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.debug-panel__value {
+  margin: 0;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+.debug-panel__pre {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  font-family: "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  white-space: pre;
+}
+
+.debug-panel__timings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
 @media (min-width: 768px) {
   .app {
     padding: 32px 48px 64px;
