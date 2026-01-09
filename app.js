@@ -1,21 +1,13 @@
 import { loadDictionary, t } from "./src/i18n/index.js";
 
-const ENDPOINTS = [
-  {
-    id: "primary",
-    url: "wss://s1.ripple.com:51233",
-    labelKey: "endpoints.primary.label",
-  },
-  {
-    id: "secondary",
-    url: "wss://s2.ripple.com:51233",
-    labelKey: "endpoints.secondary.label",
-  },
-];
+const BOOK_OFFERS_API = "/api/book_offers";
+const ORDERBOOK_API_ENDPOINT = {
+  id: "orderbook-api",
+  url: BOOK_OFFERS_API,
+  labelKey: "endpoints.api.label",
+};
+const ORDERBOOK_API_RETRIES = 2;
 
-
-
-const CONNECT_TIMEOUT_MS = 4000;
 const REQUEST_TIMEOUT_MS = 6000;
 const DEFAULT_LIMIT = 50;
 const FIAT_STORAGE_KEY = "fiat-currency";
@@ -847,156 +839,82 @@ const normalizeOffers = (offers) => {
   });
 };
 
-const requestBookOffers = async ({ endpointUrl, payload }) =>
-  new Promise((resolve, reject) => {
-    let settled = false;
-    let opened = false;
-    let requestTimeoutId = null;
-    const socket = new WebSocket(endpointUrl);
-    const connectTimeoutId = setTimeout(() => {
-      if (settled) {
-        return;
-      }
-      const connectError = new Error("Connection timed out");
-      connectError.code = "connect_failed";
-      fail(connectError);
-    }, CONNECT_TIMEOUT_MS);
+const requestBookOffers = async ({ payload }) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, REQUEST_TIMEOUT_MS);
 
-    const cleanup = () => {
-      clearTimeout(connectTimeoutId);
-      clearTimeout(requestTimeoutId);
-      socket.removeEventListener("open", onOpen);
-      socket.removeEventListener("message", onMessage);
-      socket.removeEventListener("error", onError);
-      socket.removeEventListener("close", onClose);
-    };
+  try {
+    const response = await fetch(BOOK_OFFERS_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
 
-    const fail = (error) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      const resolvedError =
-        error instanceof Error ? error : new Error("Network error");
-      try {
-        socket.close();
-      } catch (closeError) {
-        // ignore close errors
-      }
-      reject(resolvedError);
-    };
+    let data;
+    try {
+      data = await response.json();
+    } catch (error) {
+      const parseError = error instanceof Error ? error : new Error("Parse failed");
+      parseError.code = "rpc_error";
+      throw parseError;
+    }
 
-    const startRequestTimeout = () => {
-      requestTimeoutId = setTimeout(() => {
-        if (settled) {
-          return;
-        }
-        const timeoutError = new Error("Request timed out");
-        timeoutError.code = "timeout";
-        fail(timeoutError);
-      }, REQUEST_TIMEOUT_MS);
-    };
-
-    const onOpen = () => {
-      opened = true;
-      clearTimeout(connectTimeoutId);
-      startRequestTimeout();
-      try {
-        socket.send(JSON.stringify(payload));
-      } catch (error) {
-        const sendError = error instanceof Error ? error : new Error("Send failed");
-        sendError.code = "connect_failed";
-        fail(sendError);
-      }
-    };
-
-    const onMessage = (event) => {
-      let data;
-      try {
-        data = JSON.parse(event.data);
-      } catch (error) {
-        const parseError = error instanceof Error ? error : new Error("Parse failed");
-        parseError.code = "rpc_error";
-        fail(parseError);
-        return;
-      }
-
-      if (data?.id !== payload.id) {
-        return;
-      }
-
-      if (data?.status === "error" || data?.result?.error) {
-        const rpcError = new Error(
+    if (!response.ok || data?.error || data?.result?.error) {
+      const rpcError = new Error(
+        data?.error ||
           data?.error_message ||
-            data?.result?.error_message ||
-            "Request failed"
-        );
-        rpcError.code = "rpc_error";
-        rpcError.response = data;
-        fail(rpcError);
-        return;
-      }
+          data?.result?.error_message ||
+          "Request failed"
+      );
+      rpcError.code = "rpc_error";
+      rpcError.response = data;
+      throw rpcError;
+    }
 
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      try {
-        socket.close();
-      } catch (closeError) {
-        // ignore close errors
-      }
-      resolve(data);
-    };
+    return data;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      const timeoutError = new Error("Request timed out");
+      timeoutError.code = "timeout";
+      throw timeoutError;
+    }
+    if (error?.code) {
+      throw error;
+    }
+    const networkError = error instanceof Error ? error : new Error("Network error");
+    networkError.code = "connect_failed";
+    throw networkError;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
-    const onError = () => {
-      const wsError = new Error("WebSocket error");
-      wsError.code = opened ? "connect_failed" : "connect_failed";
-      fail(wsError);
-    };
-
-    const onClose = () => {
-      if (settled) {
-        return;
-      }
-      const closeError = new Error("Connection closed");
-      closeError.code = "connect_failed";
-      fail(closeError);
-    };
-
-    socket.addEventListener("open", onOpen);
-    socket.addEventListener("message", onMessage);
-    socket.addEventListener("error", onError);
-    socket.addEventListener("close", onClose);
-  });
-
-const fetchBookOffers = async ({ currency, issuer, amount, limit = DEFAULT_LIMIT }) => {
-  const takerGets = currency === "XRP" ? "XRP" : { currency, issuer };
+const fetchBookOffers = async ({ currency, issuer, limit = DEFAULT_LIMIT }) => {
   const payload = {
-    id: nextRequestId(),
-    command: "book_offers",
-    taker_gets: takerGets,
-    taker_pays: "XRP",
+    currency,
+    issuer,
     limit,
   };
 
   const attemptedEndpoints = [];
   const errors = [];
 
-  for (let index = 0; index < ENDPOINTS.length; index += 1) {
-    const endpoint = ENDPOINTS[index];
-    attemptedEndpoints.push(endpoint);
+  for (let attempt = 0; attempt < ORDERBOOK_API_RETRIES; attempt += 1) {
+    attemptedEndpoints.push({
+      ...ORDERBOOK_API_ENDPOINT,
+      attempt: attempt + 1,
+    });
     try {
       const response = await requestBookOffers({
-        endpointUrl: endpoint.url,
         payload,
       });
       const offers = normalizeOffers(response?.result?.offers);
       return {
         offers,
-        endpointIndex: index,
+        endpointIndex: 0,
         attemptedEndpoints,
       };
     } catch (error) {
@@ -1007,7 +925,7 @@ const fetchBookOffers = async ({ currency, issuer, amount, limit = DEFAULT_LIMIT
   const errorCodes = errors.map((error) => error?.code).filter(Boolean);
   const allRpc = errorCodes.length > 0 && errorCodes.every((code) => code === "rpc_error");
   const anyTimeout = errorCodes.some((code) => code === "timeout");
-  const combinedError = new Error("All endpoints failed");
+  const combinedError = new Error("All requests failed");
   combinedError.code = allRpc ? "rpc_error" : anyTimeout ? "timeout" : "connect_failed";
   throw combinedError;
 };
@@ -1819,7 +1737,11 @@ const updateExecutionDetails = ({
 
   if (Array.isArray(attemptedEndpoints) && attemptedEndpoints.length > 0) {
     const endpointTrail = attemptedEndpoints
-      .map((endpoint) => `${t(endpoint.labelKey)} (${endpoint.url})`)
+      .map((endpoint, index) => {
+        const attemptSuffix =
+          attemptedEndpoints.length > 1 ? ` #${index + 1}` : "";
+        return `${t(endpoint.labelKey)}${attemptSuffix} (${endpoint.url})`;
+      })
       .join(" → ");
     setResultText(resultEndpointDetails, endpointTrail);
   } else {
@@ -2248,16 +2170,14 @@ estimateButton?.addEventListener("click", async () => {
   setStatus("status.fetching");
 
   try {
-    const previousEndpointIndex = currentEndpointIndex;
     const { offers, endpointIndex, attemptedEndpoints } = await fetchBookOffers({
       currency,
       issuer,
-      amount: amountValue,
       limit: normalizedLimit,
     });
 
     currentEndpointIndex = endpointIndex;
-    const endpointLabel = t(ENDPOINTS[endpointIndex].labelKey);
+    const endpointLabel = t(ORDERBOOK_API_ENDPOINT.labelKey);
     lastFetchedAt = Date.now();
     lastEndpointLabel = endpointLabel;
     setResultText(
@@ -2273,13 +2193,8 @@ estimateButton?.addEventListener("click", async () => {
       })
     );
 
-    const endpointNoticeKey =
-      endpointIndex !== previousEndpointIndex
-        ? "status.endpoint_switched"
-        : "status.endpoint_in_use";
-
     setEndpointNotice(
-      t(endpointNoticeKey, {
+      t("status.endpoint_in_use", {
         endpointLabel,
       })
     );
@@ -2340,7 +2255,9 @@ estimateButton?.addEventListener("click", async () => {
   } catch (error) {
     setStatus("status.error");
     const errorKey =
-      error?.code === "rpc_error"
+      error?.code === "timeout"
+        ? "errors.fetch_timeout"
+        : error?.code === "rpc_error"
         ? "errors.fetch_failed"
         : "errors.network_unreachable";
     setError(t(errorKey));
