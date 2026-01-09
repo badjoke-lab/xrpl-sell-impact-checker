@@ -20,6 +20,20 @@ const THRESHOLD_VALUES = new Set([1, 2, 5, 10, 20]);
 const FIAT_VALUES = new Set(["USD", "JPY"]);
 const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
+const EXAMPLE_CANDIDATES = [
+  {
+    currency: "USD",
+    issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
+  },
+  {
+    currency: "EUR",
+    issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
+  },
+  {
+    currency: "BTC",
+    issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
+  },
+];
 
 const getTranslationOrFallback = (key, fallback = "…") => {
   const value = t(key);
@@ -104,6 +118,7 @@ const limitNote = document.querySelector("#limit-note");
 const copyLinkButton = document.querySelector("#copy-link");
 const shareLoadNote = document.querySelector("#share-load-note");
 const shareToast = document.querySelector("#share-toast");
+const exampleStatus = document.querySelector("#example-status");
 const fieldErrors = {
   currency: document.querySelector('[data-error-for="currency"]'),
   issuer: document.querySelector('[data-error-for="issuer"]'),
@@ -215,6 +230,24 @@ const setEndpointNotice = (message) => {
 
   statusEndpointLine.textContent = message || "";
   statusEndpointLine.hidden = !message;
+};
+
+const formatIssuerShort = (issuer) => {
+  if (!issuer) {
+    return "";
+  }
+  return `${issuer.slice(0, 5)}...`;
+};
+
+const buildExampleLabel = (candidate) =>
+  `${candidate.currency} (issuer ${formatIssuerShort(candidate.issuer)})`;
+
+const setExampleStatus = (message) => {
+  if (!exampleStatus) {
+    return;
+  }
+  exampleStatus.textContent = message || "";
+  exampleStatus.hidden = !message;
 };
 
 const setFieldError = (key, message) => {
@@ -357,6 +390,26 @@ const buildDebugPayload = () => ({
 });
 
 const buildDebugText = () => JSON.stringify(buildDebugPayload(), null, 2);
+
+const buildExampleAttemptSummary = (attempts) => {
+  if (!Array.isArray(attempts) || attempts.length === 0) {
+    return "";
+  }
+  return attempts
+    .map((attempt) => {
+      const label = buildExampleLabel(attempt.candidate);
+      if (attempt.error) {
+        const code = attempt.error?.code || "error";
+        const message = attempt.error?.message || "Request failed";
+        return `${label} -> ${code}: ${message}`;
+      }
+      if (Number.isFinite(attempt.offersCount)) {
+        return `${label} -> offers=${attempt.offersCount}`;
+      }
+      return `${label} -> offers=unknown`;
+    })
+    .join("; ");
+};
 
 const clearFieldErrors = () => {
   Object.keys(fieldErrors).forEach((key) => setFieldError(key, null));
@@ -1110,6 +1163,75 @@ const requestBookOffers = async ({ payload }) => {
   } finally {
     clearTimeout(timeoutId);
   }
+};
+
+const findExampleCandidate = async () => {
+  const attempts = [];
+  for (const candidate of EXAMPLE_CANDIDATES) {
+    const payload = {
+      currency: candidate.currency,
+      issuer: candidate.issuer,
+      limit: DEFAULT_LIMIT,
+    };
+    const requestTimestamp = Date.now();
+    const requestUrl = buildBookOffersUrl(payload);
+    const fetchStart = performance.now();
+
+    updateDebugPanel({
+      lastRequestTime: formatTime(requestTimestamp),
+      lastRequestUrl: requestUrl,
+      requestPayload: payload,
+      responseStatus: "pending",
+      endpointUsed: null,
+      upstreamStatus: null,
+      error: null,
+      rawResponse: null,
+      offersCount: null,
+      elapsedMs: null,
+    });
+
+    try {
+      const response = await requestBookOffers({ payload });
+      const offersCount = Array.isArray(response?.data?.offers)
+        ? response.data.offers.length
+        : 0;
+
+      updateDebugPanel({
+        responseStatus: "success",
+        endpointUsed: response.debugInfo?.endpointUsed ?? null,
+        upstreamStatus: response.debugInfo?.statusCode ?? null,
+        error: null,
+        rawResponse: response.debugInfo?.rawResponse ?? null,
+        offersCount,
+        elapsedMs: performance.now() - fetchStart,
+        timings: {
+          networkMs: response.debugInfo?.timings?.networkMs ?? null,
+          parseMs: response.debugInfo?.timings?.parseMs ?? null,
+        },
+      });
+
+      attempts.push({ candidate, offersCount });
+      if (offersCount > 0) {
+        return { candidate, attempts };
+      }
+    } catch (error) {
+      attempts.push({ candidate, error });
+      updateDebugPanel({
+        responseStatus: "fail",
+        endpointUsed: error?.debugInfo?.endpointUsed ?? null,
+        upstreamStatus: error?.debugInfo?.statusCode ?? null,
+        error: `${error?.code || "error"}: ${error?.message || "Request failed"}`,
+        rawResponse: error?.debugInfo?.rawResponse ?? null,
+        offersCount: null,
+        elapsedMs: performance.now() - fetchStart,
+        timings: {
+          networkMs: error?.debugInfo?.timings?.networkMs ?? null,
+          parseMs: error?.debugInfo?.timings?.parseMs ?? null,
+        },
+      });
+    }
+  }
+  return { candidate: null, attempts };
 };
 
 const fetchBookOffers = async ({ currency, issuer, limit = DEFAULT_LIMIT }) => {
@@ -2330,20 +2452,56 @@ impactThresholdSelect?.addEventListener("change", () => {
 });
 
 tryExampleButton?.addEventListener("click", () => {
-  if (currencyInput) {
-    currencyInput.value = "DEM";
-  }
-  if (issuerInput) {
-    issuerInput.value = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
-  }
-  if (amountInput) {
-    amountInput.value = "1000";
-  }
-  clearFieldErrors();
-  setError(null);
-  setShareLoadNote(false);
-  scheduleShareUrlUpdate({ immediate: true });
-  estimateButton?.scrollIntoView({ behavior: "smooth", block: "center" });
+  const runExampleLookup = async () => {
+    if (!tryExampleButton) {
+      return;
+    }
+    tryExampleButton.disabled = true;
+    setError(null);
+    setExampleStatus(null);
+
+    const { candidate, attempts } = await findExampleCandidate();
+    if (!candidate) {
+      const summary = buildExampleAttemptSummary(attempts);
+      updateDebugPanel({
+        responseStatus: "fail",
+        requestPayload: attempts.map((attempt) => ({
+          currency: attempt.candidate.currency,
+          issuer: attempt.candidate.issuer,
+          offersCount: attempt.offersCount ?? null,
+          error: attempt.error ? attempt.error.message : null,
+        })),
+        error: summary || "examples_unavailable",
+        offersCount: null,
+      });
+      const unavailableMessage = t("status.examples_unavailable");
+      setExampleStatus(unavailableMessage);
+      setError(unavailableMessage);
+      return;
+    }
+
+    if (currencyInput) {
+      currencyInput.value = candidate.currency;
+    }
+    if (issuerInput) {
+      issuerInput.value = candidate.issuer;
+    }
+    if (amountInput) {
+      amountInput.value = "1000";
+    }
+    clearFieldErrors();
+    setError(null);
+    setExampleStatus(t("status.example_selected", { label: buildExampleLabel(candidate) }));
+    setShareLoadNote(false);
+    scheduleShareUrlUpdate({ immediate: true });
+    estimateButton?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  void runExampleLookup().finally(() => {
+    if (tryExampleButton) {
+      tryExampleButton.disabled = false;
+    }
+  });
 });
 
 copyLinkButton?.addEventListener("click", async () => {
