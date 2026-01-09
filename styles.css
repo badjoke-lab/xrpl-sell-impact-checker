@@ -521,6 +521,24 @@ h2 {
   white-space: pre;
 }
 
+.debug-panel__details {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f8fafc;
+}
+
+.debug-panel__details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #334155;
+  list-style: none;
+}
+
+.debug-panel__details summary::-webkit-details-marker {
+  display: none;
+}
+
 .debug-panel__timings {
   display: flex;
   flex-wrap: wrap;

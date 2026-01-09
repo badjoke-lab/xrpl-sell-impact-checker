@@ -199,12 +199,16 @@
                 <span class="debug-panel__value" data-debug="last-request">—</span>
               </div>
               <div class="debug-panel__row">
-                <span class="debug-panel__key">Endpoint</span>
-                <span class="debug-panel__value" data-debug="endpoint">—</span>
+                <span class="debug-panel__key">Request payload</span>
+                <pre class="debug-panel__value debug-panel__pre" data-debug="request-payload">—</pre>
               </div>
               <div class="debug-panel__row">
-                <span class="debug-panel__key">Request payload</span>
-                <pre class="debug-panel__value debug-panel__pre" data-debug="payload">—</pre>
+                <span class="debug-panel__key">Endpoint tried</span>
+                <span class="debug-panel__value" data-debug="endpoint-tried">—</span>
+              </div>
+              <div class="debug-panel__row">
+                <span class="debug-panel__key">Upstream status</span>
+                <span class="debug-panel__value" data-debug="upstream-status">—</span>
               </div>
               <div class="debug-panel__row">
                 <span class="debug-panel__key">Response status</span>
@@ -215,8 +219,15 @@
                 <span class="debug-panel__value" data-debug="offers-count">—</span>
               </div>
               <div class="debug-panel__row">
-                <span class="debug-panel__key">Response detail</span>
-                <pre class="debug-panel__value debug-panel__pre" data-debug="response">—</pre>
+                <span class="debug-panel__key">Error</span>
+                <span class="debug-panel__value" data-debug="error">—</span>
+              </div>
+              <div class="debug-panel__row">
+                <span class="debug-panel__key">Raw response</span>
+                <details class="debug-panel__value debug-panel__details">
+                  <summary>View response</summary>
+                  <pre class="debug-panel__pre" data-debug="raw-response">—</pre>
+                </details>
               </div>
               <div class="debug-panel__row">
                 <span class="debug-panel__key">Timings</span>

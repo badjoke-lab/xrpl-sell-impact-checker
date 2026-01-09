@@ -85,7 +85,9 @@
       "label": "Sellability",
       "full": "Full",
       "none": "No liquidity",
+      "empty": "Order book empty (offers=0)",
       "partial": "Partial",
+      "error": "Fetch failed ({code})",
       "filled_line": "Filled {filled} / {requested} ({pct})"
     },
     "receive": {
@@ -124,7 +126,7 @@
     "why_line": "This sell consumes top {count} offers.",
     "warnings": {
       "partial": "Warning: Only {pct}% can be sold.",
-      "none": "No liquidity.",
+      "none": "Order book empty (offers=0).",
       "high_slippage": "Caution: Estimated slippage exceeds 10%."
     }
   },
