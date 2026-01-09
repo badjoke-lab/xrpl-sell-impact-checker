@@ -141,12 +141,14 @@ const debugCopyButton = document.querySelector("#debug-copy");
 const debugCopyStatus = document.querySelector('[data-debug="copy-status"]');
 const debugLastRequest = document.querySelector('[data-debug="last-request"]');
 const debugRequestPayload = document.querySelector('[data-debug="request-payload"]');
-const debugEndpointTried = document.querySelector('[data-debug="endpoint-tried"]');
+const debugEndpointUsed = document.querySelector('[data-debug="endpoint-used"]');
 const debugUpstreamStatus = document.querySelector('[data-debug="upstream-status"]');
 const debugStatus = document.querySelector('[data-debug="status"]');
+const debugElapsed = document.querySelector('[data-debug="elapsed-ms"]');
 const debugOffersCount = document.querySelector('[data-debug="offers-count"]');
 const debugError = document.querySelector('[data-debug="error"]');
 const debugRawResponse = document.querySelector('[data-debug="raw-response"]');
+const debugResponseKeys = document.querySelector('[data-debug="response-keys"]');
 const debugValidateTiming = document.querySelector('[data-debug="validate-ms"]');
 const debugNetworkTiming = document.querySelector('[data-debug="network-ms"]');
 const debugParseTiming = document.querySelector('[data-debug="parse-ms"]');
@@ -173,11 +175,14 @@ const debugState = {
   lastRequestUrl: BOOK_OFFERS_API,
   requestPayload: null,
   responseStatus: null,
-  endpointTried: null,
+  endpointUsed: null,
   upstreamStatus: null,
+  elapsedMs: null,
   offersCount: null,
   error: null,
   rawResponse: null,
+  responseKeys: null,
+  timestamp: null,
   timings: {
     validateMs: null,
     networkMs: null,
@@ -272,6 +277,29 @@ const formatLastRequest = (url, time) => {
   return url || time || "—";
 };
 
+const buildResponseKeysExcerpt = (rawResponse) => {
+  if (!rawResponse || typeof rawResponse !== "object") {
+    return "—";
+  }
+  const keys = Object.keys(rawResponse);
+  if (keys.length === 0) {
+    return "—";
+  }
+  const maxKeys = 8;
+  const truncatedKeys = keys.slice(0, maxKeys);
+  const formattedKeys = truncatedKeys.map((key) => {
+    if (key !== "offers") {
+      return key;
+    }
+    if (Array.isArray(rawResponse.offers)) {
+      return `offers(${rawResponse.offers.length})`;
+    }
+    return "offers";
+  });
+  const suffix = keys.length > maxKeys ? ` +${keys.length - maxKeys} more` : "";
+  return `${formattedKeys.join(", ")}${suffix}`;
+};
+
 const updateDebugPanel = (updates = {}) => {
   if (!isDebugEnabled || !debugPanel) {
     return;
@@ -297,39 +325,35 @@ const updateDebugPanel = (updates = {}) => {
     }
   });
 
+  if (updates.rawResponse !== undefined && updates.responseKeys === undefined) {
+    debugState.responseKeys = buildResponseKeysExcerpt(debugState.rawResponse);
+  }
+
   setDebugValue(
     debugLastRequest,
     formatLastRequest(debugState.lastRequestUrl, debugState.lastRequestTime)
   );
   setDebugValue(debugRequestPayload, formatDebugJson(debugState.requestPayload));
-  setDebugValue(debugEndpointTried, debugState.endpointTried);
+  setDebugValue(debugEndpointUsed, debugState.endpointUsed);
   setDebugValue(debugUpstreamStatus, debugState.upstreamStatus);
   setDebugValue(debugStatus, debugState.responseStatus);
+  setDebugValue(debugElapsed, formatDebugMs(debugState.elapsedMs));
   setDebugValue(debugOffersCount, debugState.offersCount ?? "—");
   setDebugValue(debugError, debugState.error);
   setDebugValue(debugRawResponse, formatDebugJson(debugState.rawResponse));
+  setDebugValue(debugResponseKeys, debugState.responseKeys);
   setDebugValue(debugValidateTiming, formatDebugMs(debugState.timings.validateMs));
   setDebugValue(debugNetworkTiming, formatDebugMs(debugState.timings.networkMs));
   setDebugValue(debugParseTiming, formatDebugMs(debugState.timings.parseMs));
 };
 
 const buildDebugPayload = () => ({
-  last_request: {
-    url: debugState.lastRequestUrl,
-    time: debugState.lastRequestTime,
-  },
-  request_payload: debugState.requestPayload,
-  endpoint_tried: debugState.endpointTried,
-  upstream_status: debugState.upstreamStatus,
-  response_status: debugState.responseStatus,
-  offers_count: debugState.offersCount,
+  input: debugState.requestPayload,
+  endpointUsed: debugState.endpointUsed,
+  elapsedMs: debugState.elapsedMs,
+  offersCount: debugState.offersCount,
   error: debugState.error,
-  raw_response: debugState.rawResponse,
-  timings: {
-    validate_ms: debugState.timings.validateMs,
-    network_ms: debugState.timings.networkMs,
-    parse_ms: debugState.timings.parseMs,
-  },
+  timestamp: debugState.timestamp,
 });
 
 const buildDebugText = () => JSON.stringify(buildDebugPayload(), null, 2);
@@ -2340,6 +2364,7 @@ debugCopyButton?.addEventListener("click", async () => {
 });
 
 estimateButton?.addEventListener("click", async () => {
+  const estimateStart = performance.now();
   const currencyRaw = currencyInput?.value?.trim() || "";
   const currency = currencyRaw.toUpperCase();
   const issuer = issuerInput?.value?.trim() || "";
@@ -2357,6 +2382,21 @@ estimateButton?.addEventListener("click", async () => {
   if (debugCopyStatus) {
     debugCopyStatus.hidden = true;
   }
+  updateDebugPanel({
+    requestPayload: {
+      currency,
+      issuer,
+      limit: limitValue,
+    },
+    responseStatus: "validating",
+    endpointUsed: null,
+    upstreamStatus: null,
+    offersCount: null,
+    error: null,
+    elapsedMs: null,
+    rawResponse: null,
+    timestamp: new Date().toISOString(),
+  });
 
   const validateStart = performance.now();
   const { errors, normalizedLimit, limitWasAutofixed } = validateInputs({
@@ -2391,6 +2431,7 @@ estimateButton?.addEventListener("click", async () => {
       responseStatus: "fail",
       error: "validation_failed",
       offersCount: null,
+      elapsedMs: performance.now() - estimateStart,
     });
     return;
   }
@@ -2403,12 +2444,13 @@ estimateButton?.addEventListener("click", async () => {
     limit: normalizedLimit,
   };
   const requestUrl = buildBookOffersUrl(requestPayload);
+  const fetchStart = performance.now();
   updateDebugPanel({
     lastRequestTime: formatTime(requestTimestamp),
     lastRequestUrl: requestUrl,
     requestPayload,
     responseStatus: "pending",
-    endpointTried: null,
+    endpointUsed: null,
     upstreamStatus: null,
     error: null,
     rawResponse: null,
@@ -2500,11 +2542,12 @@ estimateButton?.addEventListener("click", async () => {
 
     updateDebugPanel({
       responseStatus: "success",
-      endpointTried: debugInfo?.endpointUsed ?? null,
+      endpointUsed: debugInfo?.endpointUsed ?? null,
       upstreamStatus: debugInfo?.statusCode ?? null,
       error: null,
       rawResponse: debugInfo?.rawResponse ?? null,
       offersCount: sortedOffers.length,
+      elapsedMs: performance.now() - fetchStart,
       timings: {
         networkMs: debugInfo?.timings?.networkMs ?? null,
         parseMs: debugInfo?.timings?.parseMs ?? null,
@@ -2523,11 +2566,12 @@ estimateButton?.addEventListener("click", async () => {
     setError(t(errorKey));
     updateDebugPanel({
       responseStatus: "fail",
-      endpointTried: error?.debugInfo?.endpointUsed ?? null,
+      endpointUsed: error?.debugInfo?.endpointUsed ?? null,
       upstreamStatus: error?.debugInfo?.statusCode ?? null,
       error: `${errorCode}: ${error?.message || "Request failed"}`,
       rawResponse: error?.debugInfo?.rawResponse ?? null,
       offersCount: null,
+      elapsedMs: performance.now() - fetchStart,
       timings: {
         networkMs: error?.debugInfo?.timings?.networkMs ?? null,
         parseMs: error?.debugInfo?.timings?.parseMs ?? null,
