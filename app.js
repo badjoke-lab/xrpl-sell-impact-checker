@@ -18,6 +18,7 @@ const MAX_AMOUNT = 1_000_000_000;
 const LIMIT_MIN = 1;
 const LIMIT_MAX = 200;
 const THRESHOLD_VALUES = new Set([1, 2, 5, 10, 20]);
+const DEFAULT_SLIPPAGE_PERCENT = 5;
 const FIAT_VALUES = new Set(["USD", "JPY"]);
 const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
@@ -136,6 +137,12 @@ const resultEndpointDetails = document.querySelector(
 const resultOrderCount = document.querySelector('[data-result="order-count"]');
 const resultBestPrice = document.querySelector('[data-result="best-price"]');
 const resultWorstPrice = document.querySelector('[data-result="worst-price"]');
+const resultLiquiditySplitLabel = document.querySelector(
+  '[data-result="liquidity-split-label"]'
+);
+const resultLiquiditySplit = document.querySelector('[data-result="liquidity-split"]');
+const resultAmmReserves = document.querySelector('[data-result="amm-reserves"]');
+const resultAmmFee = document.querySelector('[data-result="amm-fee"]');
 const resultReceive = document.querySelector('[data-result="receive"]');
 const resultFiatRate = document.querySelector('[data-result="fiat-rate"]');
 const resultFiatWarning = document.querySelector('[data-result="fiat-warning"]');
@@ -177,6 +184,10 @@ let lastCurrency = "";
 let lastFiatRate = null;
 let lastSimulation = null;
 let lastMaxSellResult = null;
+let lastAmmReserves = null;
+let lastAmmAvailable = false;
+let lastAmmMaxSell = 0;
+let lastShouldFetchAmm = false;
 let lastOffersHash = "";
 let lastFetchedAt = null;
 let lastEndpointLabel = "";
@@ -581,7 +592,7 @@ const setResultText = (element, text) => {
 const getImpactThresholdPct = () => {
   const raw = impactThresholdSelect?.value;
   const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return Number.isFinite(parsed) ? parsed : DEFAULT_SLIPPAGE_PERCENT;
 };
 
 const updateImpactThresholdHelp = (thresholdPct) => {
@@ -601,6 +612,18 @@ const updateMaxSellLabel = (thresholdPct) => {
   setResultText(
     resultMaxSellLabel,
     t("results.max_sell.label", {
+      threshold: formatPercent(thresholdPct, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }),
+    })
+  );
+};
+
+const updateLiquiditySplitLabel = (thresholdPct) => {
+  setResultText(
+    resultLiquiditySplitLabel,
+    t("details.liquidity_split", {
       threshold: formatPercent(thresholdPct, {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
@@ -803,6 +826,7 @@ const applyShareParamsFromUrl = () => {
     impactThresholdSelect.value = String(threshold);
     updateMaxSellLabel(threshold);
     updateImpactThresholdHelp(threshold);
+    updateLiquiditySplitLabel(threshold);
   }
   if (fiatCurrencySelect && fiat) {
     fiatCurrencySelect.value = fiat;
@@ -844,6 +868,10 @@ const resetResults = () => {
   setResultText(resultOrderCount, placeholder);
   setResultText(resultBestPrice, placeholder);
   setResultText(resultWorstPrice, placeholder);
+  updateLiquiditySplitLabel(getImpactThresholdPct());
+  setResultText(resultLiquiditySplit, placeholder);
+  setResultText(resultAmmReserves, placeholder);
+  setResultText(resultAmmFee, placeholder);
   setResultText(resultReceive, placeholder);
   setResultText(resultSlippage, placeholder);
   setResultText(resultSlippageHelp, getTranslationOrFallback("results.slippage.help"));
@@ -865,6 +893,10 @@ const resetResults = () => {
   lastFiatRate = null;
   lastSimulation = null;
   lastMaxSellResult = null;
+  lastAmmReserves = null;
+  lastAmmAvailable = false;
+  lastAmmMaxSell = 0;
+  lastShouldFetchAmm = false;
   lastOffersHash = "";
   lastFetchedAt = null;
   lastEndpointLabel = "";
@@ -2211,6 +2243,78 @@ const updateExecutionDetails = ({
   }
 };
 
+const updateLiquidityBreakdown = ({
+  thresholdPct = getImpactThresholdPct(),
+  currency = lastCurrency,
+} = {}) => {
+  if (!resultLiquiditySplit || !resultAmmReserves || !resultAmmFee) {
+    return;
+  }
+
+  updateLiquiditySplitLabel(thresholdPct);
+
+  if (!lastShouldFetchAmm) {
+    setResultText(resultLiquiditySplit, t("details.liquidity_split_not_applicable"));
+    setResultText(resultAmmReserves, t("details.amm_not_applicable"));
+    setResultText(resultAmmFee, t("details.amm_not_applicable"));
+    return;
+  }
+
+  const clobMax =
+    lastMaxSellResult?.status === "available" ? lastMaxSellResult.maxSellAmount : 0;
+  const ammMax = Number.isFinite(lastAmmMaxSell) ? lastAmmMaxSell : 0;
+  const total = clobMax + ammMax;
+
+  if (!Number.isFinite(total) || total <= 0) {
+    setResultText(resultLiquiditySplit, t("common.not_available"));
+  } else {
+    const clobSharePct = (clobMax / total) * 100;
+    const ammSharePct = 100 - clobSharePct;
+    const splitKey = lastAmmAvailable
+      ? "details.liquidity_split_value"
+      : "details.liquidity_split_value_no_amm";
+    setResultText(
+      resultLiquiditySplit,
+      t(splitKey, {
+        clob: formatPercent(clobSharePct, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 1,
+        }),
+        amm: formatPercent(ammSharePct, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 1,
+        }),
+      })
+    );
+  }
+
+  if (!lastAmmAvailable || !lastAmmReserves) {
+    setResultText(resultAmmReserves, t("details.amm_not_found"));
+    setResultText(resultAmmFee, t("details.amm_not_found"));
+    return;
+  }
+
+  const tokenAmount = formatNumber(lastAmmReserves.tokenReserve, {
+    maximumFractionDigits: 6,
+  });
+  const xrpAmount = formatNumber(lastAmmReserves.xrpReserve, {
+    maximumFractionDigits: 6,
+  });
+  setResultText(
+    resultAmmReserves,
+    t("details.amm_reserves_value", {
+      token: tokenAmount,
+      currency,
+      xrp: xrpAmount,
+    })
+  );
+  const feePct = Number.isFinite(lastAmmReserves.feePct) ? lastAmmReserves.feePct : 0;
+  setResultText(
+    resultAmmFee,
+    formatPercent(feePct * 100, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+  );
+};
+
 function setChartNote(element, message) {
   if (!element) {
     return;
@@ -2469,6 +2573,7 @@ bindFieldClear(amountInput, "amount");
 bindFieldClear(limitInput, "limit");
 updateMaxSellLabel(getImpactThresholdPct());
 updateImpactThresholdHelp(getImpactThresholdPct());
+updateLiquiditySplitLabel(getImpactThresholdPct());
 
 const initFiatSelection = () => {
   if (!fiatCurrencySelect) {
@@ -2536,6 +2641,7 @@ impactThresholdSelect?.addEventListener("change", () => {
   const thresholdPct = getImpactThresholdPct();
   updateMaxSellLabel(thresholdPct);
   updateImpactThresholdHelp(thresholdPct);
+  updateLiquiditySplitLabel(thresholdPct);
   if (!lastSortedOffers || lastBestPrice <= 0 || !lastSimulation) {
     return;
   }
@@ -2545,6 +2651,13 @@ impactThresholdSelect?.addEventListener("change", () => {
     referencePrice: lastBestPrice,
   });
   lastMaxSellResult = result;
+  if (lastAmmReserves) {
+    const ammResult = findMaxSellWithinThresholdAmm({
+      reserves: lastAmmReserves,
+      thresholdPct,
+    });
+    lastAmmMaxSell = ammResult.ok ? ammResult.maxSell : 0;
+  }
   void updateMaxSellResults({
     offers: lastSortedOffers,
     thresholdPct,
@@ -2558,6 +2671,7 @@ impactThresholdSelect?.addEventListener("change", () => {
     maxSellResult: lastMaxSellResult,
     currency: lastCurrency,
   });
+  updateLiquidityBreakdown({ thresholdPct });
   setShareLoadNote(false);
   scheduleShareUrlUpdate();
 });
@@ -2712,6 +2826,14 @@ estimateButton?.addEventListener("click", async () => {
     issuer,
     limit: normalizedLimit,
   };
+  const shouldFetchAmm = currency !== "XRP" && Boolean(issuer);
+  const ammPromise = shouldFetchAmm
+    ? fetchAmmInfo({ currency, issuer }).catch((error) => ({
+        ok: false,
+        error: "fetch_failed",
+        fetchError: error,
+      }))
+    : Promise.resolve(null);
   const requestUrl = buildBookOffersUrl(requestPayload);
   const fetchStart = performance.now();
   updateDebugPanel({
@@ -2727,11 +2849,15 @@ estimateButton?.addEventListener("click", async () => {
   });
 
   try {
-    const { offers, endpointIndex, attemptedEndpoints, debugInfo } = await fetchBookOffers({
-      currency,
-      issuer,
-      limit: normalizedLimit,
-    });
+    const [{ offers, endpointIndex, attemptedEndpoints, debugInfo }, ammInfo] =
+      await Promise.all([
+        fetchBookOffers({
+          currency,
+          issuer,
+          limit: normalizedLimit,
+        }),
+        ammPromise,
+      ]);
 
     currentEndpointIndex = endpointIndex;
     const endpointLabel = t(ORDERBOOK_API_ENDPOINT.labelKey);
@@ -2786,15 +2912,32 @@ estimateButton?.addEventListener("click", async () => {
     lastBestPrice = bestPrice;
     lastCurrency = currency;
     lastSimulation = simulation;
+    const thresholdPct = getImpactThresholdPct();
     const maxSellResult = computeMaxSellUnderThreshold({
       offers: sortedOffers,
-      thresholdPct: getImpactThresholdPct(),
+      thresholdPct,
       referencePrice: bestPrice,
     });
     lastMaxSellResult = maxSellResult;
+    lastShouldFetchAmm = shouldFetchAmm;
+    const ammReserves =
+      shouldFetchAmm && ammInfo?.ok
+        ? parseAmmReserves({ amm: ammInfo?.amm, currency, issuer })
+        : null;
+    lastAmmReserves = ammReserves;
+    lastAmmAvailable = Boolean(ammReserves);
+    if (ammReserves) {
+      const ammResult = findMaxSellWithinThresholdAmm({
+        reserves: ammReserves,
+        thresholdPct,
+      });
+      lastAmmMaxSell = ammResult.ok ? ammResult.maxSell : 0;
+    } else {
+      lastAmmMaxSell = 0;
+    }
     void updateMaxSellResults({
       offers: sortedOffers,
-      thresholdPct: getImpactThresholdPct(),
+      thresholdPct,
       referencePrice: bestPrice,
       currency,
       result: maxSellResult,
@@ -2808,6 +2951,7 @@ estimateButton?.addEventListener("click", async () => {
       },
       { immediate: true }
     );
+    updateLiquidityBreakdown({ thresholdPct, currency });
 
     updateDebugPanel({
       responseStatus: "success",
