@@ -1,3 +1,5 @@
+import { normalizeCurrencyInput } from "../../shared/normalizeCurrency.js";
+
 const XRPL_RPC_ENDPOINTS = [
   "https://s1.ripple.com:51234/",
   "https://s2.ripple.com:51234/",
@@ -11,20 +13,6 @@ const withTimeout = async (promiseFactory, timeoutMs) => {
   } finally {
     clearTimeout(timer);
   }
-};
-
-const normalizeCurrency = (cur) => {
-  const c = String(cur || "").toUpperCase().trim();
-  if (!c) return "";
-  if (/^[0-9A-F]{40}$/.test(c)) return c;      // already hex
-  if (c.length === 3) return c;               // standard 3-letter
-  // ASCII -> 160-bit hex padded with 00 (20 bytes -> 40 hex chars)
-  const bytes = new TextEncoder().encode(c);
-  const hex = Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .toUpperCase();
-  return (hex + "00".repeat(40)).slice(0, 40);
 };
 
 const fetchJsonRpc = async (payload) => {
@@ -98,11 +86,15 @@ export async function onRequest(context) {
   const issuer = String(url.searchParams.get("issuer") || "").trim();
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit") || 50)));
 
-  const currency = normalizeCurrency(currencyRaw);
+  const currencyResult = normalizeCurrencyInput(currencyRaw);
+  const currency = currencyResult.error ? "" : currencyResult.currencyNormalized;
 
   if (!currency || !issuer) {
     return new Response(
-      JSON.stringify({ ok: false, error: "missing_currency_or_issuer" }),
+      JSON.stringify({
+        ok: false,
+        error: currencyResult.error ? `invalid_currency_${currencyResult.error.code}` : "missing_currency_or_issuer",
+      }),
       { status: 400, headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" } }
     );
   }
