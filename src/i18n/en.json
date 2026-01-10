@@ -6,7 +6,8 @@
     "description": "Estimate sell impact and receive amounts before you trade."
   },
   "header": {
-    "connect_wallet": "Connect Wallet"
+    "connect_wallet": "Connect Wallet",
+    "wallet_not_required": "Not required"
   },
   "sections": {
     "inputs": "Inputs",
@@ -65,6 +66,7 @@
   },
   "actions": {
     "estimate": "Estimate impact",
+    "estimating": "Estimating…",
     "try_example": "Try example",
     "try_example_note": "We'll pick a live example with active offers when available.",
     "copy_link": "Copy link"
@@ -74,8 +76,10 @@
     "queuedAt": "Estimate queued at {time}. Connect data sources to compute.",
     "validating": "Validating...",
     "validation_failed": "Validation failed.",
-    "fetching": "Fetching order book...",
+    "fetching_clob": "Fetching CLOB...",
+    "fetching_amm": "Fetching AMM...",
     "simulating": "Simulating fills...",
+    "rendering": "Rendering...",
     "done": "Done.",
     "error": "Unable to fetch order book.",
     "fetched_offers": "Fetched {count} offers from {endpointLabel}.",
