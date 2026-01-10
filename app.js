@@ -25,7 +25,12 @@ const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
 const VENUE_CLOB = "CLOB";
 const VENUE_AMM = "AMM";
+const DEFAULT_TOKEN = {
+  currency: "ARMY",
+  issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
+};
 const EXAMPLE_CANDIDATES = [
+  DEFAULT_TOKEN,
   {
     currency: "USD",
     issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
@@ -246,6 +251,14 @@ const setStatus = (key, params) => {
   if (statusLine) {
     statusLine.textContent = t(key, params);
   }
+};
+
+const setEstimateButtonBusy = (isBusy) => {
+  if (!estimateButton) {
+    return;
+  }
+  estimateButton.disabled = isBusy;
+  estimateButton.textContent = t(isBusy ? "actions.estimating" : "actions.estimate");
 };
 
 const setError = (message) => {
@@ -1360,7 +1373,7 @@ const findExampleCandidate = async () => {
       });
     }
   }
-  return { candidate: null, attempts };
+  return { candidate: DEFAULT_TOKEN, attempts };
 };
 
 const fetchBookOffers = async ({ currency, issuer, limit = DEFAULT_LIMIT }) => {
@@ -2971,6 +2984,12 @@ const initFiatSelection = () => {
 
 initFiatSelection();
 applyShareParamsFromUrl();
+if (currencyInput && !currencyInput.value) {
+  currencyInput.value = DEFAULT_TOKEN.currency;
+}
+if (issuerInput && !issuerInput.value) {
+  issuerInput.value = DEFAULT_TOKEN.issuer;
+}
 
 const handleShareInputChange = () => {
   setShareLoadNote(false);
@@ -3141,6 +3160,10 @@ debugCopyButton?.addEventListener("click", async () => {
 });
 
 estimateButton?.addEventListener("click", async () => {
+  if (estimateButton?.disabled) {
+    return;
+  }
+  setEstimateButtonBusy(true);
   const estimateStart = performance.now();
   const currencyRaw = currencyInput?.value?.trim() || "";
   const currency = currencyRaw.toUpperCase();
@@ -3151,112 +3174,113 @@ estimateButton?.addEventListener("click", async () => {
       ? ""
       : Number(limitInput?.value);
 
-  setStatus("status.validating");
-  setError(null);
-  setEndpointNotice(null);
-  clearFieldErrors();
-  resetResults();
-  if (debugCopyStatus) {
-    debugCopyStatus.hidden = true;
-  }
-  updateDebugPanel({
-    requestPayload: {
+  try {
+    setStatus("status.validating");
+    setError(null);
+    setEndpointNotice(null);
+    clearFieldErrors();
+    resetResults();
+    if (debugCopyStatus) {
+      debugCopyStatus.hidden = true;
+    }
+    updateDebugPanel({
+      requestPayload: {
+        currency,
+        issuer,
+        limit: limitValue,
+      },
+      responseStatus: "validating",
+      endpointUsed: null,
+      upstreamStatus: null,
+      offersCount: null,
+      clobMax: null,
+      ammMax: null,
+      clobSharePct: null,
+      venue: null,
+      venueReason: null,
+      error: null,
+      elapsedMs: null,
+      rawResponse: null,
+      timestamp: new Date().toISOString(),
+    });
+
+    const validateStart = performance.now();
+    const { errors, normalizedLimit, limitWasAutofixed } = validateInputs({
       currency,
       issuer,
+      amount: amountValue,
       limit: limitValue,
-    },
-    responseStatus: "validating",
-    endpointUsed: null,
-    upstreamStatus: null,
-    offersCount: null,
-    clobMax: null,
-    ammMax: null,
-    clobSharePct: null,
-    venue: null,
-    venueReason: null,
-    error: null,
-    elapsedMs: null,
-    rawResponse: null,
-    timestamp: new Date().toISOString(),
-  });
-
-  const validateStart = performance.now();
-  const { errors, normalizedLimit, limitWasAutofixed } = validateInputs({
-    currency,
-    issuer,
-    amount: amountValue,
-    limit: limitValue,
-  });
-  const validateMs = performance.now() - validateStart;
-  updateDebugPanel({
-    timings: {
-      validateMs,
-    },
-  });
-
-  Object.entries(errors).forEach(([key, message]) => {
-    if (message) {
-      setFieldError(key, message);
-    }
-  });
-
-  if (limitWasAutofixed) {
-    if (limitInput) {
-      limitInput.value = String(DEFAULT_LIMIT);
-    }
-    setLimitNote(t("notes.limit_autofix", { limit: DEFAULT_LIMIT }));
-  }
-
-  if (Object.keys(errors).length > 0) {
-    setStatus("status.validation_failed");
-    updateDebugPanel({
-      responseStatus: "fail",
-      error: "validation_failed",
-      offersCount: null,
-      elapsedMs: performance.now() - estimateStart,
     });
-    return;
-  }
+    const validateMs = performance.now() - validateStart;
+    updateDebugPanel({
+      timings: {
+        validateMs,
+      },
+    });
 
-  setStatus("status.fetching");
-  const requestTimestamp = Date.now();
-  const requestPayload = {
-    currency,
-    issuer,
-    limit: normalizedLimit,
-  };
-  const shouldFetchAmm = currency !== "XRP" && Boolean(issuer);
-  const ammPromise = shouldFetchAmm
-    ? fetchAmmInfo({ currency, issuer }).catch((error) => ({
-        ok: false,
-        error: "fetch_failed",
-        fetchError: error,
-      }))
-    : Promise.resolve(null);
-  const requestUrl = buildBookOffersUrl(requestPayload);
-  const fetchStart = performance.now();
-  updateDebugPanel({
-    lastRequestTime: formatTime(requestTimestamp),
-    lastRequestUrl: requestUrl,
-    requestPayload,
-    responseStatus: "pending",
-    endpointUsed: null,
-    upstreamStatus: null,
-    error: null,
-    rawResponse: null,
-    offersCount: null,
-  });
+    Object.entries(errors).forEach(([key, message]) => {
+      if (message) {
+        setFieldError(key, message);
+      }
+    });
 
-  try {
-    const [{ offers, endpointIndex, attemptedEndpoints, debugInfo }, ammInfo] =
-      await Promise.all([
-        fetchBookOffers({
-          currency,
-          issuer,
-          limit: normalizedLimit,
-        }),
-        ammPromise,
-      ]);
+    if (limitWasAutofixed) {
+      if (limitInput) {
+        limitInput.value = String(DEFAULT_LIMIT);
+      }
+      setLimitNote(t("notes.limit_autofix", { limit: DEFAULT_LIMIT }));
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setStatus("status.validation_failed");
+      updateDebugPanel({
+        responseStatus: "fail",
+        error: "validation_failed",
+        offersCount: null,
+        elapsedMs: performance.now() - estimateStart,
+      });
+      return;
+    }
+
+    setStatus("status.fetching_clob");
+    const requestTimestamp = Date.now();
+    const requestPayload = {
+      currency,
+      issuer,
+      limit: normalizedLimit,
+    };
+    const shouldFetchAmm = currency !== "XRP" && Boolean(issuer);
+    const ammPromise = shouldFetchAmm
+      ? fetchAmmInfo({ currency, issuer }).catch((error) => ({
+          ok: false,
+          error: "fetch_failed",
+          fetchError: error,
+        }))
+      : Promise.resolve(null);
+    const clobPromise = fetchBookOffers({
+      currency,
+      issuer,
+      limit: normalizedLimit,
+    });
+    const requestUrl = buildBookOffersUrl(requestPayload);
+    const fetchStart = performance.now();
+    updateDebugPanel({
+      lastRequestTime: formatTime(requestTimestamp),
+      lastRequestUrl: requestUrl,
+      requestPayload,
+      responseStatus: "pending",
+      endpointUsed: null,
+      upstreamStatus: null,
+      error: null,
+      rawResponse: null,
+      offersCount: null,
+    });
+
+    const { offers, endpointIndex, attemptedEndpoints, debugInfo } = await clobPromise;
+    if (shouldFetchAmm) {
+      setStatus("status.fetching_amm");
+    }
+    const ammInfo = await ammPromise;
 
     currentEndpointIndex = endpointIndex;
     const endpointLabel = t(ORDERBOOK_API_ENDPOINT.labelKey);
@@ -3379,6 +3403,7 @@ estimateButton?.addEventListener("click", async () => {
     const displayMaxSellResult =
       chosenVenue === VENUE_AMM ? ammMaxSellResult : maxSellResult;
     lastDisplayMaxSellResult = displayMaxSellResult;
+    setStatus("status.rendering");
     updateResultsSummary({
       simulation: displaySimulation,
       bestPrice,
@@ -3472,5 +3497,7 @@ estimateButton?.addEventListener("click", async () => {
       resultSellability,
       t("results.sellability.error", { code: errorCode })
     );
+  } finally {
+    setEstimateButtonBusy(false);
   }
 });
