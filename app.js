@@ -1,4 +1,5 @@
 import { loadDictionary, t } from "./src/i18n/index.js";
+import { normalizeCurrencyInput } from "./shared/normalizeCurrency.js";
 
 const BOOK_OFFERS_API = "/api/book_offers";
 const AMM_INFO_API = "/api/amm_info";
@@ -576,20 +577,11 @@ const formatTime = (timestamp) =>
 const clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const sanitizeCurrency = (value) => {
-  if (!value) {
+  const result = normalizeCurrencyInput(value);
+  if (result.error) {
     return null;
   }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const upper = trimmed.toUpperCase();
-  const isHexCurrency = /^[A-F0-9]{40}$/.test(upper);
-  const isShortCurrency = /^[A-Z0-9]{3}$/.test(upper);
-  if (!isHexCurrency && !isShortCurrency) {
-    return null;
-  }
-  return upper;
+  return result.currencyNormalized || null;
 };
 
 const sanitizeIssuer = (value) => {
@@ -650,6 +642,23 @@ const sanitizeFiat = (value) => {
   }
   const upper = value.trim().toUpperCase();
   return FIAT_VALUES.has(upper) ? upper : null;
+};
+
+const getCurrencyErrorMessage = (currencyResult) => {
+  if (!currencyResult?.error) {
+    return null;
+  }
+  switch (currencyResult.error.code) {
+    case "empty":
+      return t("errors.currency_required");
+    case "non_ascii":
+      return t("errors.currency_non_ascii");
+    case "hex_invalid":
+      return t("errors.currency_hex_invalid");
+    case "invalid_length":
+    default:
+      return t("errors.currency_invalid_length");
+  }
 };
 
 const setResultText = (element, text) => {
@@ -871,7 +880,8 @@ const applyShareParamsFromUrl = () => {
   const thinCutoffParam = params.get("thinCutoffPercent") ?? params.get("thin");
   const fiatParam = params.get("fiat");
 
-  const currency = currencyParam ? sanitizeCurrency(currencyParam) : null;
+  const currencyResult = currencyParam ? normalizeCurrencyInput(currencyParam) : null;
+  const currency = currencyResult?.error ? null : currencyResult?.currencyNormalized ?? null;
   if (currencyParam && !currency) {
     hadInvalidParam = true;
   }
@@ -911,8 +921,8 @@ const applyShareParamsFromUrl = () => {
   }
 
   isApplyingShareParams = true;
-  if (currencyInput && currency) {
-    currencyInput.value = currency;
+  if (currencyInput && currencyParam) {
+    currencyInput.value = String(currencyParam).trim().toUpperCase();
   }
   if (amountInput && amount) {
     amountInput.value = String(amount);
@@ -2887,18 +2897,13 @@ const scheduleChartsUpdate = (payload, { immediate = false } = {}) => {
   }, 120);
 };
 
-const validateInputs = ({ currency, issuer, amount, limit }) => {
+const validateInputs = ({ currencyResult, issuer, amount, limit }) => {
   const errors = {};
 
-  if (!currency) {
-    errors.currency = t("errors.currency_required");
-  } else {
-    const isHexCurrency = /^[a-fA-F0-9]{40}$/.test(currency);
-    const isShortCurrency = /^[A-Za-z0-9]{3}$/.test(currency);
-
-    if (!isHexCurrency && !isShortCurrency) {
-      errors.currency = t("errors.currency_invalid");
-    }
+  const currency = currencyResult?.currencyNormalized || "";
+  const currencyError = getCurrencyErrorMessage(currencyResult);
+  if (currencyError) {
+    errors.currency = currencyError;
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -3154,8 +3159,8 @@ estimateButton?.addEventListener("click", async () => {
   }
   setEstimateButtonBusy(true);
   const estimateStart = performance.now();
-  const currencyRaw = currencyInput?.value?.trim() || "";
-  const currency = currencyRaw.toUpperCase();
+  const currencyResult = normalizeCurrencyInput(currencyInput?.value ?? "");
+  const currency = currencyResult.currencyNormalized || "";
   const issuer = issuerInput?.value?.trim() || "";
   const amountValue = amountInput?.value ? Number(amountInput.value) : 0;
   const limitValue =
@@ -3174,7 +3179,9 @@ estimateButton?.addEventListener("click", async () => {
     }
     updateDebugPanel({
       requestPayload: {
-        currency,
+        currencyInput: currencyResult.currencyInput ?? "",
+        currencyNormalized: currency,
+        currencyKind: currencyResult.kind ?? null,
         issuer,
         limit: limitValue,
       },
@@ -3195,7 +3202,7 @@ estimateButton?.addEventListener("click", async () => {
 
     const validateStart = performance.now();
     const { errors, normalizedLimit, limitWasAutofixed } = validateInputs({
-      currency,
+      currencyResult,
       issuer,
       amount: amountValue,
       limit: limitValue,
@@ -3249,7 +3256,13 @@ estimateButton?.addEventListener("click", async () => {
     updateDebugPanel({
       lastRequestTime: formatTime(requestTimestamp),
       lastRequestUrl: requestUrl,
-      requestPayload,
+      requestPayload: {
+        currencyInput: currencyResult.currencyInput ?? "",
+        currencyNormalized: currency,
+        currencyKind: currencyResult.kind ?? null,
+        issuer,
+        limit: normalizedLimit,
+      },
       responseStatus: "pending",
       endpointUsed: null,
       upstreamStatus: null,
