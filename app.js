@@ -26,6 +26,9 @@ const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
 const VENUE_CLOB = "CLOB";
 const VENUE_AMM = "AMM";
+const TOKENLIST_SEED_URL = "./data/tokenlist.seed.json";
+const RECENT_TOKENS_STORAGE_KEY = "xsic_recent_tokens_v1";
+const MAX_RECENT_TOKENS = 10;
 const DEFAULT_TOKEN = {
   currency: "ARMY",
   issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
@@ -121,6 +124,8 @@ const estimateButton = document.querySelector(".primary-button");
 const tryExampleButton = document.querySelector("#try-example");
 const currencyInput = document.querySelector("#currency-input");
 const issuerInput = document.querySelector("#issuer-input");
+const currencySuggestionList = document.querySelector("#currency-suggestions");
+const currencySuggestionField = document.querySelector(".field--suggestions");
 const amountInput = document.querySelector("#sell-amount-input");
 const limitInput = document.querySelector("#limit-input");
 const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
@@ -286,6 +291,37 @@ const formatIssuerShort = (issuer) => {
   return `${issuer.slice(0, 5)}...`;
 };
 
+const normalizeTokenSuggestion = (item) => {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const symbol = typeof item.symbol === "string" ? item.symbol.trim() : "";
+  const issuer = typeof item.issuer === "string" ? item.issuer.trim() : "";
+  if (!symbol) {
+    return null;
+  }
+  const name = typeof item.name === "string" ? item.name.trim() : "";
+  const tags = Array.isArray(item.tags)
+    ? item.tags.map((tag) => String(tag).trim()).filter(Boolean)
+    : [];
+  return {
+    symbol: symbol.toUpperCase(),
+    issuer,
+    name,
+    tags,
+  };
+};
+
+const getTokenKey = (token) => `${token.symbol}::${token.issuer}`;
+const getTokenIssuerLabel = (token) =>
+  token.issuer ? formatIssuerShort(token.issuer) : "XRP";
+
+let seedTokenSuggestions = [];
+let recentTokenSuggestions = [];
+let suggestionsEnabled = false;
+let suggestionItems = [];
+let suggestionActiveIndex = -1;
+
 const buildExampleLabel = (candidate) =>
   `${candidate.currency} (issuer ${formatIssuerShort(candidate.issuer)})`;
 
@@ -295,6 +331,168 @@ const setExampleStatus = (message) => {
   }
   exampleStatus.textContent = message || "";
   exampleStatus.hidden = !message;
+};
+
+const loadRecentTokenSuggestions = () => {
+  if (!currencySuggestionList) {
+    return [];
+  }
+  try {
+    const raw = localStorage.getItem(RECENT_TOKENS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map(normalizeTokenSuggestion)
+      .filter((token) => token && token.symbol);
+  } catch (error) {
+    return [];
+  }
+};
+
+const saveRecentTokenSuggestion = (token) => {
+  if (!token) {
+    return;
+  }
+  const key = getTokenKey(token);
+  const deduped = recentTokenSuggestions.filter(
+    (item) => getTokenKey(item) !== key
+  );
+  recentTokenSuggestions = [token, ...deduped].slice(0, MAX_RECENT_TOKENS);
+  try {
+    localStorage.setItem(RECENT_TOKENS_STORAGE_KEY, JSON.stringify(recentTokenSuggestions));
+  } catch (error) {
+    // Ignore storage failures.
+  }
+};
+
+const matchesTokenQuery = (token, query) => {
+  if (!query) {
+    return true;
+  }
+  const haystack = `${token.symbol} ${token.name || ""}`.toLowerCase();
+  return haystack.includes(query);
+};
+
+const closeTokenSuggestions = () => {
+  if (!currencySuggestionList || !currencyInput) {
+    return;
+  }
+  currencySuggestionList.hidden = true;
+  currencyInput.setAttribute("aria-expanded", "false");
+  suggestionItems = [];
+  suggestionActiveIndex = -1;
+};
+
+const setActiveSuggestionIndex = (index) => {
+  if (!currencySuggestionList) {
+    return;
+  }
+  const options = Array.from(
+    currencySuggestionList.querySelectorAll(".suggestion-item")
+  );
+  options.forEach((option, optionIndex) => {
+    const isActive = optionIndex === index;
+    option.classList.toggle("is-active", isActive);
+    option.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  suggestionActiveIndex = index;
+};
+
+const applyTokenSuggestion = (token) => {
+  if (!currencyInput || !issuerInput) {
+    return;
+  }
+  currencyInput.value = token.symbol;
+  issuerInput.value = token.issuer;
+  setFieldError("currency", null);
+  setFieldError("issuer", null);
+  saveRecentTokenSuggestion(token);
+  closeTokenSuggestions();
+  handleShareInputChange();
+  currencyInput.focus();
+};
+
+const renderTokenSuggestions = (queryValue) => {
+  if (!currencySuggestionList || !currencyInput || !suggestionsEnabled) {
+    return;
+  }
+  const query = queryValue.trim().toLowerCase();
+  const recentMatches = recentTokenSuggestions.filter((token) =>
+    matchesTokenQuery(token, query)
+  );
+  const recentKeys = new Set(recentMatches.map(getTokenKey));
+  const seedMatches = seedTokenSuggestions.filter(
+    (token) => matchesTokenQuery(token, query) && !recentKeys.has(getTokenKey(token))
+  );
+
+  const hasMatches = recentMatches.length > 0 || seedMatches.length > 0;
+  if (!hasMatches) {
+    closeTokenSuggestions();
+    return;
+  }
+
+  currencySuggestionList.innerHTML = "";
+  suggestionItems = [];
+
+  const addGroupLabel = (label) => {
+    const group = document.createElement("div");
+    group.className = "suggestions__group";
+    group.textContent = label;
+    currencySuggestionList.appendChild(group);
+  };
+
+  const addTokenButton = (token) => {
+    const index = suggestionItems.length;
+    suggestionItems.push(token);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "suggestion-item";
+    button.setAttribute("role", "option");
+    button.dataset.index = String(index);
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "suggestion-item__row";
+    const symbol = document.createElement("span");
+    symbol.textContent = token.symbol;
+    const issuer = document.createElement("span");
+    issuer.className = "suggestion-item__issuer";
+    issuer.textContent = getTokenIssuerLabel(token);
+    titleRow.append(symbol, issuer);
+
+    const meta = document.createElement("div");
+    meta.className = "suggestion-item__meta";
+    meta.textContent = token.name || "";
+
+    button.append(titleRow, meta);
+    button.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+    });
+    button.addEventListener("mouseenter", () => {
+      setActiveSuggestionIndex(index);
+    });
+    button.addEventListener("click", () => {
+      applyTokenSuggestion(token);
+    });
+    currencySuggestionList.appendChild(button);
+  };
+
+  if (recentMatches.length) {
+    addGroupLabel("Recent");
+    recentMatches.forEach(addTokenButton);
+  }
+
+  if (seedMatches.length) {
+    if (recentMatches.length) {
+      addGroupLabel("Tokens");
+    }
+    seedMatches.forEach(addTokenButton);
+  }
+
+  currencySuggestionList.hidden = false;
+  currencyInput.setAttribute("aria-expanded", "true");
+  setActiveSuggestionIndex(-1);
 };
 
 const setFieldError = (key, message) => {
@@ -2989,6 +3187,105 @@ const handleShareInputChange = () => {
   setShareLoadNote(false);
   scheduleShareUrlUpdate();
 };
+
+const initTokenSuggestions = async () => {
+  if (!currencyInput || !currencySuggestionList) {
+    return;
+  }
+  currencyInput.setAttribute("aria-expanded", "false");
+  recentTokenSuggestions = loadRecentTokenSuggestions();
+
+  try {
+    const response = await fetch(TOKENLIST_SEED_URL, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Seed token list not available");
+    }
+    const payload = await response.json();
+    if (!Array.isArray(payload)) {
+      throw new Error("Seed token list invalid");
+    }
+    seedTokenSuggestions = payload
+      .map(normalizeTokenSuggestion)
+      .filter((token) => token && token.symbol);
+    suggestionsEnabled = seedTokenSuggestions.length > 0;
+    if (!suggestionsEnabled) {
+      closeTokenSuggestions();
+      return;
+    }
+  } catch (error) {
+    seedTokenSuggestions = [];
+    suggestionsEnabled = false;
+    closeTokenSuggestions();
+    return;
+  }
+
+  const handleSuggestionInput = () => {
+    renderTokenSuggestions(currencyInput.value);
+  };
+
+  currencyInput.addEventListener("input", handleSuggestionInput);
+  currencyInput.addEventListener("focus", handleSuggestionInput);
+  currencyInput.addEventListener("keydown", (event) => {
+    if (!suggestionsEnabled) {
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      if (currencySuggestionList.hidden) {
+        renderTokenSuggestions(currencyInput.value);
+      }
+      if (!suggestionItems.length) {
+        return;
+      }
+      event.preventDefault();
+      const nextIndex =
+        suggestionActiveIndex < 0
+          ? 0
+          : (suggestionActiveIndex + 1) % suggestionItems.length;
+      setActiveSuggestionIndex(nextIndex);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      if (currencySuggestionList.hidden) {
+        renderTokenSuggestions(currencyInput.value);
+      }
+      if (!suggestionItems.length) {
+        return;
+      }
+      event.preventDefault();
+      const nextIndex =
+        suggestionActiveIndex < 0
+          ? suggestionItems.length - 1
+          : (suggestionActiveIndex - 1 + suggestionItems.length) % suggestionItems.length;
+      setActiveSuggestionIndex(nextIndex);
+      return;
+    }
+    if (event.key === "Enter") {
+      if (currencySuggestionList.hidden || suggestionActiveIndex < 0) {
+        return;
+      }
+      event.preventDefault();
+      applyTokenSuggestion(suggestionItems[suggestionActiveIndex]);
+      return;
+    }
+    if (event.key === "Escape") {
+      if (!currencySuggestionList.hidden) {
+        event.preventDefault();
+        closeTokenSuggestions();
+      }
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!currencySuggestionField || currencySuggestionList.hidden) {
+      return;
+    }
+    if (!currencySuggestionField.contains(event.target)) {
+      closeTokenSuggestions();
+    }
+  });
+};
+
+void initTokenSuggestions();
 
 currencyInput?.addEventListener("input", handleShareInputChange);
 issuerInput?.addEventListener("input", handleShareInputChange);

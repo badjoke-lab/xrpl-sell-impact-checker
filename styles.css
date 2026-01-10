@@ -126,6 +126,71 @@ h2 {
   background: #ffffff;
 }
 
+.field--suggestions {
+  position: relative;
+}
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #cbd5f5;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  padding: 6px;
+  z-index: 10;
+}
+
+.suggestions__group {
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.suggestion-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #0f172a;
+}
+
+.suggestion-item__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.suggestion-item__meta {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.suggestion-item__issuer {
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.suggestion-item.is-active,
+.suggestion-item:focus-visible {
+  outline: none;
+  background: #e2e8f0;
+}
+
 .field input:focus-visible,
 .field select:focus-visible {
   outline: 2px solid var(--color-focus-ring);
