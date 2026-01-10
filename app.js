@@ -203,6 +203,10 @@ let lastShouldFetchAmm = false;
 let lastOffersHash = "";
 let lastFetchedAt = null;
 let lastEndpointLabel = "";
+let lastUsedVenue = VENUE_CLOB;
+let lastDisplaySimulation = null;
+let lastDisplayMaxSellResult = null;
+let lastAmmMaxSellResult = null;
 let chartUpdateTimer = null;
 let pendingChartPayload = null;
 let shareUrlTimer = null;
@@ -984,6 +988,10 @@ const resetResults = () => {
   lastOffersHash = "";
   lastFetchedAt = null;
   lastEndpointLabel = "";
+  lastUsedVenue = VENUE_CLOB;
+  lastDisplaySimulation = null;
+  lastDisplayMaxSellResult = null;
+  lastAmmMaxSellResult = null;
   scheduleChartsUpdate(
     { offers: null, simulation: null, maxSellResult: null, currency: "" },
     { immediate: true }
@@ -1082,12 +1090,14 @@ const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
       })
     );
     setFiatWarning(null);
-    if (lastSortedOffers && lastSimulation) {
+    if (lastSortedOffers && lastDisplaySimulation) {
       scheduleChartsUpdate({
         offers: lastSortedOffers,
-        simulation: lastSimulation,
-        maxSellResult: lastMaxSellResult,
+        simulation: lastDisplaySimulation,
+        maxSellResult: lastDisplayMaxSellResult,
         currency: lastCurrency,
+        venue: lastUsedVenue,
+        ammReserves: lastAmmReserves,
       });
     }
     return;
@@ -1102,12 +1112,14 @@ const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
   );
   setResultText(resultFiatRate, t("results.receive.rate_unavailable"));
   setFiatWarning(t("results.receive.fiat_warning"));
-  if (lastSortedOffers && lastSimulation) {
+  if (lastSortedOffers && lastDisplaySimulation) {
     scheduleChartsUpdate({
       offers: lastSortedOffers,
-      simulation: lastSimulation,
-      maxSellResult: lastMaxSellResult,
+      simulation: lastDisplaySimulation,
+      maxSellResult: lastDisplayMaxSellResult,
       currency: lastCurrency,
+      venue: lastUsedVenue,
+      ammReserves: lastAmmReserves,
     });
   }
 };
@@ -1649,6 +1661,24 @@ const findMaxSellWithinThresholdAmm = ({ reserves, thresholdPct }) => {
   return { ok: true, maxSell: lo };
 };
 
+const buildAmmMaxSellResult = ({ reserves, thresholdPct }) => {
+  const result = findMaxSellWithinThresholdAmm({ reserves, thresholdPct });
+  if (!result.ok || !Number.isFinite(result.maxSell) || result.maxSell <= 0) {
+    return { status: "not_available" };
+  }
+  const simulation = simulateSellIntoAmm({ sellAmount: result.maxSell, reserves });
+  if (!simulation.ok) {
+    return { status: "not_available" };
+  }
+  return {
+    status: "available",
+    maxSellAmount: result.maxSell,
+    simulation: {
+      receiveXrp: simulation.receivedXrp,
+    },
+  };
+};
+
 const computeClobSlippagePct = ({ simulation, bestPrice }) => {
   if (
     !simulation ||
@@ -1753,6 +1783,31 @@ const buildImpactSamples = ({ offers, sellAmount, sampleCount = 20 }) => {
   return { samples: points, totalLiquidity };
 };
 
+const buildAmmImpactSamples = ({ reserves, sellAmount, sampleCount = 20 }) => {
+  const total = Number(sellAmount);
+  if (!reserves || !Number.isFinite(total) || total <= 0) {
+    return { samples: [], totalLiquidity: 0 };
+  }
+  const totalPoints = Math.max(2, Math.min(sampleCount, 30));
+  const points = [];
+
+  for (let index = 1; index <= totalPoints; index += 1) {
+    const amount = (total * index) / totalPoints;
+    const simulation = simulateSellIntoAmm({ sellAmount: amount, reserves });
+    if (!simulation.ok) {
+      continue;
+    }
+    points.push({
+      sellAmount: amount,
+      receiveXrp: simulation.receivedXrp,
+      filledToken: amount,
+      isPartial: false,
+    });
+  }
+
+  return { samples: points, totalLiquidity: total };
+};
+
 const getOffersHash = (offers) => {
   if (!Array.isArray(offers) || offers.length === 0) {
     return "empty";
@@ -1768,7 +1823,23 @@ const getOffersHash = (offers) => {
   return String(hash);
 };
 
+const getAmmCacheKey = ({ reserves, sellAmount, sampleCount }) => {
+  if (!reserves) {
+    return "empty";
+  }
+  const rounded = (value) =>
+    Number.isFinite(value) ? Math.round(value * 1e6) : 0;
+  return [
+    rounded(reserves.tokenReserve),
+    rounded(reserves.xrpReserve),
+    rounded(reserves.feePct),
+    rounded(sellAmount),
+    sampleCount,
+  ].join(":");
+};
+
 const impactSampleCache = new Map();
+const ammSampleCache = new Map();
 
 const buildDepthSeries = ({ offers }) => {
   const validOffers = filterValidOffers(offers);
@@ -1783,6 +1854,28 @@ const buildDepthSeries = ({ offers }) => {
   });
 
   return { points, totalToken, totalXrp, hasLiquidity: totalToken > 0 };
+};
+
+const buildAmmDepthSeries = ({ reserves, sellAmount, sampleCount = 20 }) => {
+  const { samples, totalLiquidity } = buildAmmImpactSamples({
+    reserves,
+    sellAmount,
+    sampleCount,
+  });
+  if (!samples.length || totalLiquidity <= 0) {
+    return { points: [], totalToken: 0, totalXrp: 0, hasLiquidity: false };
+  }
+  const points = [{ token: 0, xrp: 0 }];
+  samples.forEach((sample) => {
+    points.push({ token: sample.sellAmount, xrp: sample.receiveXrp });
+  });
+  const lastPoint = points[points.length - 1];
+  return {
+    points,
+    totalToken: lastPoint.token,
+    totalXrp: lastPoint.xrp,
+    hasLiquidity: lastPoint.token > 0,
+  };
 };
 
 const buildConsumedDepth = ({ offers, sellAmount }) => {
@@ -2217,8 +2310,61 @@ const updateMaxSellResults = async ({
   referencePrice,
   currency,
   result: precomputedResult,
+  venue = VENUE_CLOB,
+  ammReserves = null,
 }) => {
   updateMaxSellLabel(thresholdPct);
+
+  if (venue === VENUE_AMM) {
+    const result =
+      precomputedResult ?? buildAmmMaxSellResult({ reserves: ammReserves, thresholdPct });
+    if (result.status !== "available") {
+      setResultText(resultMaxSellValue, t("results.max_sell.not_available"));
+      setResultText(resultMaxSellNote, "");
+      return;
+    }
+    const tokenAmount = formatNumber(result.maxSellAmount, {
+      maximumFractionDigits: 6,
+    });
+    const xrpAmount = formatNumber(result.simulation.receiveXrp, {
+      maximumFractionDigits: 6,
+    });
+    const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
+    const fiatRate = await fetchXrpFiatRate(fiat);
+
+    if (fiatRate && Number.isFinite(fiatRate.rate)) {
+      const fiatAmount = formatFiatAmount(
+        result.simulation.receiveXrp * fiatRate.rate,
+        fiat
+      );
+      setResultText(
+        resultMaxSellValue,
+        t("results.max_sell.value_with_fiat", {
+          amount: tokenAmount,
+          currency,
+          fiat: fiatAmount,
+        })
+      );
+      setResultText(
+        resultMaxSellNote,
+        t("results.max_sell.xrp_line", {
+          amount: xrpAmount,
+        })
+      );
+      return;
+    }
+
+    setResultText(
+      resultMaxSellValue,
+      t("results.max_sell.value_with_xrp", {
+        amount: tokenAmount,
+        currency,
+        xrp: xrpAmount,
+      })
+    );
+    setResultText(resultMaxSellNote, t("results.max_sell.fiat_unavailable"));
+    return;
+  }
 
   if (!offers || offers.length === 0) {
     setResultText(resultMaxSellValue, t("results.max_sell.not_available"));
@@ -2506,12 +2652,21 @@ function setChartNote(element, message) {
   element.hidden = !message;
 }
 
-function renderCharts({ offers, simulation, maxSellResult, currency }) {
+function renderCharts({
+  offers,
+  simulation,
+  maxSellResult,
+  currency,
+  venue = VENUE_CLOB,
+  ammReserves = null,
+}) {
   if (!impactChart || !depthChart) {
     return;
   }
 
-  if (!offers || offers.length === 0 || !simulation) {
+  const isAmm = venue === VENUE_AMM;
+
+  if ((!simulation || (!isAmm && (!offers || offers.length === 0))) || (isAmm && !ammReserves)) {
     renderImpactChart({ svg: impactChart, samples: [] });
     renderDepthChart({ svg: depthChart, depthSeries: { points: [] } });
     setChartNote(impactChartNote, null);
@@ -2524,7 +2679,8 @@ function renderCharts({ offers, simulation, maxSellResult, currency }) {
   const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
   const rate = lastFiatRate?.rate ?? null;
   const hasFiat = Number.isFinite(rate);
-  const isPartial = simulation.filledToken < simulation.requestedToken;
+  const isPartial =
+    !isAmm && simulation.filledToken < simulation.requestedToken;
   const receiveLabel = hasFiat
     ? formatFiatAmount(simulation.receiveXrp * rate, fiat)
     : t("graphs.impact.receive_xrp", {
@@ -2532,18 +2688,43 @@ function renderCharts({ offers, simulation, maxSellResult, currency }) {
       });
 
   const thresholdPct = getImpactThresholdPct();
-  const offersHash = lastOffersHash || getOffersHash(offers);
-  const sampleCacheKey = `${offersHash}:${fiat}:${thresholdPct}:${simulation.requestedToken}`;
-  let cachedSample = impactSampleCache.get(sampleCacheKey);
-  if (!cachedSample) {
-    cachedSample = buildImpactSamples({
-      offers,
-      sellAmount: simulation.requestedToken,
-      sampleCount: 24,
+  let samples = [];
+  let totalLiquidity = 0;
+  if (isAmm) {
+    const sampleCount = 24;
+    const chartSellAmount = Math.max(
+      simulation.requestedToken,
+      maxSellResult?.maxSellAmount ?? 0
+    );
+    const sampleCacheKey = getAmmCacheKey({
+      reserves: ammReserves,
+      sellAmount: chartSellAmount,
+      sampleCount,
     });
-    impactSampleCache.set(sampleCacheKey, cachedSample);
+    let cachedSample = ammSampleCache.get(sampleCacheKey);
+    if (!cachedSample) {
+      cachedSample = buildAmmImpactSamples({
+        reserves: ammReserves,
+        sellAmount: chartSellAmount,
+        sampleCount,
+      });
+      ammSampleCache.set(sampleCacheKey, cachedSample);
+    }
+    ({ samples, totalLiquidity } = cachedSample);
+  } else {
+    const offersHash = lastOffersHash || getOffersHash(offers);
+    const sampleCacheKey = `${offersHash}:${fiat}:${thresholdPct}:${simulation.requestedToken}`;
+    let cachedSample = impactSampleCache.get(sampleCacheKey);
+    if (!cachedSample) {
+      cachedSample = buildImpactSamples({
+        offers,
+        sellAmount: simulation.requestedToken,
+        sampleCount: 24,
+      });
+      impactSampleCache.set(sampleCacheKey, cachedSample);
+    }
+    ({ samples, totalLiquidity } = cachedSample);
   }
-  const { samples, totalLiquidity } = cachedSample;
   if (samples.length === 0 || totalLiquidity <= 0) {
     renderImpactChart({ svg: impactChart, samples: [] });
     setChartNote(impactChartNote, t("graphs.impact.note_no_liquidity"));
@@ -2611,11 +2792,26 @@ function renderCharts({ offers, simulation, maxSellResult, currency }) {
     }
   }
 
-  const depthSeries = buildDepthSeries({ offers });
-  const consumedSeries = buildConsumedDepth({
-    offers,
-    sellAmount: simulation.requestedToken,
-  });
+  const depthSeries = isAmm
+    ? buildAmmDepthSeries({
+        reserves: ammReserves,
+        sellAmount: Math.max(
+          simulation.requestedToken,
+          maxSellResult?.maxSellAmount ?? 0
+        ),
+        sampleCount: 24,
+      })
+    : buildDepthSeries({ offers });
+  const consumedSeries = isAmm
+    ? buildAmmDepthSeries({
+        reserves: ammReserves,
+        sellAmount: simulation.requestedToken,
+        sampleCount: 24,
+      })
+    : buildConsumedDepth({
+        offers,
+        sellAmount: simulation.requestedToken,
+      });
 
   if (!depthSeries.hasLiquidity) {
     renderDepthChart({ svg: depthChart, depthSeries: { points: [] } });
@@ -2808,13 +3004,15 @@ fiatCurrencySelect?.addEventListener("change", () => {
   setResultText(resultFiatRate, t("results.receive.fiat_pending"));
   setFiatWarning(null);
   void refreshFiatEstimate(lastReceiveXrp);
-  if (lastSortedOffers && lastBestPrice > 0) {
+  if (lastDisplaySimulation) {
     void updateMaxSellResults({
       offers: lastSortedOffers,
       thresholdPct: getImpactThresholdPct(),
       referencePrice: lastBestPrice,
       currency: lastCurrency,
-      result: lastMaxSellResult,
+      result: lastDisplayMaxSellResult,
+      venue: lastUsedVenue,
+      ammReserves: lastAmmReserves,
     });
   }
   setShareLoadNote(false);
@@ -2826,7 +3024,7 @@ impactThresholdSelect?.addEventListener("change", () => {
   updateMaxSellLabel(thresholdPct);
   updateImpactThresholdHelp(thresholdPct);
   updateLiquiditySplitLabel(thresholdPct);
-  if (!lastSortedOffers || lastBestPrice <= 0 || !lastSimulation) {
+  if (!lastSortedOffers || !lastDisplaySimulation) {
     return;
   }
   const result = computeMaxSellUnderThreshold({
@@ -2835,25 +3033,37 @@ impactThresholdSelect?.addEventListener("change", () => {
     referencePrice: lastBestPrice,
   });
   lastMaxSellResult = result;
+  let ammMaxSellResult = null;
   if (lastAmmReserves) {
-    const ammResult = findMaxSellWithinThresholdAmm({
+    ammMaxSellResult = buildAmmMaxSellResult({
       reserves: lastAmmReserves,
       thresholdPct,
     });
-    lastAmmMaxSell = ammResult.ok ? ammResult.maxSell : 0;
+    lastAmmMaxSellResult = ammMaxSellResult;
+    lastAmmMaxSell =
+      ammMaxSellResult?.status === "available" ? ammMaxSellResult.maxSellAmount : 0;
+  } else {
+    lastAmmMaxSellResult = null;
+    lastAmmMaxSell = 0;
   }
+  lastDisplayMaxSellResult =
+    lastUsedVenue === VENUE_AMM ? ammMaxSellResult : result;
   void updateMaxSellResults({
     offers: lastSortedOffers,
     thresholdPct,
     referencePrice: lastBestPrice,
     currency: lastCurrency,
-    result,
+    result: lastDisplayMaxSellResult,
+    venue: lastUsedVenue,
+    ammReserves: lastAmmReserves,
   });
   scheduleChartsUpdate({
     offers: lastSortedOffers,
-    simulation: lastSimulation,
-    maxSellResult: lastMaxSellResult,
+    simulation: lastDisplaySimulation,
+    maxSellResult: lastDisplayMaxSellResult,
     currency: lastCurrency,
+    venue: lastUsedVenue,
+    ammReserves: lastAmmReserves,
   });
   updateLiquidityBreakdown({ thresholdPct });
   setShareLoadNote(false);
@@ -3110,12 +3320,15 @@ estimateButton?.addEventListener("click", async () => {
     });
     let ammMax = 0;
     let ammSimulation = null;
+    let ammMaxSellResult = null;
     if (ammReserves) {
-      const ammResult = findMaxSellWithinThresholdAmm({
+      ammMaxSellResult = buildAmmMaxSellResult({
         reserves: ammReserves,
         thresholdPct,
       });
-      ammMax = ammResult.ok ? ammResult.maxSell : 0;
+      lastAmmMaxSellResult = ammMaxSellResult;
+      ammMax =
+        ammMaxSellResult?.status === "available" ? ammMaxSellResult.maxSellAmount : 0;
       lastAmmMaxSell = ammMax;
       ammSimulation = simulateSellIntoAmm({
         sellAmount: amountValue,
@@ -3123,6 +3336,7 @@ estimateButton?.addEventListener("click", async () => {
       });
     } else {
       lastAmmMaxSell = 0;
+      lastAmmMaxSellResult = null;
     }
     const thinCutoffPct = getThinCutoffPct();
     const decision = decideVenue({
@@ -3160,6 +3374,11 @@ estimateButton?.addEventListener("click", async () => {
     }
 
     setUsedVenue(chosenVenue);
+    lastUsedVenue = chosenVenue;
+    lastDisplaySimulation = displaySimulation;
+    const displayMaxSellResult =
+      chosenVenue === VENUE_AMM ? ammMaxSellResult : maxSellResult;
+    lastDisplayMaxSellResult = displayMaxSellResult;
     updateResultsSummary({
       simulation: displaySimulation,
       bestPrice,
@@ -3184,14 +3403,18 @@ estimateButton?.addEventListener("click", async () => {
       thresholdPct,
       referencePrice: bestPrice,
       currency,
-      result: maxSellResult,
+      result: displayMaxSellResult,
+      venue: chosenVenue,
+      ammReserves: lastAmmReserves,
     });
     scheduleChartsUpdate(
       {
         offers: sortedOffers,
-        simulation: clobSimulation,
-        maxSellResult,
+        simulation: displaySimulation,
+        maxSellResult: displayMaxSellResult,
         currency,
+        venue: chosenVenue,
+        ammReserves: lastAmmReserves,
       },
       { immediate: true }
     );
