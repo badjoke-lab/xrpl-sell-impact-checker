@@ -15,7 +15,12 @@
           <p class="eyebrow" data-i18n="app.eyebrow"></p>
           <h1 data-i18n="app.tagline"></h1>
         </div>
-        <button class="ghost-button" type="button" data-i18n="header.wallet_not_required" disabled></button>
+        <button
+          class="ghost-button"
+          type="button"
+          data-i18n="header.wallet_not_required"
+          hidden
+        ></button>
       </header>
 
       <main class="app__main">
@@ -143,10 +148,14 @@
             <button class="secondary-button" type="button" id="try-example" data-i18n="actions.try_example"></button>
             <p class="field__help" data-i18n="actions.try_example_note"></p>
             <p class="status status--notice" id="example-status" hidden></p>
+            <button class="secondary-button" type="button" id="reset-inputs" data-i18n="actions.reset"></button>
             <button class="secondary-button" type="button" id="copy-link" data-i18n="actions.copy_link"></button>
             <p class="status status--notice" id="share-load-note" data-i18n="status.loaded_from_link" hidden></p>
             <p class="status status--success" id="share-toast" aria-live="polite" hidden></p>
             <button class="primary-button" type="button" data-i18n="actions.estimate"></button>
+            <div class="progress-bar" id="estimate-progress" role="progressbar" aria-label="Estimating" hidden>
+              <span class="progress-bar__fill"></span>
+            </div>
             <p class="error-banner" hidden></p>
             <p class="status" data-i18n="status.waiting"></p>
             <p class="status-endpoint" hidden></p>
