@@ -122,6 +122,7 @@ const statusEndpointLine = document.querySelector(".status-endpoint");
 const errorBanner = document.querySelector(".error-banner");
 const estimateButton = document.querySelector(".primary-button");
 const tryExampleButton = document.querySelector("#try-example");
+const resetButton = document.querySelector("#reset-inputs");
 const currencyInput = document.querySelector("#currency-input");
 const issuerInput = document.querySelector("#issuer-input");
 const currencySuggestionList = document.querySelector("#currency-suggestions");
@@ -135,6 +136,7 @@ const limitNote = document.querySelector("#limit-note");
 const copyLinkButton = document.querySelector("#copy-link");
 const shareLoadNote = document.querySelector("#share-load-note");
 const shareToast = document.querySelector("#share-toast");
+const estimateProgress = document.querySelector("#estimate-progress");
 const exampleStatus = document.querySelector("#example-status");
 const fieldErrors = {
   currency: document.querySelector('[data-error-for="currency"]'),
@@ -265,6 +267,9 @@ const setEstimateButtonBusy = (isBusy) => {
   }
   estimateButton.disabled = isBusy;
   estimateButton.textContent = t(isBusy ? "actions.estimating" : "actions.estimate");
+  if (estimateProgress) {
+    estimateProgress.hidden = !isBusy;
+  }
 };
 
 const setError = (message) => {
@@ -404,7 +409,8 @@ const applyTokenSuggestion = (token) => {
   if (!currencyInput || !issuerInput) {
     return;
   }
-  currencyInput.value = token.symbol;
+  const normalized = normalizeCurrencyInput(token.symbol);
+  currencyInput.value = normalized.currencyInput || token.symbol;
   issuerInput.value = token.issuer;
   setFieldError("currency", null);
   setFieldError("issuer", null);
@@ -925,6 +931,12 @@ const setShareLoadNote = (visible) => {
     return;
   }
   shareLoadNote.hidden = !visible;
+};
+
+const clearShareParams = () => {
+  const url = new URL(window.location.href);
+  url.search = "";
+  history.replaceState(null, "", url.toString());
 };
 
 const showShareToast = (message) => {
@@ -3182,6 +3194,50 @@ if (currencyInput && !currencyInput.value) {
 if (issuerInput && !issuerInput.value) {
   issuerInput.value = DEFAULT_TOKEN.issuer;
 }
+
+const resetInputs = () => {
+  if (currencyInput) {
+    currencyInput.value = DEFAULT_TOKEN.currency;
+  }
+  if (issuerInput) {
+    issuerInput.value = DEFAULT_TOKEN.issuer;
+  }
+  if (amountInput) {
+    amountInput.value = "";
+  }
+  if (limitInput) {
+    limitInput.value = String(DEFAULT_LIMIT);
+  }
+  if (impactThresholdSelect) {
+    impactThresholdSelect.value = "5";
+  }
+  if (thinCutoffInput) {
+    thinCutoffInput.value = String(DEFAULT_THIN_CUTOFF_PERCENT);
+  }
+  if (fiatCurrencySelect) {
+    fiatCurrencySelect.value = DEFAULT_FIAT;
+    try {
+      localStorage.setItem(FIAT_STORAGE_KEY, DEFAULT_FIAT);
+    } catch (error) {
+      // Ignore storage failures.
+    }
+  }
+  clearFieldErrors();
+  setLimitNote(null);
+  setError(null);
+  setEndpointNotice(null);
+  setShareLoadNote(false);
+  showShareToast(null);
+  setExampleStatus("");
+  closeTokenSuggestions();
+  resetResults();
+  setStatus("status.waiting");
+  clearShareParams();
+};
+
+resetButton?.addEventListener("click", () => {
+  resetInputs();
+});
 
 const handleShareInputChange = () => {
   setShareLoadNote(false);
