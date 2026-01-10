@@ -10,7 +10,7 @@ const XRPL_ENDPOINTS = [
 ];
 const TIMEOUT_MS = 12_000;
 const MAX_BODY_BYTES = 25 * 1024;
-const ALLOWED_METHODS = new Set(["server_info", "book_offers"]);
+const ALLOWED_METHODS = new Set(["server_info", "book_offers", "account_lines"]);
 
 function jsonResponse(status, payload) {
   return new Response(JSON.stringify(payload), {
