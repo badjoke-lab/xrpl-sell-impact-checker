@@ -4,13 +4,9 @@ const args = process.argv.slice(2);
 const baseUrl = args[0] || process.env.PAGES_BASE_URL;
 
 if (!baseUrl) {
-  console.error("Usage: node scripts/test-pages-function.mjs <https://your-pages-domain> [currency] [issuer] [limit]");
+  console.error("Usage: node scripts/test-pages-function.mjs <http://localhost:8788|https://your-pages-domain> [currency] [issuer] [limit]");
   process.exit(1);
 }
-
-const endpoint = baseUrl.endsWith("/api/book_offers")
-  ? baseUrl
-  : `${baseUrl.replace(/\/$/, "")}/api/book_offers`;
 
 const currencyArg = args[1];
 const issuerArg = args[2];
@@ -20,24 +16,22 @@ const currency = (currencyArg || "DEM").toUpperCase();
 const issuer = issuerArg || "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
 const limit = Number(limitArg || 50);
 
-const payload = {
-  currency,
-  issuer,
-  limit,
-};
+const endpointBase = baseUrl.endsWith("/api/book_offers")
+  ? baseUrl
+  : `${baseUrl.replace(/\/$/, "")}/api/book_offers`;
+
+const url = new URL(endpointBase);
+url.searchParams.set("currency", currency);
+url.searchParams.set("issuer", issuer);
+url.searchParams.set("limit", String(limit));
 
 const run = async () => {
   const startedAt = new Date().toISOString();
   console.log(`Pages Function test @ ${startedAt}`);
-  console.log(`Endpoint: ${endpoint}`);
-  console.log(`Request payload: ${JSON.stringify(payload)}`);
+  console.log(`Endpoint: ${url.toString()}`);
 
   try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const response = await fetch(url.toString(), { method: "GET" });
 
     const bodyText = await response.text();
     let data = null;
@@ -51,7 +45,7 @@ const run = async () => {
       return;
     }
 
-    const offers = data?.result?.offers;
+    const offers = data?.offers ?? data?.result?.offers;
     const offersCount = Array.isArray(offers) ? offers.length : null;
 
     console.log(`Status: ${response.status}`);

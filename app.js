@@ -1,6 +1,7 @@
 import { loadDictionary, t } from "./src/i18n/index.js";
 
 const BOOK_OFFERS_API = "/api/book_offers";
+const AMM_INFO_API = "/api/amm_info";
 const ORDERBOOK_API_ENDPOINT = {
   id: "orderbook-api",
   url: BOOK_OFFERS_API,
@@ -1420,6 +1421,116 @@ const computeMaxSellUnderThreshold = ({
     maxSellAmount: lastOkAmount,
     simulation: lastOkSimulation,
   };
+};
+
+
+const fetchAmmInfo = async ({ currency, issuer }) => {
+  const url = new URL(AMM_INFO_API, window.location.href);
+  url.searchParams.set("currency", String(currency || "").toUpperCase());
+  url.searchParams.set("issuer", String(issuer || ""));
+  const res = await fetch(url.toString(), { method: "GET" });
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, error: "non_json_response", rawText: text?.slice?.(0, 600) };
+  }
+};
+
+const parseAmmReserves = ({ amm, currency, issuer }) => {
+  if (!amm) return null;
+
+  const a1 = amm.amount ?? amm.asset1 ?? null;
+  const a2 = amm.amount2 ?? amm.asset2 ?? null;
+
+  const parseXrp = (x) => {
+    if (typeof x === "string") {
+      const drops = Number(x);
+      if (!Number.isFinite(drops)) return null;
+      return drops / 1_000_000;
+    }
+    if (x && typeof x === "object" && String(x.currency || "").toUpperCase() === "XRP") {
+      const v = Number(x.value);
+      return Number.isFinite(v) ? v : null;
+    }
+    return null;
+  };
+
+  const parseIou = (x) => {
+    if (x && typeof x === "object") {
+      const v = Number(x.value);
+      return Number.isFinite(v) ? v : null;
+    }
+    return null;
+  };
+
+  // determine which side is XRP
+  const xrp1 = parseXrp(a1);
+  const xrp2 = parseXrp(a2);
+
+  let xrpReserve = null;
+  let tokenReserve = null;
+
+  if (xrp1 != null) {
+    xrpReserve = xrp1;
+    tokenReserve = parseIou(a2);
+  } else if (xrp2 != null) {
+    xrpReserve = xrp2;
+    tokenReserve = parseIou(a1);
+  }
+
+  if (!Number.isFinite(xrpReserve) || !Number.isFinite(tokenReserve) || xrpReserve <= 0 || tokenReserve <= 0) {
+    return null;
+  }
+
+  const tradingFee = Number(amm.trading_fee ?? amm.tradingFee ?? 0);
+  const feePct = Number.isFinite(tradingFee) ? tradingFee / 100000 : 0;
+
+  return { xrpReserve, tokenReserve, feePct };
+};
+
+const simulateSellIntoAmm = ({ sellAmount, reserves }) => {
+  const sell = Number(sellAmount);
+  if (!reserves || !Number.isFinite(sell) || sell <= 0) {
+    return { ok: false, receivedXrp: 0, avgPrice: 0, slippagePct: null, spotPrice: null };
+  }
+
+  const { xrpReserve: Y, tokenReserve: X, feePct } = reserves;
+  const spotPrice = Y / X; // XRP per token
+  const dxEff = sell * (1 - Math.max(0, Math.min(1, feePct)));
+  const k = X * Y;
+
+  const newX = X + dxEff;
+  const newY = k / newX;
+  const out = Math.max(0, Y - newY);
+
+  const avgPrice = out / sell;
+  const rawSlip = spotPrice > 0 ? ((spotPrice - avgPrice) / spotPrice) * 100 : null;
+  const slippagePct = rawSlip == null ? null : Math.max(0, rawSlip);
+
+  return { ok: true, receivedXrp: out, avgPrice, slippagePct, spotPrice };
+};
+
+const findMaxSellWithinThresholdAmm = ({ reserves, thresholdPct }) => {
+  if (!reserves) return { ok: false, maxSell: 0 };
+
+  const thr = Number(thresholdPct);
+  if (!Number.isFinite(thr) || thr <= 0) return { ok: false, maxSell: 0 };
+
+  let lo = 0;
+  let hi = reserves.tokenReserve * 0.99; // practical cap
+
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    const sim = simulateSellIntoAmm({ sellAmount: mid, reserves });
+    if (!sim.ok || sim.slippagePct == null) {
+      hi = mid;
+      continue;
+    }
+    if (sim.slippagePct <= thr) lo = mid;
+    else hi = mid;
+  }
+  return { ok: true, maxSell: lo };
 };
 
 const buildImpactSamples = ({ offers, sellAmount, sampleCount = 20 }) => {
