@@ -51,6 +51,11 @@
       "option_10": "10%",
       "option_20": "20%"
     },
+    "thin_cutoff": {
+      "label": "Thin cutoff (%)",
+      "placeholder": "20",
+      "helper": "If CLOB share is below this, favor AMM for larger sells."
+    },
     "fiat_currency": {
       "label": "Fiat currency",
       "helper": "Fiat estimate comes later; XRP is shown now.",
@@ -117,6 +122,9 @@
       "label": "Slippage (est.)",
       "help": "When the book is thin, larger sells worsen the rate and reduce proceeds."
     },
+    "used_venue": {
+      "label": "Used venue"
+    },
     "max_sell": {
       "label": "Max sell under {threshold} (est.)",
       "value_with_fiat": "{amount} {currency} (≈ {fiat})",
@@ -126,6 +134,7 @@
       "not_available": "Not available (insufficient liquidity for full fill)"
     },
     "why_line": "This sell consumes top {count} offers.",
+    "why_line_amm": "This sell uses AMM pool pricing.",
     "warnings": {
       "partial": "Warning: Only {pct}% can be sold.",
       "none": "Order book empty (offers=0).",
@@ -143,6 +152,7 @@
     "amm_reserves": "AMM pool reserves",
     "amm_reserves_value": "{token} {currency} / {xrp} XRP",
     "amm_fee": "AMM trading fee",
+    "used_venue": "Used venue",
     "amm_not_found": "AMM not found",
     "amm_not_applicable": "Not applicable",
     "endpoint_tried": "Endpoint tried"

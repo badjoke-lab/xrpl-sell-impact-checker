@@ -19,9 +19,12 @@ const LIMIT_MIN = 1;
 const LIMIT_MAX = 200;
 const THRESHOLD_VALUES = new Set([1, 2, 5, 10, 20]);
 const DEFAULT_SLIPPAGE_PERCENT = 5;
+const DEFAULT_THIN_CUTOFF_PERCENT = 20;
 const FIAT_VALUES = new Set(["USD", "JPY"]);
 const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
+const VENUE_CLOB = "CLOB";
+const VENUE_AMM = "AMM";
 const EXAMPLE_CANDIDATES = [
   {
     currency: "USD",
@@ -116,6 +119,7 @@ const amountInput = document.querySelector("#sell-amount-input");
 const limitInput = document.querySelector("#limit-input");
 const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
 const impactThresholdSelect = document.querySelector("#impact-threshold-select");
+const thinCutoffInput = document.querySelector("#thin-cutoff-input");
 const limitNote = document.querySelector("#limit-note");
 const copyLinkButton = document.querySelector("#copy-link");
 const shareLoadNote = document.querySelector("#share-load-note");
@@ -153,6 +157,9 @@ const resultWarning = document.querySelector('[data-result="warning"]');
 const resultMaxSellLabel = document.querySelector('[data-result="max-sell-label"]');
 const resultMaxSellValue = document.querySelector('[data-result="max-sell-value"]');
 const resultMaxSellNote = document.querySelector('[data-result="max-sell-note"]');
+const resultUsedVenueSummary = document.querySelector('[data-result="used-venue-summary"]');
+const resultUsedVenueDetails = document.querySelector('[data-result="used-venue-details"]');
+const resultUsedVenueNote = document.querySelector('[data-result="used-venue-note"]');
 const impactChart = document.querySelector("#impact-chart");
 const depthChart = document.querySelector("#depth-chart");
 const impactChartNote = document.querySelector('[data-result="impact-note"]');
@@ -175,6 +182,11 @@ const debugResponseKeys = document.querySelector('[data-debug="response-keys"]')
 const debugValidateTiming = document.querySelector('[data-debug="validate-ms"]');
 const debugNetworkTiming = document.querySelector('[data-debug="network-ms"]');
 const debugParseTiming = document.querySelector('[data-debug="parse-ms"]');
+const debugClobMax = document.querySelector('[data-debug="clob-max"]');
+const debugAmmMax = document.querySelector('[data-debug="amm-max"]');
+const debugClobShare = document.querySelector('[data-debug="clob-share"]');
+const debugVenue = document.querySelector('[data-debug="venue"]');
+const debugVenueReason = document.querySelector('[data-debug="venue-reason"]');
 
 let currentEndpointIndex = 0;
 let lastReceiveXrp = 0;
@@ -210,6 +222,11 @@ const debugState = {
   rawResponse: null,
   responseKeys: null,
   timestamp: null,
+  clobMax: null,
+  ammMax: null,
+  clobSharePct: null,
+  venue: null,
+  venueReason: null,
   timings: {
     validateMs: null,
     networkMs: null,
@@ -296,6 +313,20 @@ const formatDebugMs = (value) => {
     return "—";
   }
   return `${Math.round(value)} ms`;
+};
+
+const formatDebugNumber = (value) => {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  return formatNumber(value, { maximumFractionDigits: 6 });
+};
+
+const formatDebugPercent = (value) => {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  return formatPercent(value, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 };
 
 const setDebugValue = (element, value) => {
@@ -387,6 +418,11 @@ const updateDebugPanel = (updates = {}) => {
   setDebugValue(debugError, debugState.error);
   setDebugValue(debugRawResponse, formatDebugJson(debugState.rawResponse));
   setDebugValue(debugResponseKeys, debugState.responseKeys);
+  setDebugValue(debugClobMax, formatDebugNumber(debugState.clobMax));
+  setDebugValue(debugAmmMax, formatDebugNumber(debugState.ammMax));
+  setDebugValue(debugClobShare, formatDebugPercent(debugState.clobSharePct));
+  setDebugValue(debugVenue, debugState.venue ?? "—");
+  setDebugValue(debugVenueReason, debugState.venueReason ?? "—");
   setDebugValue(debugValidateTiming, formatDebugMs(debugState.timings.validateMs));
   setDebugValue(debugNetworkTiming, formatDebugMs(debugState.timings.networkMs));
   setDebugValue(debugParseTiming, formatDebugMs(debugState.timings.parseMs));
@@ -397,6 +433,11 @@ const buildDebugPayload = () => ({
   endpointUsed: debugState.endpointUsed,
   elapsedMs: debugState.elapsedMs,
   offersCount: debugState.offersCount,
+  clobMax: debugState.clobMax,
+  ammMax: debugState.ammMax,
+  clobSharePct: debugState.clobSharePct,
+  venue: debugState.venue,
+  venueReason: debugState.venueReason,
   error: debugState.error,
   timestamp: debugState.timestamp,
 });
@@ -575,6 +616,17 @@ const sanitizeThreshold = (value) => {
   return parsed;
 };
 
+const sanitizeThinCutoff = (value) => {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return clampNumber(parsed, 0, 100);
+};
+
 const sanitizeFiat = (value) => {
   if (!value) {
     return null;
@@ -593,6 +645,18 @@ const getImpactThresholdPct = () => {
   const raw = impactThresholdSelect?.value;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : DEFAULT_SLIPPAGE_PERCENT;
+};
+
+const getThinCutoffPct = () => {
+  const raw = thinCutoffInput?.value;
+  if (raw === "" || raw === null || raw === undefined) {
+    return DEFAULT_THIN_CUTOFF_PERCENT;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_THIN_CUTOFF_PERCENT;
+  }
+  return clampNumber(parsed, 0, 100);
 };
 
 const updateImpactThresholdHelp = (thresholdPct) => {
@@ -660,6 +724,7 @@ const getShareInputState = () => {
   const currency = sanitizeCurrency(currencyInput?.value || "");
   const amount = sanitizeAmount(amountInput?.value);
   const threshold = sanitizeThreshold(impactThresholdSelect?.value);
+  const thinCutoff = sanitizeThinCutoff(thinCutoffInput?.value);
   const fiat = sanitizeFiat(fiatCurrencySelect?.value);
   const limitRaw = limitInput?.value;
   const limit =
@@ -673,13 +738,15 @@ const getShareInputState = () => {
     amount,
     limit,
     threshold,
+    thinCutoff,
     fiat,
   };
 };
 
 const buildShareParams = () => {
   const params = new URLSearchParams();
-  const { currency, issuer, amount, limit, threshold, fiat } = getShareInputState();
+  const { currency, issuer, amount, limit, threshold, thinCutoff, fiat } =
+    getShareInputState();
   const hasPrimary = Boolean(currency || amount);
   if (!hasPrimary) {
     return params;
@@ -698,6 +765,11 @@ const buildShareParams = () => {
   const resolvedThreshold = threshold ?? getImpactThresholdPct();
   if (resolvedThreshold) {
     params.set("threshold", String(resolvedThreshold));
+    params.set("slippage", String(resolvedThreshold));
+  }
+  const resolvedThinCutoff = thinCutoff ?? getThinCutoffPct();
+  if (resolvedThinCutoff !== null && resolvedThinCutoff !== undefined) {
+    params.set("thin", String(resolvedThinCutoff));
   }
   const resolvedFiat = fiat ?? DEFAULT_FIAT;
   if (resolvedFiat) {
@@ -775,7 +847,8 @@ const applyShareParamsFromUrl = () => {
   const issuerParam = params.get("issuer");
   const amountParam = params.get("amount");
   const limitParam = params.get("limit");
-  const thresholdParam = params.get("threshold");
+  const slippageParam = params.get("slippage") ?? params.get("threshold");
+  const thinCutoffParam = params.get("thin");
   const fiatParam = params.get("fiat");
 
   const currency = currencyParam ? sanitizeCurrency(currencyParam) : null;
@@ -793,8 +866,13 @@ const applyShareParamsFromUrl = () => {
     hadInvalidParam = true;
   }
 
-  const threshold = thresholdParam ? sanitizeThreshold(thresholdParam) : null;
-  if (thresholdParam && !threshold) {
+  const threshold = slippageParam ? sanitizeThreshold(slippageParam) : null;
+  if (slippageParam && !threshold) {
+    hadInvalidParam = true;
+  }
+
+  const thinCutoff = thinCutoffParam ? sanitizeThinCutoff(thinCutoffParam) : null;
+  if (thinCutoffParam && thinCutoff === null) {
     hadInvalidParam = true;
   }
 
@@ -827,6 +905,9 @@ const applyShareParamsFromUrl = () => {
     updateMaxSellLabel(threshold);
     updateImpactThresholdHelp(threshold);
     updateLiquiditySplitLabel(threshold);
+  }
+  if (thinCutoffInput && thinCutoff !== null) {
+    thinCutoffInput.value = String(thinCutoff);
   }
   if (fiatCurrencySelect && fiat) {
     fiatCurrencySelect.value = fiat;
@@ -876,6 +957,9 @@ const resetResults = () => {
   setResultText(resultSlippage, placeholder);
   setResultText(resultSlippageHelp, getTranslationOrFallback("results.slippage.help"));
   setResultText(resultWhyLine, "");
+  setResultText(resultUsedVenueSummary, placeholder);
+  setResultText(resultUsedVenueDetails, placeholder);
+  setResultText(resultUsedVenueNote, "");
   setResultText(resultFiatRate, t("results.receive.fiat_pending"));
   setFiatWarning(null);
   lastReceiveXrp = 0;
@@ -1565,6 +1649,77 @@ const findMaxSellWithinThresholdAmm = ({ reserves, thresholdPct }) => {
   return { ok: true, maxSell: lo };
 };
 
+const computeClobSlippagePct = ({ simulation, bestPrice }) => {
+  if (
+    !simulation ||
+    !Number.isFinite(bestPrice) ||
+    bestPrice <= 0 ||
+    simulation.filledToken < simulation.requestedToken ||
+    simulation.effectivePrice <= 0
+  ) {
+    return null;
+  }
+  return Math.max(0, ((bestPrice - simulation.effectivePrice) / bestPrice) * 100);
+};
+
+const canClobFillWithinSlippage = ({
+  simulation,
+  bestPrice,
+  thresholdPct,
+}) => {
+  const slippagePct = computeClobSlippagePct({ simulation, bestPrice });
+  return slippagePct !== null && slippagePct <= thresholdPct;
+};
+
+const decideVenue = ({
+  amount,
+  clobMax,
+  ammMax,
+  hasAmm,
+  thinCutoffPct,
+  clobCanFill,
+}) => {
+  if (!hasAmm) {
+    return {
+      venue: VENUE_CLOB,
+      reason: "AMM missing.",
+      clobSharePct: 100,
+    };
+  }
+
+  const total = clobMax + ammMax;
+  const clobSharePct = total > 0 ? (clobMax / total) * 100 : 0;
+
+  if (clobSharePct < thinCutoffPct) {
+    if (amount <= clobMax) {
+      return {
+        venue: VENUE_CLOB,
+        reason: "CLOB share below thin cutoff; amount within CLOB max.",
+        clobSharePct,
+      };
+    }
+    return {
+      venue: VENUE_AMM,
+      reason: "CLOB share below thin cutoff; amount exceeds CLOB max.",
+      clobSharePct,
+    };
+  }
+
+  if (clobCanFill) {
+    return {
+      venue: VENUE_CLOB,
+      reason: "CLOB fills within slippage threshold.",
+      clobSharePct,
+    };
+  }
+
+  return {
+    venue: VENUE_AMM,
+    reason: "CLOB exceeds slippage threshold.",
+    clobSharePct,
+  };
+};
+
 const buildImpactSamples = ({ offers, sellAmount, sampleCount = 20 }) => {
   const validOffers = filterValidOffers(offers);
   const totalLiquidity = validOffers.reduce(
@@ -2122,7 +2277,14 @@ const updateMaxSellResults = async ({
   setResultText(resultMaxSellNote, t("results.max_sell.fiat_unavailable"));
 };
 
-const updateResultsSummary = ({ simulation, bestPrice, offersCount }) => {
+const updateResultsSummary = ({
+  simulation,
+  bestPrice,
+  offersCount,
+  venue = VENUE_CLOB,
+  slippagePct = null,
+}) => {
+  const isAmm = venue === VENUE_AMM;
   const hasLiquidity = simulation.filledToken > 0;
   const isFullFill = hasLiquidity && simulation.filledToken >= simulation.requestedToken;
   const isPartialFill =
@@ -2133,7 +2295,15 @@ const updateResultsSummary = ({ simulation, bestPrice, offersCount }) => {
     pct: formatPercent(simulation.fillRatePct),
   });
 
-  if (offersCount === 0) {
+  if (isAmm) {
+    if (!hasLiquidity) {
+      setResultText(resultSellability, t("results.sellability.none"));
+    } else if (isPartialFill) {
+      setResultText(resultSellability, t("results.sellability.partial"));
+    } else {
+      setResultText(resultSellability, t("results.sellability.full"));
+    }
+  } else if (offersCount === 0) {
     setResultText(resultSellability, t("results.sellability.empty"));
   } else if (!hasLiquidity) {
     setResultText(resultSellability, t("results.sellability.none"));
@@ -2151,7 +2321,7 @@ const updateResultsSummary = ({ simulation, bestPrice, offersCount }) => {
         pct: formatPercent(simulation.fillRatePct),
       });
       resultWarning.hidden = false;
-    } else if (!hasLiquidity || offersCount === 0) {
+    } else if (!hasLiquidity || (!isAmm && offersCount === 0)) {
       resultWarning.textContent = t("results.warnings.none");
       resultWarning.hidden = false;
     } else {
@@ -2173,22 +2343,27 @@ const updateResultsSummary = ({ simulation, bestPrice, offersCount }) => {
   setResultText(resultFiatRate, t("results.receive.fiat_pending"));
   setFiatWarning(null);
 
-  if (isFullFill && bestPrice > 0 && simulation.effectivePrice > 0) {
-    const rawSlippagePct = ((bestPrice - simulation.effectivePrice) / bestPrice) * 100;
-    const slippagePct = Math.max(0, rawSlippagePct);
-    setResultText(resultSlippage, formatPercent(slippagePct));
-    if (resultWarning && slippagePct >= 10) {
+  const resolvedSlippage =
+    slippagePct ??
+    (isFullFill && bestPrice > 0 && simulation.effectivePrice > 0
+      ? Math.max(0, ((bestPrice - simulation.effectivePrice) / bestPrice) * 100)
+      : null);
+  if (resolvedSlippage === null || resolvedSlippage === undefined) {
+    setResultText(resultSlippage, t("common.not_available"));
+  } else {
+    setResultText(resultSlippage, formatPercent(resolvedSlippage));
+    if (resultWarning && resolvedSlippage >= 10) {
       resultWarning.textContent = t("results.warnings.high_slippage");
       resultWarning.hidden = false;
     }
-  } else {
-    setResultText(resultSlippage, t("common.not_available"));
   }
 
   setResultText(resultSlippageHelp, t("results.slippage.help"));
   setResultText(
     resultWhyLine,
-    t("results.why_line", { count: simulation.topConsumedOffersCount })
+    isAmm
+      ? t("results.why_line_amm")
+      : t("results.why_line", { count: simulation.topConsumedOffersCount })
   );
 };
 
@@ -2241,6 +2416,14 @@ const updateExecutionDetails = ({
       getTranslationOrFallback("common.placeholder", "…")
     );
   }
+};
+
+const setUsedVenue = (venue) => {
+  const placeholder = getTranslationOrFallback("common.placeholder", "…");
+  const value = venue || placeholder;
+  setResultText(resultUsedVenueSummary, value);
+  setResultText(resultUsedVenueDetails, value);
+  setResultText(resultUsedVenueNote, "");
 };
 
 const updateLiquidityBreakdown = ({
@@ -2602,6 +2785,7 @@ currencyInput?.addEventListener("input", handleShareInputChange);
 issuerInput?.addEventListener("input", handleShareInputChange);
 amountInput?.addEventListener("input", handleShareInputChange);
 limitInput?.addEventListener("input", handleShareInputChange);
+thinCutoffInput?.addEventListener("input", handleShareInputChange);
 
 fiatCurrencySelect?.addEventListener("change", () => {
   if (fiatCurrencySelect) {
@@ -2775,6 +2959,11 @@ estimateButton?.addEventListener("click", async () => {
     endpointUsed: null,
     upstreamStatus: null,
     offersCount: null,
+    clobMax: null,
+    ammMax: null,
+    clobSharePct: null,
+    venue: null,
+    venueReason: null,
     error: null,
     elapsedMs: null,
     rawResponse: null,
@@ -2890,28 +3079,10 @@ estimateButton?.addEventListener("click", async () => {
       sortedOffers.length > 0
         ? sortedOffers[sortedOffers.length - 1]?.price ?? 0
         : 0;
-    const simulation = simulateSellIntoOrderbook({
+    const clobSimulation = simulateSellIntoOrderbook({
       sellAmount: amountValue,
       offers: sortedOffers,
     });
-
-    updateResultsSummary({
-      simulation,
-      bestPrice,
-      offersCount: sortedOffers.length,
-    });
-    updateExecutionDetails({
-      offers: sortedOffers,
-      bestPrice,
-      worstPrice,
-      attemptedEndpoints,
-    });
-    void refreshFiatEstimate(simulation.receiveXrp);
-    lastSortedOffers = sortedOffers;
-    lastOffersHash = getOffersHash(sortedOffers);
-    lastBestPrice = bestPrice;
-    lastCurrency = currency;
-    lastSimulation = simulation;
     const thresholdPct = getImpactThresholdPct();
     const maxSellResult = computeMaxSellUnderThreshold({
       offers: sortedOffers,
@@ -2926,15 +3097,88 @@ estimateButton?.addEventListener("click", async () => {
         : null;
     lastAmmReserves = ammReserves;
     lastAmmAvailable = Boolean(ammReserves);
+    const clobMax =
+      maxSellResult?.status === "available" ? maxSellResult.maxSellAmount : 0;
+    const clobSlippagePct = computeClobSlippagePct({
+      simulation: clobSimulation,
+      bestPrice,
+    });
+    const clobCanFill = canClobFillWithinSlippage({
+      simulation: clobSimulation,
+      bestPrice,
+      thresholdPct,
+    });
+    let ammMax = 0;
+    let ammSimulation = null;
     if (ammReserves) {
       const ammResult = findMaxSellWithinThresholdAmm({
         reserves: ammReserves,
         thresholdPct,
       });
-      lastAmmMaxSell = ammResult.ok ? ammResult.maxSell : 0;
+      ammMax = ammResult.ok ? ammResult.maxSell : 0;
+      lastAmmMaxSell = ammMax;
+      ammSimulation = simulateSellIntoAmm({
+        sellAmount: amountValue,
+        reserves: ammReserves,
+      });
     } else {
       lastAmmMaxSell = 0;
     }
+    const thinCutoffPct = getThinCutoffPct();
+    const decision = decideVenue({
+      amount: amountValue,
+      clobMax,
+      ammMax,
+      hasAmm: lastAmmAvailable,
+      thinCutoffPct,
+      clobCanFill,
+    });
+    let chosenVenue = decision.venue;
+    let venueReason = decision.reason;
+    let clobSharePct = decision.clobSharePct;
+    let displaySimulation = clobSimulation;
+    let displaySlippagePct = clobSlippagePct;
+    if (chosenVenue === VENUE_AMM) {
+      if (ammSimulation?.ok) {
+        displaySimulation = {
+          filledToken: amountValue,
+          requestedToken: amountValue,
+          fillRate: 1,
+          fillRatePct: 100,
+          receiveXrp: ammSimulation.receivedXrp,
+          effectivePrice: ammSimulation.avgPrice,
+          topConsumedOffersCount: 0,
+        };
+        displaySlippagePct = ammSimulation.slippagePct ?? null;
+      } else {
+        chosenVenue = VENUE_CLOB;
+        venueReason = "AMM calc failed; falling back to CLOB.";
+        displaySimulation = clobSimulation;
+        displaySlippagePct = clobSlippagePct;
+        clobSharePct = lastAmmAvailable ? clobSharePct : 100;
+      }
+    }
+
+    setUsedVenue(chosenVenue);
+    updateResultsSummary({
+      simulation: displaySimulation,
+      bestPrice,
+      offersCount: sortedOffers.length,
+      venue: chosenVenue,
+      slippagePct: displaySlippagePct,
+    });
+    updateExecutionDetails({
+      offers: sortedOffers,
+      bestPrice,
+      worstPrice,
+      attemptedEndpoints,
+    });
+    void refreshFiatEstimate(displaySimulation.receiveXrp);
+    lastSortedOffers = sortedOffers;
+    lastOffersHash = getOffersHash(sortedOffers);
+    lastBestPrice = bestPrice;
+    lastCurrency = currency;
+    lastSimulation = clobSimulation;
     void updateMaxSellResults({
       offers: sortedOffers,
       thresholdPct,
@@ -2945,7 +3189,7 @@ estimateButton?.addEventListener("click", async () => {
     scheduleChartsUpdate(
       {
         offers: sortedOffers,
-        simulation,
+        simulation: clobSimulation,
         maxSellResult,
         currency,
       },
@@ -2957,6 +3201,11 @@ estimateButton?.addEventListener("click", async () => {
       responseStatus: "success",
       endpointUsed: debugInfo?.endpointUsed ?? null,
       upstreamStatus: debugInfo?.statusCode ?? null,
+      clobMax,
+      ammMax,
+      clobSharePct,
+      venue: chosenVenue,
+      venueReason,
       error: null,
       rawResponse: debugInfo?.rawResponse ?? null,
       offersCount: sortedOffers.length,
@@ -2981,6 +3230,11 @@ estimateButton?.addEventListener("click", async () => {
       responseStatus: "fail",
       endpointUsed: error?.debugInfo?.endpointUsed ?? null,
       upstreamStatus: error?.debugInfo?.statusCode ?? null,
+      clobMax: null,
+      ammMax: null,
+      clobSharePct: null,
+      venue: null,
+      venueReason: null,
       error: `${errorCode}: ${error?.message || "Request failed"}`,
       rawResponse: error?.debugInfo?.rawResponse ?? null,
       offersCount: null,
