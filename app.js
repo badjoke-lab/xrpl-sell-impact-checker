@@ -783,10 +783,12 @@ const buildShareParams = () => {
   if (resolvedThreshold) {
     params.set("threshold", String(resolvedThreshold));
     params.set("slippage", String(resolvedThreshold));
+    params.set("slippagePercent", String(resolvedThreshold));
   }
   const resolvedThinCutoff = thinCutoff ?? getThinCutoffPct();
   if (resolvedThinCutoff !== null && resolvedThinCutoff !== undefined) {
     params.set("thin", String(resolvedThinCutoff));
+    params.set("thinCutoffPercent", String(resolvedThinCutoff));
   }
   const resolvedFiat = fiat ?? DEFAULT_FIAT;
   if (resolvedFiat) {
@@ -864,8 +866,9 @@ const applyShareParamsFromUrl = () => {
   const issuerParam = params.get("issuer");
   const amountParam = params.get("amount");
   const limitParam = params.get("limit");
-  const slippageParam = params.get("slippage") ?? params.get("threshold");
-  const thinCutoffParam = params.get("thin");
+  const slippageParam =
+    params.get("slippagePercent") ?? params.get("slippage") ?? params.get("threshold");
+  const thinCutoffParam = params.get("thinCutoffPercent") ?? params.get("thin");
   const fiatParam = params.get("fiat");
 
   const currency = currencyParam ? sanitizeCurrency(currencyParam) : null;
@@ -1714,14 +1717,7 @@ const canClobFillWithinSlippage = ({
   return slippagePct !== null && slippagePct <= thresholdPct;
 };
 
-const decideVenue = ({
-  amount,
-  clobMax,
-  ammMax,
-  hasAmm,
-  thinCutoffPct,
-  clobCanFill,
-}) => {
+const decideVenue = ({ clobMax, ammMax, hasAmm, thinCutoffPct, clobCanFill }) => {
   if (!hasAmm) {
     return {
       venue: VENUE_CLOB,
@@ -1734,16 +1730,9 @@ const decideVenue = ({
   const clobSharePct = total > 0 ? (clobMax / total) * 100 : 0;
 
   if (clobSharePct < thinCutoffPct) {
-    if (amount <= clobMax) {
-      return {
-        venue: VENUE_CLOB,
-        reason: "CLOB share below thin cutoff; amount within CLOB max.",
-        clobSharePct,
-      };
-    }
     return {
       venue: VENUE_AMM,
-      reason: "CLOB share below thin cutoff; amount exceeds CLOB max.",
+      reason: "CLOB share below thin cutoff.",
       clobSharePct,
     };
   }
@@ -3250,13 +3239,6 @@ estimateButton?.addEventListener("click", async () => {
       limit: normalizedLimit,
     };
     const shouldFetchAmm = currency !== "XRP" && Boolean(issuer);
-    const ammPromise = shouldFetchAmm
-      ? fetchAmmInfo({ currency, issuer }).catch((error) => ({
-          ok: false,
-          error: "fetch_failed",
-          fetchError: error,
-        }))
-      : Promise.resolve(null);
     const clobPromise = fetchBookOffers({
       currency,
       issuer,
@@ -3277,10 +3259,15 @@ estimateButton?.addEventListener("click", async () => {
     });
 
     const { offers, endpointIndex, attemptedEndpoints, debugInfo } = await clobPromise;
+    let ammInfo = null;
     if (shouldFetchAmm) {
       setStatus("status.fetching_amm");
+      try {
+        ammInfo = await fetchAmmInfo({ currency, issuer });
+      } catch (error) {
+        ammInfo = { ok: false, error: "fetch_failed", fetchError: error };
+      }
     }
-    const ammInfo = await ammPromise;
 
     currentEndpointIndex = endpointIndex;
     const endpointLabel = t(ORDERBOOK_API_ENDPOINT.labelKey);
@@ -3364,7 +3351,6 @@ estimateButton?.addEventListener("click", async () => {
     }
     const thinCutoffPct = getThinCutoffPct();
     const decision = decideVenue({
-      amount: amountValue,
       clobMax,
       ammMax,
       hasAmm: lastAmmAvailable,
