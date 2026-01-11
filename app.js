@@ -1599,7 +1599,7 @@ const findExampleCandidate = async () => {
     };
     const requestTimestamp = Date.now();
     const requestUrl = buildBookOffersUrl(payload);
-    const fetchStart = performance.now();
+    var fetchStart = performance.now();
 
     updateDebugPanel({
       lastRequestTime: formatTime(requestTimestamp),
@@ -3668,7 +3668,7 @@ estimateButton?.addEventListener("click", async () => {
       limit: normalizedLimit,
     });
     const requestUrl = buildBookOffersUrl(requestPayload);
-    const fetchStart = performance.now();
+    var fetchStart = performance.now();
     updateDebugPanel({
       lastRequestTime: formatTime(requestTimestamp),
       lastRequestUrl: requestUrl,
