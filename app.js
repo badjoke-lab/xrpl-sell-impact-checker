@@ -27,7 +27,7 @@ const DEBUG_RESPONSE_LIMIT = 600;
 const VENUE_CLOB = "CLOB";
 const VENUE_AMM = "AMM";
 const TOKENLIST_SEED_URL = "./data/tokenlist.seed.json";
-const RECENT_TOKENS_STORAGE_KEY = "xsic_recent_tokens_v1";
+const RECENT_TOKENS_STORAGE_KEY = "xsic_recent_tokens_v2";
 const MAX_RECENT_TOKENS = 10;
 const DEFAULT_TOKEN = {
   currency: "ARMY",
@@ -317,7 +317,25 @@ const normalizeTokenSuggestion = (item) => {
   };
 };
 
-const getTokenKey = (token) => `${token.symbol}::${token.issuer}`;
+
+const resolveTokenIssuer = (token) => {
+  const issuer = token?.issuer;
+  if (typeof issuer === "string" && issuer.trim()) {
+    return issuer.trim();
+  }
+  const symbol = token?.symbol;
+  if (!symbol) {
+    return "";
+  }
+  const list =
+    typeof seedTokenSuggestions === "undefined" || !Array.isArray(seedTokenSuggestions)
+      ? []
+      : seedTokenSuggestions;
+  const match = list.find((t) => t && t.symbol === String(symbol).toUpperCase());
+  return match?.issuer || "";
+};
+
+const getTokenKey = (token) => `${token.symbol}::${resolveTokenIssuer(token)}`;
 const getTokenIssuerLabel = (token) =>
   token.issuer ? formatIssuerShort(token.issuer) : "XRP";
 
@@ -364,8 +382,15 @@ const saveRecentTokenSuggestion = (token) => {
   const deduped = recentTokenSuggestions.filter(
     (item) => getTokenKey(item) !== key
   );
-  recentTokenSuggestions = [token, ...deduped].slice(0, MAX_RECENT_TOKENS);
-  try {
+  
+  const normalizedToken = {
+    symbol: token?.symbol || "",
+    issuer: resolveTokenIssuer(token),
+    name: token?.name || "",
+    tags: Array.isArray(token?.tags) ? token.tags : [],
+  };
+  recentTokenSuggestions = [normalizedToken, ...deduped].slice(0, MAX_RECENT_TOKENS);
+try {
     localStorage.setItem(RECENT_TOKENS_STORAGE_KEY, JSON.stringify(recentTokenSuggestions));
   } catch (error) {
     // Ignore storage failures.
@@ -411,7 +436,7 @@ const applyTokenSuggestion = (token) => {
   }
   const normalized = normalizeCurrencyInput(token.symbol);
   currencyInput.value = normalized.currencyInput || token.symbol;
-  issuerInput.value = token.issuer;
+  issuerInput.value = resolveTokenIssuer(token) || "";
   setFieldError("currency", null);
   setFieldError("issuer", null);
   saveRecentTokenSuggestion(token);
@@ -555,7 +580,7 @@ const setDebugValue = (element, value) => {
   if (!element) {
     return;
   }
-  element.textContent = value ?? "—";
+  element.textContent = prettifyHexCurrencyInText(value ?? "—");
 };
 
 const formatDebugJson = (value) => {
@@ -703,6 +728,40 @@ const formatCompactNumber = (value, options = {}) =>
     maximumFractionDigits: 2,
     ...options,
   }).format(value);
+
+
+
+function decodeCurrencyHexToAscii(hex) {
+  if (typeof hex !== "string") return "";
+  const v = hex.trim();
+  if (!/^[0-9A-Fa-f]{40}$/.test(v)) return v;
+  const bytes = v.match(/.{2}/g).map((b) => parseInt(b, 16));
+  let out = "";
+  for (const b of bytes) {
+    if (b === 0x00) continue;
+    if (b >= 0x20 && b <= 0x7e) out += String.fromCharCode(b);
+  }
+  return out.trim();
+}
+
+function formatCurrencyForDisplay(code) {
+  if (code == null) return "";
+  const raw = String(code).trim();
+  if (!raw) return "";
+  if (/^[0-9A-Fa-f]{40}$/.test(raw)) {
+    const decoded = decodeCurrencyHexToAscii(raw);
+    return decoded ? decoded.toUpperCase() : raw.toUpperCase();
+  }
+  return raw.toUpperCase();
+}
+
+function prettifyHexCurrencyInText(text) {
+  if (text == null) return text;
+  return String(text).replace(/\b([0-9A-Fa-f]{40})\b/g, (m) => {
+    const decoded = decodeCurrencyHexToAscii(m);
+    return decoded ? decoded.toUpperCase() : m.toUpperCase();
+  });
+}
 
 const formatPercent = (
   value,
@@ -867,7 +926,7 @@ const getCurrencyErrorMessage = (currencyResult) => {
 
 const setResultText = (element, text) => {
   if (element) {
-    element.textContent = text;
+    element.textContent = prettifyHexCurrencyInText(text);
   }
 };
 
@@ -1540,7 +1599,7 @@ const findExampleCandidate = async () => {
     };
     const requestTimestamp = Date.now();
     const requestUrl = buildBookOffersUrl(payload);
-    const fetchStart = performance.now();
+    var fetchStart = performance.now();
 
     updateDebugPanel({
       lastRequestTime: formatTime(requestTimestamp),
@@ -3189,18 +3248,22 @@ const initFiatSelection = () => {
 initFiatSelection();
 applyShareParamsFromUrl();
 if (currencyInput && !currencyInput.value) {
-  currencyInput.value = DEFAULT_TOKEN.currency;
+  currencyInput.value = "";
+
 }
 if (issuerInput && !issuerInput.value) {
-  issuerInput.value = DEFAULT_TOKEN.issuer;
+  issuerInput.value = "";
+
 }
 
 const resetInputs = () => {
   if (currencyInput) {
-    currencyInput.value = DEFAULT_TOKEN.currency;
+    currencyInput.value = "";
+
   }
   if (issuerInput) {
-    issuerInput.value = DEFAULT_TOKEN.issuer;
+    issuerInput.value = "";
+
   }
   if (amountInput) {
     amountInput.value = "";
@@ -3605,7 +3668,7 @@ estimateButton?.addEventListener("click", async () => {
       limit: normalizedLimit,
     });
     const requestUrl = buildBookOffersUrl(requestPayload);
-    const fetchStart = performance.now();
+    var fetchStart = performance.now();
     updateDebugPanel({
       lastRequestTime: formatTime(requestTimestamp),
       lastRequestUrl: requestUrl,
