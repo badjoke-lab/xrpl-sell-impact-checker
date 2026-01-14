@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FAQ | XRPL Sell Impact Checker</title>
+    <meta
+      name="description"
+      content="Frequently asked questions about XSIC, including XRP-only handling and data freshness."
+    />
+    <meta property="og:title" content="FAQ | XRPL Sell Impact Checker" />
+    <meta
+      property="og:description"
+      content="Frequently asked questions about XSIC, including XRP-only handling and data freshness."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app page">
+      <header class="app__header">
+        <div class="app__header-top">
+          <div>
+            <p class="eyebrow">XSIC</p>
+            <h1>XRPL Sell Impact Checker</h1>
+          </div>
+        </div>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="/">Home</a>
+          <a href="/methods">Methods</a>
+          <a href="/faq">FAQ</a>
+          <a href="/disclaimer">Disclaimer</a>
+          <a href="/credits">Credits</a>
+          <a href="/donate">Donate</a>
+        </nav>
+      </header>
+
+      <main class="page__content">
+        <section class="card">
+          <h2 class="page__title">FAQ</h2>
+          <p class="page__lede">Quick answers to common questions about XSIC.</p>
+        </section>
+
+        <section class="card">
+          <h3>Why can’t I enter XRP alone?</h3>
+          <p>
+            XRPL XRP is the quote asset for most order books. XSIC estimates sell impact for IOUs
+            against XRP, so it requires both a currency code and issuer. For XRP/XRP there is no
+            order book to simulate.
+          </p>
+        </section>
+
+        <section class="card">
+          <h3>How fresh is the data?</h3>
+          <p>
+            XSIC calls public XRPL endpoints in real time and records the fetch time shown in the
+            results. If live data is unavailable, cached values may be shown with a warning.
+          </p>
+        </section>
+
+        <section class="card">
+          <h3>Why do CLOB and AMM results differ?</h3>
+          <p>
+            CLOB results are based on visible offers, while AMM results depend on pool reserves and
+            fees. XSIC compares both and uses the better outcome for your requested amount.
+          </p>
+        </section>
+
+        <section class="card">
+          <h3>Is fiat pricing guaranteed?</h3>
+          <p>
+            No. Fiat amounts are optional and sourced from external feeds. If the feed is down, XSIC
+            will still show XRP values and note that fiat is unavailable.
+          </p>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="site-footer__brand">
+          <p class="site-footer__title">XSIC by BadJoke-Lab</p>
+          <p class="site-footer__note">XRPL Sell Impact Checker for transparent estimates.</p>
+        </div>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="/methods">Methods</a>
+          <a href="/faq">FAQ</a>
+          <a href="/disclaimer">Disclaimer</a>
+          <a href="/credits">Credits</a>
+          <a href="/donate">Donate</a>
+        </nav>
+      </footer>
+    </div>
+  </body>
+</html>

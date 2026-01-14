@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Credits | XRPL Sell Impact Checker</title>
+    <meta
+      name="description"
+      content="Credits for data sources, infrastructure, and libraries used by XSIC."
+    />
+    <meta property="og:title" content="Credits | XRPL Sell Impact Checker" />
+    <meta
+      property="og:description"
+      content="Credits for data sources, infrastructure, and libraries used by XSIC."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app page">
+      <header class="app__header">
+        <div class="app__header-top">
+          <div>
+            <p class="eyebrow">XSIC</p>
+            <h1>XRPL Sell Impact Checker</h1>
+          </div>
+        </div>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="/">Home</a>
+          <a href="/methods">Methods</a>
+          <a href="/faq">FAQ</a>
+          <a href="/disclaimer">Disclaimer</a>
+          <a href="/credits">Credits</a>
+          <a href="/donate">Donate</a>
+        </nav>
+      </header>
+
+      <main class="page__content">
+        <section class="card">
+          <h2 class="page__title">Credits</h2>
+          <p class="page__lede">Thanks to the open infrastructure that keeps XSIC running.</p>
+        </section>
+
+        <section class="card">
+          <h3>Data sources</h3>
+          <ul class="info-list">
+            <li>XRPL public rippled endpoints (s1.ripple.com, s2.ripple.com).</li>
+            <li>XRPL methods: <code>book_offers</code> and <code>amm_info</code>.</li>
+            <li>XRP fiat pricing via CoinGecko.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h3>Infrastructure</h3>
+          <ul class="info-list">
+            <li>Cloudflare Pages + Functions for hosting and API proxying.</li>
+            <li>XRPL open protocols and documentation.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h3>Libraries</h3>
+          <ul class="info-list">
+            <li>Vanilla JavaScript + Web APIs.</li>
+            <li>Inter font family and system UI fonts.</li>
+          </ul>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="site-footer__brand">
+          <p class="site-footer__title">XSIC by BadJoke-Lab</p>
+          <p class="site-footer__note">XRPL Sell Impact Checker for transparent estimates.</p>
+        </div>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="/methods">Methods</a>
+          <a href="/faq">FAQ</a>
+          <a href="/disclaimer">Disclaimer</a>
+          <a href="/credits">Credits</a>
+          <a href="/donate">Donate</a>
+        </nav>
+      </footer>
+    </div>
+  </body>
+</html>

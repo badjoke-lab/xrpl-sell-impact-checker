@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title data-i18n="app.title"></title>
+    <meta
+      name="description"
+      data-i18n-content="app.description"
+      content="Estimate sell impact and receive amounts before you trade."
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -11,16 +16,25 @@
     <div class="app">
       <p class="error-banner" id="i18n-error-banner" hidden></p>
       <header class="app__header">
-        <div>
-          <p class="eyebrow" data-i18n="app.eyebrow"></p>
-          <h1 data-i18n="app.tagline"></h1>
+        <div class="app__header-top">
+          <div>
+            <p class="eyebrow" data-i18n="app.eyebrow"></p>
+            <h1 data-i18n="app.tagline"></h1>
+          </div>
+          <button
+            class="ghost-button"
+            type="button"
+            data-i18n="header.wallet_not_required"
+            hidden
+          ></button>
         </div>
-        <button
-          class="ghost-button"
-          type="button"
-          data-i18n="header.wallet_not_required"
-          hidden
-        ></button>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="/methods" data-i18n="nav.methods"></a>
+          <a href="/faq" data-i18n="nav.faq"></a>
+          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
+          <a href="/credits" data-i18n="nav.credits"></a>
+          <a href="/donate" data-i18n="nav.donate"></a>
+        </nav>
       </header>
 
       <main class="app__main">
@@ -405,6 +419,20 @@
           </ul>
         </section>
       </main>
+
+      <footer class="site-footer">
+        <div class="site-footer__brand">
+          <p class="site-footer__title" data-i18n="footer.brand"></p>
+          <p class="site-footer__note" data-i18n="footer.note"></p>
+        </div>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="/methods" data-i18n="nav.methods"></a>
+          <a href="/faq" data-i18n="nav.faq"></a>
+          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
+          <a href="/credits" data-i18n="nav.credits"></a>
+          <a href="/donate" data-i18n="nav.donate"></a>
+        </nav>
+      </footer>
     </div>
 
     <script type="module" src="app.js"></script>
