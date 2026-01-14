@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Donate | XRPL Sell Impact Checker</title>
+    <meta
+      name="description"
+      content="Support XSIC with an XRP donation. Copy the address and share feedback."
+    />
+    <meta property="og:title" content="Donate | XRPL Sell Impact Checker" />
+    <meta
+      property="og:description"
+      content="Support XSIC with an XRP donation. Copy the address and share feedback."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app page">
+      <header class="app__header">
+        <div class="app__header-top">
+          <div>
+            <p class="eyebrow">XSIC</p>
+            <h1>XRPL Sell Impact Checker</h1>
+          </div>
+        </div>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="/">Home</a>
+          <a href="/methods">Methods</a>
+          <a href="/faq">FAQ</a>
+          <a href="/disclaimer">Disclaimer</a>
+          <a href="/credits">Credits</a>
+          <a href="/donate">Donate</a>
+        </nav>
+      </header>
+
+      <main class="page__content">
+        <section class="card">
+          <h2 class="page__title">Donate</h2>
+          <p class="page__lede">
+            XSIC is free to use. If this tool helps you, consider supporting the ongoing hosting and
+            maintenance costs.
+          </p>
+        </section>
+
+        <section class="card">
+          <h3>XRP donation address</h3>
+          <div class="address-card">
+            <code id="donation-address">rsMuUUdLC1wxrJ2DvQnTrnKGRhVxoLrhEj</code>
+            <button class="secondary-button" type="button" id="copy-donation">Copy address</button>
+            <p class="status" id="copy-status" role="status" aria-live="polite"></p>
+          </div>
+          <p class="page__lede">
+            Please double-check the address before sending. There is no destination tag required for
+            this address.
+          </p>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="site-footer__brand">
+          <p class="site-footer__title">XSIC by BadJoke-Lab</p>
+          <p class="site-footer__note">XRPL Sell Impact Checker for transparent estimates.</p>
+        </div>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="/methods">Methods</a>
+          <a href="/faq">FAQ</a>
+          <a href="/disclaimer">Disclaimer</a>
+          <a href="/credits">Credits</a>
+          <a href="/donate">Donate</a>
+        </nav>
+      </footer>
+    </div>
+
+    <script type="module" src="/donate/donate.js"></script>
+  </body>
+</html>

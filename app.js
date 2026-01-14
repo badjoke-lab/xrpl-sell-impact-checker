@@ -186,6 +186,12 @@ const applyTranslations = () => {
     const key = element.dataset.i18nAriaLabel;
     element.setAttribute("aria-label", getTranslationOrFallback(key));
   });
+
+  document.querySelectorAll("[data-i18n-content]").forEach((element) => {
+    const key = element.dataset.i18nContent;
+    const fallback = element.getAttribute("content") || "";
+    element.setAttribute("content", getTranslationOrFallback(key, fallback));
+  });
 };
 
 const getStatusLine = () =>

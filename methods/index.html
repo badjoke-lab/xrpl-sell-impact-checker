@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Methods | XRPL Sell Impact Checker</title>
+    <meta
+      name="description"
+      content="How XSIC estimates sell impact using XRPL order books and AMM pools, plus known limits."
+    />
+    <meta property="og:title" content="Methods | XRPL Sell Impact Checker" />
+    <meta
+      property="og:description"
+      content="How XSIC estimates sell impact using XRPL order books and AMM pools, plus known limits."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app page">
+      <header class="app__header">
+        <div class="app__header-top">
+          <div>
+            <p class="eyebrow">XSIC</p>
+            <h1>XRPL Sell Impact Checker</h1>
+          </div>
+        </div>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="/">Home</a>
+          <a href="/methods">Methods</a>
+          <a href="/faq">FAQ</a>
+          <a href="/disclaimer">Disclaimer</a>
+          <a href="/credits">Credits</a>
+          <a href="/donate">Donate</a>
+        </nav>
+      </header>
+
+      <main class="page__content">
+        <section class="card">
+          <h2 class="page__title">Methods</h2>
+          <p class="page__lede">
+            XSIC estimates sell impact by simulating fills against XRPL order books (CLOB) and AMM
+            pools, then choosing the best venue for the requested trade size.
+          </p>
+        </section>
+
+        <section class="card">
+          <h3>Data inputs</h3>
+          <ul class="info-list">
+            <li>CLOB order books via XRPL <code>book_offers</code>.</li>
+            <li>AMM pool reserves and trading fee via XRPL <code>amm_info</code>.</li>
+            <li>Optional fiat rates (XRP → fiat) from CoinGecko.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h3>Computation flow</h3>
+          <ol class="info-list">
+            <li>Validate token (currency + issuer) and requested sell amount.</li>
+            <li>Fetch order book offers up to the limit you select.</li>
+            <li>Simulate fills against the book, computing average price and slippage.</li>
+            <li>Fetch AMM reserves and estimate the AMM swap output for the same amount.</li>
+            <li>Pick the venue that yields the higher receive amount (CLOB or AMM).</li>
+          </ol>
+        </section>
+
+        <section class="card">
+          <h3>Important limits</h3>
+          <ul class="info-list">
+            <li>
+              Order book depth is capped by the <strong>Orderbook limit</strong>; large trades can be
+              under-estimated if liquidity exists deeper than the limit.
+            </li>
+            <li>
+              AMM estimates assume current pool reserves and do not include future swaps or
+              governance actions.
+            </li>
+            <li>
+              Fiat values are informational and depend on the external rate feed availability.
+            </li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h3>How to read results</h3>
+          <ul class="info-list">
+            <li>Sellability indicates whether the requested amount can fill.</li>
+            <li>Slippage estimates how much the average price worsens as size grows.</li>
+            <li>Max sell under X% shows the largest size that stays below a chosen impact threshold.</li>
+          </ul>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="site-footer__brand">
+          <p class="site-footer__title">XSIC by BadJoke-Lab</p>
+          <p class="site-footer__note">XRPL Sell Impact Checker for transparent estimates.</p>
+        </div>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="/methods">Methods</a>
+          <a href="/faq">FAQ</a>
+          <a href="/disclaimer">Disclaimer</a>
+          <a href="/credits">Credits</a>
+          <a href="/donate">Donate</a>
+        </nav>
+      </footer>
+    </div>
+  </body>
+</html>
