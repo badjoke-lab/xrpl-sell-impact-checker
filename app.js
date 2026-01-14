@@ -88,7 +88,7 @@ function showInputError(title, hint = "") {
   const message = hint ? `${title}\n${hint}` : title;
 
   // Use the existing status line first (this app already has ".status")
-  const status = document.querySelector(".status");
+  const status = getStatusLine();
   if (status) {
     status.textContent = message;
     status.hidden = false;
@@ -133,6 +133,8 @@ const THRESHOLD_VALUES = new Set([1, 2, 5, 10, 20]);
 const DEFAULT_SLIPPAGE_PERCENT = 5;
 const DEFAULT_THIN_CUTOFF_PERCENT = 20;
 const FIAT_VALUES = new Set(["USD", "JPY"]);
+const SUPPORTED_LANGS = new Set(["en", "ja"]);
+const DEFAULT_LANG = "en";
 const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
 const VENUE_CLOB = "CLOB";
@@ -186,6 +188,10 @@ const applyTranslations = () => {
   });
 };
 
+const getStatusLine = () =>
+  document.querySelector('.status[data-i18n="status.waiting"]') ||
+  document.querySelector(".status");
+
 const i18nErrorBanner = document.querySelector("#i18n-error-banner");
 
 const showI18nError = () => {
@@ -220,7 +226,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-const statusLine = document.querySelector(".status");
 const statusEndpointLine = document.querySelector(".status-endpoint");
 const errorBanner = document.querySelector(".error-banner");
 const estimateButton = document.querySelector(".primary-button");
@@ -359,11 +364,38 @@ if (debugPanel) {
 }
 
 const setStatus = (key, params) => {
-  if (statusLine) {
-    statusLine.textContent = t(key, params);
-    statusLine.hidden = false;
+  const statusLine = getStatusLine();
+  if (!statusLine) {
+    return;
+  }
+  statusLine.textContent = t(key, params);
+  statusLine.hidden = false;
+  statusLine.classList?.remove?.("error");
+};
+
+const setStatusText = (message, { isError = false } = {}) => {
+  const statusLine = getStatusLine();
+  if (!statusLine) {
+    return;
+  }
+  statusLine.textContent = message || "";
+  statusLine.hidden = !message;
+  if (isError) {
+    statusLine.classList?.add?.("error");
+  } else {
     statusLine.classList?.remove?.("error");
   }
+};
+
+const READY_STATUS_LABELS = {
+  en: "Ready",
+  ja: "準備OK",
+};
+
+const setReadyStatus = () => {
+  const lang = getActiveLang();
+  const fallback = READY_STATUS_LABELS.en;
+  setStatusText(READY_STATUS_LABELS[lang] || fallback);
 };
 
 const setEstimateButtonBusy = (isBusy) => {
@@ -879,6 +911,23 @@ const formatTime = (timestamp) =>
 
 const clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
 
+const normalizeLang = (value) => {
+  if (!value) {
+    return null;
+  }
+  const trimmed = String(value).trim().toLowerCase();
+  return SUPPORTED_LANGS.has(trimmed) ? trimmed : null;
+};
+
+const getActiveLang = () => normalizeLang(document.documentElement.lang) || DEFAULT_LANG;
+
+const setActiveLang = (lang) => {
+  if (!lang) {
+    return;
+  }
+  document.documentElement.lang = lang;
+};
+
 const sanitizeCurrency = (value) => {
   const result = normalizeCurrencyInput(value);
   if (result.error) {
@@ -1061,6 +1110,7 @@ const getShareInputState = () => {
   const threshold = sanitizeThreshold(impactThresholdSelect?.value);
   const thinCutoff = sanitizeThinCutoff(thinCutoffInput?.value);
   const fiat = sanitizeFiat(fiatCurrencySelect?.value);
+  const lang = getActiveLang();
   const limitRaw = limitInput?.value;
   const limit =
     limitRaw === "" || limitRaw === null || limitRaw === undefined
@@ -1075,12 +1125,13 @@ const getShareInputState = () => {
     threshold,
     thinCutoff,
     fiat,
+    lang,
   };
 };
 
 const buildShareParams = () => {
   const params = new URLSearchParams();
-  const { currency, issuer, amount, limit, threshold, thinCutoff, fiat } =
+  const { currency, issuer, amount, limit, threshold, thinCutoff, fiat, lang } =
     getShareInputState();
   const hasPrimary = Boolean(currency || amount);
   if (!hasPrimary) {
@@ -1111,6 +1162,9 @@ const buildShareParams = () => {
   const resolvedFiat = fiat ?? DEFAULT_FIAT;
   if (resolvedFiat) {
     params.set("fiat", resolvedFiat);
+  }
+  if (lang) {
+    params.set("lang", lang);
   }
   return params;
 };
@@ -1188,6 +1242,7 @@ const applyShareParamsFromUrl = () => {
     params.get("slippagePercent") ?? params.get("slippage") ?? params.get("threshold");
   const thinCutoffParam = params.get("thinCutoffPercent") ?? params.get("thin");
   const fiatParam = params.get("fiat");
+  const langParam = params.get("lang");
 
   const currencyResult = currencyParam ? normalizeCurrencyInput(currencyParam) : null;
   const currency = currencyResult?.error ? null : currencyResult?.currencyNormalized ?? null;
@@ -1220,6 +1275,11 @@ const applyShareParamsFromUrl = () => {
     hadInvalidParam = true;
   }
 
+  const lang = normalizeLang(langParam);
+  if (langParam && lang) {
+    setActiveLang(lang);
+  }
+
   let issuer = issuerParam ? sanitizeIssuer(issuerParam) : null;
   if (issuerParam && !issuer) {
     hadInvalidParam = true;
@@ -1230,8 +1290,8 @@ const applyShareParamsFromUrl = () => {
   }
 
   isApplyingShareParams = true;
-  if (currencyInput && currencyParam) {
-    currencyInput.value = String(currencyParam).trim().toUpperCase();
+  if (currencyInput && currency) {
+    currencyInput.value = currency;
   }
   if (amountInput && amount) {
     amountInput.value = String(amount);
@@ -1261,10 +1321,13 @@ const applyShareParamsFromUrl = () => {
   }
   isApplyingShareParams = false;
 
-  const hasValidScenario =
-    Boolean(currency && amount) && (currency === "XRP" || Boolean(issuer));
-  if (!hadInvalidParam && hasValidScenario) {
-    setShareLoadNote(true);
+  const isXrpOnly = currency === "XRP" && !issuer;
+  if (currencyParam && isXrpOnly) {
+    setShareLoadNote(false);
+    showApiError({ code: "xrp_not_supported" });
+  } else if (!hadInvalidParam) {
+    setShareLoadNote(false);
+    setReadyStatus();
   }
 
   scheduleShareUrlUpdate({ immediate: true });
