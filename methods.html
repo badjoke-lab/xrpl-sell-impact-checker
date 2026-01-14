@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>XSIC – Methods</title>
+  <meta name="description" content="How XSIC estimates sell impact using XRPL CLOB + AMM." />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="page-header">
+    <a class="home-link" href="/">← Back</a>
+    <h1>Methods</h1>
+  </header>
+
+  <main class="page">
+    <h2>What this tool does</h2>
+    <p>XSIC estimates how selling an IOU token into XRP may impact price/liquidity on XRPL.</p>
+
+    <h2>Data sources</h2>
+    <ul>
+      <li>CLOB (Order Book Offers) via XRPL JSON-RPC</li>
+      <li>AMM pool info via XRPL JSON-RPC</li>
+    </ul>
+
+    <h2>Key notes</h2>
+    <ul>
+      <li>XRP is the settlement asset. You must enter an IOU token (currency + issuer).</li>
+      <li>Results are estimates. Network conditions and on-ledger changes can differ.</li>
+      <li>Limits and pagination may cap how much depth we can read per request.</li>
+    </ul>
+  </main>
+
+  <footer class="page-footer">
+    <nav class="page-links">
+      <a href="/faq.html">FAQ</a>
+      <a href="/disclaimer.html">Disclaimer</a>
+      <a href="/credits.html">Credits</a>
+      <a href="/donate.html">Donate</a>
+    </nav>
+  </footer>
+</body>
+</html>
