@@ -234,9 +234,42 @@
     "issuer_required": "Issuer is required for non-XRP tokens.",
     "issuer_invalid": "Issuer must look like a valid XRPL address.",
     "limit_invalid": "Limit must be a positive number.",
-    "fetch_failed": "Fetch failed. Please try again.",
-    "fetch_timeout": "Order book request timed out. Please try again.",
-    "network_unreachable": "Network cannot reach XRPL nodes (try different network / retry).",
+    "fetch_failed": {
+      "title": "Order book request failed.",
+      "hint": "Retry the estimate or try again in a moment."
+    },
+    "fetch_timeout": {
+      "title": "Order book request timed out.",
+      "hint": "Retry the estimate or reduce the request size."
+    },
+    "network_unreachable": {
+      "title": "Network cannot reach XRPL nodes.",
+      "hint": "Check your connection or try again later."
+    },
+    "missing_params": {
+      "title": "Missing required inputs.",
+      "hint": "Enter both currency and issuer, then retry."
+    },
+    "xrp_not_supported": {
+      "title": "XRP is the settlement asset.",
+      "hint": "Enter an IOU token (currency + issuer) to estimate selling into XRP."
+    },
+    "issueMalformed": {
+      "title": "XRPL rejected this currency or issuer.",
+      "hint": "Double-check the currency code and issuer address."
+    },
+    "no_liquidity": {
+      "title": "No liquidity available for this pair.",
+      "hint": "Try a different issuer or a smaller amount."
+    },
+    "upstream_fail": {
+      "title": "Upstream service failed to respond.",
+      "hint": "Retry in a moment or switch endpoints."
+    },
+    "default": {
+      "title": "Something went wrong.",
+      "hint": "Retry the estimate or check your inputs."
+    },
     "i18n_failed": "Translations failed to load. Please refresh the page."
   },
   "notes": {
