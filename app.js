@@ -426,6 +426,29 @@ const setEndpointNotice = (message) => {
   statusEndpointLine.hidden = !message;
 };
 
+const resolveCacheStatus = (data) => {
+  if (data?.isStale) {
+    return "stale";
+  }
+  if (data?.cached) {
+    return "cached";
+  }
+  return "live";
+};
+
+const formatCacheStatusLabel = (cacheStatus) =>
+  getTranslationOrFallback(`status.cache_state.${cacheStatus}`, cacheStatus);
+
+const buildEndpointNoticeMessage = ({ endpointLabel, cacheStatus }) => {
+  if (cacheStatus === "stale") {
+    return t("status.endpoint_stale", { endpointLabel });
+  }
+  return t("status.endpoint_in_use", {
+    endpointLabel,
+    cacheStatus: formatCacheStatusLabel(cacheStatus),
+  });
+};
+
 const formatIssuerShort = (issuer) => {
   if (!issuer) {
     return "";
@@ -1656,6 +1679,7 @@ const requestBookOffers = async ({ payload }) => {
 
     return {
       data,
+      cacheStatus: resolveCacheStatus(data),
       debugInfo: {
         responseSnippet,
         statusCode,
@@ -1787,6 +1811,7 @@ const fetchBookOffers = async ({ currency, issuer, limit = DEFAULT_LIMIT }) => {
       const offers = normalizeOffers(response?.data?.offers);
       return {
         offers,
+        cacheStatus: response?.cacheStatus ?? "live",
         endpointIndex: 0,
         attemptedEndpoints,
         debugInfo: response?.debugInfo ?? null,
@@ -3751,7 +3776,8 @@ estimateButton?.addEventListener("click", async () => {
       offersCount: null,
     });
 
-    const { offers, endpointIndex, attemptedEndpoints, debugInfo } = await clobPromise;
+    const { offers, endpointIndex, attemptedEndpoints, debugInfo, cacheStatus } =
+      await clobPromise;
     let ammInfo = null;
     if (shouldFetchAmm) {
       setStatus("status.fetching_amm");
@@ -3776,12 +3802,14 @@ estimateButton?.addEventListener("click", async () => {
       resultEndpoint,
       t("results.freshness.endpoint", {
         endpointLabel,
+        cacheStatus: formatCacheStatusLabel(cacheStatus || "live"),
       })
     );
 
     setEndpointNotice(
-      t("status.endpoint_in_use", {
+      buildEndpointNoticeMessage({
         endpointLabel,
+        cacheStatus: cacheStatus || "live",
       })
     );
 

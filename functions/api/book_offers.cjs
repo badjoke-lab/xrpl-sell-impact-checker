@@ -4,6 +4,7 @@ const {
   jsonResponse,
   cacheGet,
   cachePut,
+  CACHE_TTL_SECONDS,
 } = require("./_rpc.cjs");
 
 function buildBookOffersPayload({ currencyNormalized, issuer, limit }) {
@@ -51,7 +52,8 @@ exports.onRequestGet = async (context) => {
         error: "xrp_not_supported",
         message: "XRP is the settlement asset. Enter an IOU token (currency + issuer) to estimate selling into XRP.",
         attempts: [],
-        cached: false
+        cached: false,
+        isStale: false
       };
       return new Response(JSON.stringify(body), {
         status: 400,
@@ -79,6 +81,7 @@ exports.onRequestGet = async (context) => {
         error: "missing_params",
         attempts: [],
         cached: false,
+        isStale: false,
       },
       { status: 400 }
     );
@@ -118,10 +121,19 @@ exports.onRequestGet = async (context) => {
     error: rpcError || result?.error || null,
     attempts,
     cached: false,
+    isStale: false,
   };
 
-  const resp = jsonResponse(body, { status: 200, cacheSeconds: 30 });
-  await cachePut(request, resp);
+  if (!body.ok) {
+    const stale = await cacheGet(request, { markStale: true });
+    if (stale) {
+      return stale;
+    }
+    return jsonResponse(body, { status: 200 });
+  }
+
+  const resp = jsonResponse(body, { status: 200, cacheSeconds: CACHE_TTL_SECONDS });
+  await cachePut(request, body);
   return resp;
 };
 
