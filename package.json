@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "python3 -m http.server 5173",
     "start": "python3 -m http.server 5173",
+    "seed:generate": "node scripts/generate-tokenlist-seed.mjs",
     "pages:dev": "npx wrangler pages dev . --port 8788 --log-level debug",
     "pages:dev:open": "wrangler pages dev . --port 8788 --compatibility-date=2025-01-01 --open"
   },
