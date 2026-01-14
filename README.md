@@ -64,3 +64,6 @@ Manual checks (local):
 - `pnpm run pages:dev`
 - Open `http://localhost:8788/donate` and click **Copy address**.
 - `curl -i http://localhost:8788/api/ping`
+- `curl -i -X POST http://localhost:8788/api/book-offers -H 'content-type: application/json' -d '{"currency":"USD","issuer":"rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq","amount":100,"limit":20}'`
+- `curl -i -X POST http://localhost:8788/api/amm-info -H 'content-type: application/json' -d '{"currency":"USD","issuer":"rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq"}'`
+- Open `http://localhost:8788/methods`, `/faq`, `/disclaimer`, `/credits`, and `/donate` (no 404s).
