@@ -90,7 +90,13 @@
     "error": "Unable to fetch order book.",
     "fetched_offers": "Fetched {count} offers from {endpointLabel}.",
     "endpoint_switched": "Switched to {endpointLabel} endpoint.",
-    "endpoint_in_use": "Using {endpointLabel} endpoint.",
+    "endpoint_in_use": "Using {endpointLabel} endpoint ({cacheStatus}).",
+    "endpoint_stale": "Showing stale cache from {endpointLabel} (upstream unavailable).",
+    "cache_state": {
+      "live": "live",
+      "cached": "cached",
+      "stale": "stale cache"
+    },
     "loaded_from_link": "Loaded from link.",
     "example_selected": "Example: {label}",
     "examples_unavailable": "Examples unavailable right now.",
@@ -126,7 +132,7 @@
     "freshness": {
       "label": "Freshness",
       "fetched_at": "XRPL data fetched at {time}",
-      "endpoint": "Endpoint: {endpointLabel}"
+      "endpoint": "Endpoint: {endpointLabel} ({cacheStatus})"
     },
     "slippage": {
       "label": "Slippage (est.)",

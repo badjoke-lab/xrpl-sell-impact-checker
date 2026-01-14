@@ -1,8 +1,11 @@
 const RPC_ENDPOINTS = [
+  // Fallback priority order (first is preferred).
   "https://xrplcluster.com/",
   "https://s1.ripple.com:51234/",
   "https://s2.ripple.com:51234/",
 ];
+
+const CACHE_TTL_SECONDS = 30;
 
 // --- currency normalize: "SOLO" -> 40hex(ASCII + zero pad) ---
 function isHex40(v) {
@@ -28,7 +31,10 @@ function normalizeCurrencyInput(input) {
 
 // --- tiny helpers ---
 function jsonResponse(obj, { status = 200, cacheSeconds = 0 } = {}) {
-  const headers = { "content-type": "application/json; charset=utf-8" };
+  const headers = {
+    "content-type": "application/json; charset=utf-8",
+    "access-control-allow-origin": "*",
+  };
   if (cacheSeconds > 0) {
     headers["cache-control"] = `public, max-age=${cacheSeconds}`;
   } else {
@@ -120,21 +126,41 @@ async function hedgedRpcCall(payload, { timeoutMs = 6000, staggerMs = 700 } = {}
 }
 
 // Cache API helpers (GET only, keyed by full URL)
-async function cacheGet(request) {
+function buildCacheKeyRequest(request) {
+  const url = new URL(request.url);
+  const sortedParams = [...url.searchParams.entries()].sort(([aKey, aValue], [bKey, bValue]) => {
+    const keyDiff = aKey.localeCompare(bKey);
+    if (keyDiff !== 0) return keyDiff;
+    return aValue.localeCompare(bValue);
+  });
+  url.search = new URLSearchParams(sortedParams).toString();
+  return new Request(url.toString(), { method: request.method });
+}
+
+async function cacheGet(request, { markStale = false } = {}) {
   try {
     if (request.method !== "GET") return null;
     const cache = caches.default;
-    const hit = await cache.match(request);
-    return hit || null;
+    const key = buildCacheKeyRequest(request);
+    const hit = await cache.match(key);
+    if (!hit) return null;
+    if (!markStale) return hit;
+    const payload = await hit.json().catch(() => null);
+    if (!payload || typeof payload !== "object") return null;
+    const stalePayload = { ...payload, cached: true, isStale: true };
+    return jsonResponse(stalePayload, { status: 200, cacheSeconds: CACHE_TTL_SECONDS });
   } catch {
     return null;
   }
 }
-async function cachePut(request, response) {
+async function cachePut(request, body) {
   try {
     if (request.method !== "GET") return;
     const cache = caches.default;
-    await cache.put(request, response.clone());
+    const key = buildCacheKeyRequest(request);
+    const cachedBody = { ...body, cached: true, isStale: false };
+    const response = jsonResponse(cachedBody, { status: 200, cacheSeconds: CACHE_TTL_SECONDS });
+    await cache.put(key, response);
   } catch {}
 }
 
@@ -144,4 +170,5 @@ module.exports = {
   jsonResponse,
   cacheGet,
   cachePut,
+  CACHE_TTL_SECONDS,
 };
