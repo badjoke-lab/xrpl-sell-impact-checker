@@ -1,8 +1,38 @@
 import { loadDictionary, t } from "./src/i18n/index.js";
 import { normalizeCurrencyInput } from "./shared/normalizeCurrency.js";
 
-const BOOK_OFFERS_API = "/api/book_offers";
-const AMM_INFO_API = "/api/amm_info";
+const BOOK_OFFERS_API = "/api/book-offers";
+const AMM_INFO_API = "/api/amm-info";
+
+
+/** xrp_not_supported_ui */
+function showInputError(msg){
+  // Use the existing status line first (this app already has ".status")
+  const status = document.querySelector(".status");
+  if (status) {
+    status.textContent = msg;
+    status.classList?.add?.("error");
+    return;
+  }
+
+  // Fallback: banners (some are hidden by default)
+  const banner =
+    document.querySelector("#i18n-error-banner") ||
+    document.querySelector(".error-banner") ||
+    null;
+
+  if (banner) {
+    banner.hidden = false;
+    banner.textContent = msg;
+    banner.classList?.add?.("error");
+    return;
+  }
+
+  // Last resort
+  alert(msg);
+}
+
+
 const ORDERBOOK_API_ENDPOINT = {
   id: "orderbook-api",
   url: BOOK_OFFERS_API,
@@ -3578,6 +3608,13 @@ estimateButton?.addEventListener("click", async () => {
   const currencyResult = normalizeCurrencyInput(currencyInput?.value ?? "");
   const currency = currencyResult.currencyNormalized || "";
   const issuer = issuerInput?.value?.trim() || "";
+
+  // xrp_not_supported_ui: XRP alone is not a valid target in this tool
+  if (String(currency).trim().toUpperCase() === "XRP" && !String(issuer).trim()) {
+    showInputError("XRP is the settlement asset. Enter an IOU token (currency + issuer) to estimate selling into XRP.");
+    return;
+  }
+
   const amountValue = amountInput?.value ? Number(amountInput.value) : 0;
   const limitValue =
     limitInput?.value === "" || limitInput?.value === undefined
