@@ -1,5 +1,6 @@
 import { loadDictionary, t } from "./src/i18n/index.js";
 import { normalizeCurrencyInput } from "./shared/normalizeCurrency.js";
+import copyToClipboard from "./shared/copyToClipboard.js";
 
 const BOOK_OFFERS_API = "/api/book-offers";
 const AMM_INFO_API = "/api/amm-info";
@@ -185,6 +186,12 @@ const applyTranslations = () => {
   document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
     const key = element.dataset.i18nAriaLabel;
     element.setAttribute("aria-label", getTranslationOrFallback(key));
+  });
+
+  document.querySelectorAll("[data-i18n-content]").forEach((element) => {
+    const key = element.dataset.i18nContent;
+    const fallback = element.getAttribute("content") || "";
+    element.setAttribute("content", getTranslationOrFallback(key, fallback));
   });
 };
 
@@ -1216,38 +1223,6 @@ const scheduleShareUrlUpdate = ({ immediate = false } = {}) => {
     shareUrlTimer = null;
     updateShareUrl();
   }, SHARE_URL_DEBOUNCE_MS);
-};
-
-const copyToClipboard = async (value) => {
-  if (!value) {
-    return false;
-  }
-  if (navigator.clipboard?.writeText && window.isSecureContext) {
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch (error) {
-      // Fall back to legacy approach.
-    }
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "absolute";
-  textarea.style.left = "-9999px";
-  document.body.appendChild(textarea);
-  textarea.select();
-  textarea.setSelectionRange(0, value.length);
-  let success = false;
-  try {
-    success = document.execCommand("copy");
-  } catch (error) {
-    success = false;
-  } finally {
-    document.body.removeChild(textarea);
-  }
-  return success;
 };
 
 const applyShareParamsFromUrl = () => {
