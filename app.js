@@ -4,13 +4,94 @@ import { normalizeCurrencyInput } from "./shared/normalizeCurrency.js";
 const BOOK_OFFERS_API = "/api/book-offers";
 const AMM_INFO_API = "/api/amm-info";
 
+const getTranslationOrFallback = (key, fallback = "…") => {
+  const value = t(key);
+  if (!value || value.startsWith("[[")) {
+    return fallback;
+  }
+  return value;
+};
+
+const API_ERROR_CODES = new Set([
+  "missing_params",
+  "xrp_not_supported",
+  "issueMalformed",
+  "no_liquidity",
+  "upstream_fail",
+]);
+
+const extractApiErrorCode = (error) => {
+  if (!error) {
+    return null;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (typeof error === "object") {
+    if (typeof error.error === "string") {
+      return error.error;
+    }
+    if (typeof error.code === "string") {
+      return error.code;
+    }
+  }
+  return null;
+};
+
+const extractApiErrorMessage = (error) => {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+  if (typeof error.error_message === "string") {
+    return error.error_message;
+  }
+  if (typeof error.message === "string") {
+    return error.message;
+  }
+  return null;
+};
+
+const resolveUiErrorKey = (code) => {
+  if (API_ERROR_CODES.has(code)) {
+    return code;
+  }
+  if (code === "timeout") {
+    return "fetch_timeout";
+  }
+  if (code === "rpc_error") {
+    return "fetch_failed";
+  }
+  if (code === "connect_failed") {
+    return "network_unreachable";
+  }
+  return "default";
+};
+
+const buildErrorLines = ({ code, message }) => {
+  const uiKey = resolveUiErrorKey(code);
+  const title = getTranslationOrFallback(`errors.${uiKey}.title`, message || "Error");
+  const hintBase = getTranslationOrFallback(`errors.${uiKey}.hint`, "");
+  const hint =
+    message && hintBase && !hintBase.includes(message)
+      ? `${hintBase} (${message})`
+      : hintBase || message || "";
+  return { title, hint };
+};
+
+const showApiError = ({ code, message }) => {
+  const { title, hint } = buildErrorLines({ code, message });
+  showInputError(title, hint);
+};
 
 /** xrp_not_supported_ui */
-function showInputError(msg){
+function showInputError(title, hint = "") {
+  const message = hint ? `${title}\n${hint}` : title;
+
   // Use the existing status line first (this app already has ".status")
   const status = document.querySelector(".status");
   if (status) {
-    status.textContent = msg;
+    status.textContent = message;
+    status.hidden = false;
     status.classList?.add?.("error");
     return;
   }
@@ -23,13 +104,13 @@ function showInputError(msg){
 
   if (banner) {
     banner.hidden = false;
-    banner.textContent = msg;
+    banner.textContent = message;
     banner.classList?.add?.("error");
     return;
   }
 
   // Last resort
-  alert(msg);
+  alert(message);
 }
 
 
@@ -78,14 +159,6 @@ const EXAMPLE_CANDIDATES = [
     issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
   },
 ];
-
-const getTranslationOrFallback = (key, fallback = "…") => {
-  const value = t(key);
-  if (!value || value.startsWith("[[")) {
-    return fallback;
-  }
-  return value;
-};
 
 const applyTranslations = () => {
   document.querySelectorAll("[data-i18n]").forEach((element) => {
@@ -288,6 +361,8 @@ if (debugPanel) {
 const setStatus = (key, params) => {
   if (statusLine) {
     statusLine.textContent = t(key, params);
+    statusLine.hidden = false;
+    statusLine.classList?.remove?.("error");
   }
 };
 
@@ -1565,8 +1640,11 @@ const requestBookOffers = async ({ payload }) => {
     responseSnippet = truncateDebugText(JSON.stringify(data), DEBUG_RESPONSE_LIMIT);
 
     if (!response.ok || !data?.ok) {
-      const rpcError = new Error(data?.error || "Request failed");
-      rpcError.code = "rpc_error";
+      const apiErrorCode = extractApiErrorCode(data?.error) || "upstream_fail";
+      const apiMessage =
+        data?.message || extractApiErrorMessage(data?.error) || data?.error || null;
+      const rpcError = new Error(apiMessage || "Request failed");
+      rpcError.code = apiErrorCode;
       rpcError.response = data;
       rpcError.debugInfo = {
         responseSnippet,
@@ -3611,7 +3689,8 @@ estimateButton?.addEventListener("click", async () => {
 
   // xrp_not_supported_ui: XRP alone is not a valid target in this tool
   if (String(currency).trim().toUpperCase() === "XRP" && !String(issuer).trim()) {
-    showInputError("XRP is the settlement asset. Enter an IOU token (currency + issuer) to estimate selling into XRP.");
+    showApiError({ code: "xrp_not_supported" });
+    setEstimateButtonBusy(false);
     return;
   }
 
@@ -3917,15 +3996,12 @@ estimateButton?.addEventListener("click", async () => {
     });
     setStatus("status.done");
   } catch (error) {
-    setStatus("status.error");
-    const errorCode = error?.code || "error";
-    const errorKey =
-      error?.code === "timeout"
-        ? "errors.fetch_timeout"
-        : error?.code === "rpc_error"
-        ? "errors.fetch_failed"
-        : "errors.network_unreachable";
-    setError(t(errorKey));
+    const errorCode = error?.code || "default";
+    showApiError({
+      code: errorCode,
+      message: error?.message || null,
+    });
+    setError(null);
     updateDebugPanel({
       responseStatus: "fail",
       endpointUsed: error?.debugInfo?.endpointUsed ?? null,
