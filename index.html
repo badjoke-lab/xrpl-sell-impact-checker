@@ -34,24 +34,27 @@
           </div>
 
           <div class="grid two-column">
-            <label class="field field--suggestions">
+            <label class="field">
+              <span class="field__label" data-i18n="fields.token_preset.label"></span>
+              <input
+                id="token-suggest-input"
+                type="text"
+                list="token-suggestions"
+                data-i18n-placeholder="fields.token_preset.placeholder"
+                autocomplete="off"
+              />
+              <datalist id="token-suggestions"></datalist>
+              <p class="field__help" data-i18n="fields.token_preset.helper"></p>
+            </label>
+            <label class="field">
               <span class="field__label" data-i18n="fields.currency.label"></span>
               <input
                 id="currency-input"
                 type="text"
                 data-i18n-placeholder="fields.currency.placeholder"
                 aria-describedby="currency-error"
-                aria-autocomplete="list"
-                aria-controls="currency-suggestions"
                 autocomplete="off"
               />
-              <div
-                class="suggestions"
-                id="currency-suggestions"
-                role="listbox"
-                aria-label="Token suggestions"
-                hidden
-              ></div>
               <p class="field__error" id="currency-error" data-error-for="currency" hidden></p>
             </label>
             <label class="field">

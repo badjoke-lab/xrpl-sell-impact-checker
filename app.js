@@ -137,8 +137,8 @@ const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
 const VENUE_CLOB = "CLOB";
 const VENUE_AMM = "AMM";
-const TOKENLIST_SEED_URL = "./data/tokenlist.seed.json";
-const RECENT_TOKENS_STORAGE_KEY = "xsic_recent_tokens_v2";
+const TOKEN_PRESETS_URL = "./data/token-presets.json";
+const RECENT_TOKENS_STORAGE_KEY = "xsic.recentTokens.v1";
 const MAX_RECENT_TOKENS = 10;
 const DEFAULT_TOKEN = {
   currency: "ARMY",
@@ -228,8 +228,8 @@ const tryExampleButton = document.querySelector("#try-example");
 const resetButton = document.querySelector("#reset-inputs");
 const currencyInput = document.querySelector("#currency-input");
 const issuerInput = document.querySelector("#issuer-input");
-const currencySuggestionList = document.querySelector("#currency-suggestions");
-const currencySuggestionField = document.querySelector(".field--suggestions");
+const tokenSuggestionInput = document.querySelector("#token-suggest-input");
+const tokenSuggestionList = document.querySelector("#token-suggestions");
 const amountInput = document.querySelector("#sell-amount-input");
 const limitInput = document.querySelector("#limit-input");
 const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
@@ -401,54 +401,62 @@ const formatIssuerShort = (issuer) => {
   return `${issuer.slice(0, 5)}...`;
 };
 
-const normalizeTokenSuggestion = (item) => {
+const normalizePresetToken = (item) => {
   if (!item || typeof item !== "object") {
     return null;
   }
-  const symbol = typeof item.symbol === "string" ? item.symbol.trim() : "";
+  const label = typeof item.label === "string" ? item.label.trim() : "";
   const issuer = typeof item.issuer === "string" ? item.issuer.trim() : "";
-  if (!symbol) {
+  const rawCurrency = typeof item.currency === "string" ? item.currency.trim() : "";
+  if (!label || !issuer || !rawCurrency) {
     return null;
   }
-  const name = typeof item.name === "string" ? item.name.trim() : "";
-  const tags = Array.isArray(item.tags)
-    ? item.tags.map((tag) => String(tag).trim()).filter(Boolean)
-    : [];
+  const normalized = normalizeCurrencyInput(rawCurrency);
+  const currency = normalized.currencyNormalized || normalized.currencyInput?.trim() || "";
+  if (!currency || currency === "XRP") {
+    return null;
+  }
   return {
-    symbol: symbol.toUpperCase(),
+    label,
+    currency,
     issuer,
-    name,
-    tags,
   };
 };
 
-
-const resolveTokenIssuer = (token) => {
-  const issuer = token?.issuer;
-  if (typeof issuer === "string" && issuer.trim()) {
-    return issuer.trim();
+const normalizeRecentToken = (item) => {
+  if (!item || typeof item !== "object") {
+    return null;
   }
-  const symbol = token?.symbol;
-  if (!symbol) {
-    return "";
+  const label = typeof item.label === "string" ? item.label.trim() : "";
+  const issuer = typeof item.issuer === "string" ? item.issuer.trim() : "";
+  const rawCurrency = typeof item.currency === "string" ? item.currency.trim() : "";
+  if (!issuer || !rawCurrency) {
+    return null;
   }
-  const list =
-    typeof seedTokenSuggestions === "undefined" || !Array.isArray(seedTokenSuggestions)
-      ? []
-      : seedTokenSuggestions;
-  const match = list.find((t) => t && t.symbol === String(symbol).toUpperCase());
-  return match?.issuer || "";
+  const normalized = normalizeCurrencyInput(rawCurrency);
+  const currency = normalized.currencyNormalized || normalized.currencyInput?.trim() || "";
+  if (!currency || currency === "XRP") {
+    return null;
+  }
+  return {
+    label: label || formatCurrencyForDisplay(currency),
+    currency,
+    issuer,
+  };
 };
 
-const getTokenKey = (token) => `${token.symbol}::${resolveTokenIssuer(token)}`;
-const getTokenIssuerLabel = (token) =>
-  token.issuer ? formatIssuerShort(token.issuer) : "XRP";
+const getTokenKey = (token) =>
+  `${String(token.currency).toUpperCase()}|${String(token.issuer).toUpperCase()}`;
+const getTokenLabel = (token) =>
+  token.label?.trim() || formatCurrencyForDisplay(token.currency);
+const getTokenOptionValue = (token) => {
+  const issuerShort = formatIssuerShort(token.issuer);
+  return issuerShort ? `${getTokenLabel(token)} (${issuerShort})` : getTokenLabel(token);
+};
 
-let seedTokenSuggestions = [];
+let presetTokenSuggestions = [];
 let recentTokenSuggestions = [];
-let suggestionsEnabled = false;
-let suggestionItems = [];
-let suggestionActiveIndex = -1;
+let tokenSuggestionIndex = new Map();
 
 const buildExampleLabel = (candidate) =>
   `${candidate.currency} (issuer ${formatIssuerShort(candidate.issuer)})`;
@@ -462,9 +470,6 @@ const setExampleStatus = (message) => {
 };
 
 const loadRecentTokenSuggestions = () => {
-  if (!currencySuggestionList) {
-    return [];
-  }
   try {
     const raw = localStorage.getItem(RECENT_TOKENS_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
@@ -472,163 +477,93 @@ const loadRecentTokenSuggestions = () => {
       return [];
     }
     return parsed
-      .map(normalizeTokenSuggestion)
-      .filter((token) => token && token.symbol);
+      .map(normalizeRecentToken)
+      .filter((token) => token && token.currency && token.issuer);
   } catch (error) {
     return [];
   }
 };
 
-const saveRecentTokenSuggestion = (token) => {
-  if (!token) {
+const findPresetLabel = ({ currency, issuer }) => {
+  const key = getTokenKey({ currency, issuer });
+  const match = presetTokenSuggestions.find((token) => getTokenKey(token) === key);
+  return match?.label || "";
+};
+
+const renderTokenSuggestionOptions = () => {
+  if (!tokenSuggestionList) {
     return;
   }
-  const key = getTokenKey(token);
+  tokenSuggestionList.innerHTML = "";
+  tokenSuggestionIndex = new Map();
+
+  const seen = new Set();
+  const addTokenOption = (token) => {
+    const key = getTokenKey(token);
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    const option = document.createElement("option");
+    const optionValue = getTokenOptionValue(token);
+    option.value = optionValue;
+    option.dataset.currency = token.currency;
+    option.dataset.issuer = token.issuer;
+    tokenSuggestionIndex.set(optionValue, token);
+    tokenSuggestionList.appendChild(option);
+  };
+
+  recentTokenSuggestions.forEach(addTokenOption);
+  presetTokenSuggestions.forEach(addTokenOption);
+};
+
+const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
+  if (!currency || !issuer) {
+    return;
+  }
+  const normalizedCurrencyResult = normalizeCurrencyInput(currency);
+  const normalizedCurrency =
+    normalizedCurrencyResult.currencyNormalized ||
+    normalizedCurrencyResult.currencyInput?.trim() ||
+    "";
+  if (!normalizedCurrency || normalizedCurrency === "XRP") {
+    return;
+  }
+  const resolvedLabel =
+    label || findPresetLabel({ currency: normalizedCurrency, issuer }) || getTokenLabel({
+      currency: normalizedCurrency,
+      issuer,
+      label,
+    });
+  const tokenRecord = {
+    label: resolvedLabel,
+    currency: normalizedCurrency,
+    issuer,
+  };
+  const key = getTokenKey(tokenRecord);
   const deduped = recentTokenSuggestions.filter(
     (item) => getTokenKey(item) !== key
   );
-  
-  const normalizedToken = {
-    symbol: token?.symbol || "",
-    issuer: resolveTokenIssuer(token),
-    name: token?.name || "",
-    tags: Array.isArray(token?.tags) ? token.tags : [],
-  };
-  recentTokenSuggestions = [normalizedToken, ...deduped].slice(0, MAX_RECENT_TOKENS);
-try {
+  recentTokenSuggestions = [tokenRecord, ...deduped].slice(0, MAX_RECENT_TOKENS);
+  try {
     localStorage.setItem(RECENT_TOKENS_STORAGE_KEY, JSON.stringify(recentTokenSuggestions));
   } catch (error) {
     // Ignore storage failures.
   }
-};
-
-const matchesTokenQuery = (token, query) => {
-  if (!query) {
-    return true;
-  }
-  const haystack = `${token.symbol} ${token.name || ""}`.toLowerCase();
-  return haystack.includes(query);
-};
-
-const closeTokenSuggestions = () => {
-  if (!currencySuggestionList || !currencyInput) {
-    return;
-  }
-  currencySuggestionList.hidden = true;
-  currencyInput.setAttribute("aria-expanded", "false");
-  suggestionItems = [];
-  suggestionActiveIndex = -1;
-};
-
-const setActiveSuggestionIndex = (index) => {
-  if (!currencySuggestionList) {
-    return;
-  }
-  const options = Array.from(
-    currencySuggestionList.querySelectorAll(".suggestion-item")
-  );
-  options.forEach((option, optionIndex) => {
-    const isActive = optionIndex === index;
-    option.classList.toggle("is-active", isActive);
-    option.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
-  suggestionActiveIndex = index;
+  renderTokenSuggestionOptions();
 };
 
 const applyTokenSuggestion = (token) => {
   if (!currencyInput || !issuerInput) {
     return;
   }
-  const normalized = normalizeCurrencyInput(token.symbol);
-  currencyInput.value = normalized.currencyInput || token.symbol;
-  issuerInput.value = resolveTokenIssuer(token) || "";
+  currencyInput.value = token.currency;
+  issuerInput.value = token.issuer;
   setFieldError("currency", null);
   setFieldError("issuer", null);
   saveRecentTokenSuggestion(token);
-  closeTokenSuggestions();
   handleShareInputChange();
   currencyInput.focus();
-};
-
-const renderTokenSuggestions = (queryValue) => {
-  if (!currencySuggestionList || !currencyInput || !suggestionsEnabled) {
-    return;
-  }
-  const query = queryValue.trim().toLowerCase();
-  const recentMatches = recentTokenSuggestions.filter((token) =>
-    matchesTokenQuery(token, query)
-  );
-  const recentKeys = new Set(recentMatches.map(getTokenKey));
-  const seedMatches = seedTokenSuggestions.filter(
-    (token) => matchesTokenQuery(token, query) && !recentKeys.has(getTokenKey(token))
-  );
-
-  const hasMatches = recentMatches.length > 0 || seedMatches.length > 0;
-  if (!hasMatches) {
-    closeTokenSuggestions();
-    return;
-  }
-
-  currencySuggestionList.innerHTML = "";
-  suggestionItems = [];
-
-  const addGroupLabel = (label) => {
-    const group = document.createElement("div");
-    group.className = "suggestions__group";
-    group.textContent = label;
-    currencySuggestionList.appendChild(group);
-  };
-
-  const addTokenButton = (token) => {
-    const index = suggestionItems.length;
-    suggestionItems.push(token);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "suggestion-item";
-    button.setAttribute("role", "option");
-    button.dataset.index = String(index);
-
-    const titleRow = document.createElement("div");
-    titleRow.className = "suggestion-item__row";
-    const symbol = document.createElement("span");
-    symbol.textContent = token.symbol;
-    const issuer = document.createElement("span");
-    issuer.className = "suggestion-item__issuer";
-    issuer.textContent = getTokenIssuerLabel(token);
-    titleRow.append(symbol, issuer);
-
-    const meta = document.createElement("div");
-    meta.className = "suggestion-item__meta";
-    meta.textContent = token.name || "";
-
-    button.append(titleRow, meta);
-    button.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-    });
-    button.addEventListener("mouseenter", () => {
-      setActiveSuggestionIndex(index);
-    });
-    button.addEventListener("click", () => {
-      applyTokenSuggestion(token);
-    });
-    currencySuggestionList.appendChild(button);
-  };
-
-  if (recentMatches.length) {
-    addGroupLabel("Recent");
-    recentMatches.forEach(addTokenButton);
-  }
-
-  if (seedMatches.length) {
-    if (recentMatches.length) {
-      addGroupLabel("Tokens");
-    }
-    seedMatches.forEach(addTokenButton);
-  }
-
-  currencySuggestionList.hidden = false;
-  currencyInput.setAttribute("aria-expanded", "true");
-  setActiveSuggestionIndex(-1);
 };
 
 const setFieldError = (key, message) => {
@@ -3357,21 +3292,20 @@ initFiatSelection();
 applyShareParamsFromUrl();
 if (currencyInput && !currencyInput.value) {
   currencyInput.value = "";
-
 }
 if (issuerInput && !issuerInput.value) {
   issuerInput.value = "";
-
 }
 
 const resetInputs = () => {
+  if (tokenSuggestionInput) {
+    tokenSuggestionInput.value = "";
+  }
   if (currencyInput) {
     currencyInput.value = "";
-
   }
   if (issuerInput) {
     issuerInput.value = "";
-
   }
   if (amountInput) {
     amountInput.value = "";
@@ -3400,7 +3334,6 @@ const resetInputs = () => {
   setShareLoadNote(false);
   showShareToast(null);
   setExampleStatus("");
-  closeTokenSuggestions();
   resetResults();
   setStatus("status.waiting");
   clearShareParams();
@@ -3416,100 +3349,42 @@ const handleShareInputChange = () => {
 };
 
 const initTokenSuggestions = async () => {
-  if (!currencyInput || !currencySuggestionList) {
+  if (!tokenSuggestionInput || !tokenSuggestionList) {
     return;
   }
-  currencyInput.setAttribute("aria-expanded", "false");
   recentTokenSuggestions = loadRecentTokenSuggestions();
 
   try {
-    const response = await fetch(TOKENLIST_SEED_URL, { cache: "no-store" });
+    const response = await fetch(TOKEN_PRESETS_URL, { cache: "no-store" });
     if (!response.ok) {
-      throw new Error("Seed token list not available");
+      throw new Error("Token presets not available");
     }
     const payload = await response.json();
     if (!Array.isArray(payload)) {
-      throw new Error("Seed token list invalid");
+      throw new Error("Token presets invalid");
     }
-    seedTokenSuggestions = payload
-      .map(normalizeTokenSuggestion)
-      .filter((token) => token && token.symbol);
-    suggestionsEnabled = seedTokenSuggestions.length > 0;
-    if (!suggestionsEnabled) {
-      closeTokenSuggestions();
-      return;
-    }
+    presetTokenSuggestions = payload
+      .map(normalizePresetToken)
+      .filter((token) => token && token.currency && token.issuer);
   } catch (error) {
-    seedTokenSuggestions = [];
-    suggestionsEnabled = false;
-    closeTokenSuggestions();
-    return;
+    presetTokenSuggestions = [];
   }
+  renderTokenSuggestionOptions();
 
   const handleSuggestionInput = () => {
-    renderTokenSuggestions(currencyInput.value);
+    const value = tokenSuggestionInput.value.trim();
+    if (!value) {
+      return;
+    }
+    const token = tokenSuggestionIndex.get(value);
+    if (!token) {
+      return;
+    }
+    applyTokenSuggestion(token);
   };
 
-  currencyInput.addEventListener("input", handleSuggestionInput);
-  currencyInput.addEventListener("focus", handleSuggestionInput);
-  currencyInput.addEventListener("keydown", (event) => {
-    if (!suggestionsEnabled) {
-      return;
-    }
-    if (event.key === "ArrowDown") {
-      if (currencySuggestionList.hidden) {
-        renderTokenSuggestions(currencyInput.value);
-      }
-      if (!suggestionItems.length) {
-        return;
-      }
-      event.preventDefault();
-      const nextIndex =
-        suggestionActiveIndex < 0
-          ? 0
-          : (suggestionActiveIndex + 1) % suggestionItems.length;
-      setActiveSuggestionIndex(nextIndex);
-      return;
-    }
-    if (event.key === "ArrowUp") {
-      if (currencySuggestionList.hidden) {
-        renderTokenSuggestions(currencyInput.value);
-      }
-      if (!suggestionItems.length) {
-        return;
-      }
-      event.preventDefault();
-      const nextIndex =
-        suggestionActiveIndex < 0
-          ? suggestionItems.length - 1
-          : (suggestionActiveIndex - 1 + suggestionItems.length) % suggestionItems.length;
-      setActiveSuggestionIndex(nextIndex);
-      return;
-    }
-    if (event.key === "Enter") {
-      if (currencySuggestionList.hidden || suggestionActiveIndex < 0) {
-        return;
-      }
-      event.preventDefault();
-      applyTokenSuggestion(suggestionItems[suggestionActiveIndex]);
-      return;
-    }
-    if (event.key === "Escape") {
-      if (!currencySuggestionList.hidden) {
-        event.preventDefault();
-        closeTokenSuggestions();
-      }
-    }
-  });
-
-  document.addEventListener("click", (event) => {
-    if (!currencySuggestionField || currencySuggestionList.hidden) {
-      return;
-    }
-    if (!currencySuggestionField.contains(event.target)) {
-      closeTokenSuggestions();
-    }
-  });
+  tokenSuggestionInput.addEventListener("input", handleSuggestionInput);
+  tokenSuggestionInput.addEventListener("change", handleSuggestionInput);
 };
 
 void initTokenSuggestions();
@@ -3645,6 +3520,11 @@ tryExampleButton?.addEventListener("click", () => {
     if (amountInput) {
       amountInput.value = "1000";
     }
+    saveRecentTokenSuggestion({
+      currency: candidate.currency,
+      issuer: candidate.issuer,
+      label: findPresetLabel(candidate),
+    });
     clearFieldErrors();
     setError(null);
     setExampleStatus(t("status.example_selected", { label: buildExampleLabel(candidate) }));
@@ -3770,6 +3650,11 @@ estimateButton?.addEventListener("click", async () => {
       return;
     }
 
+    saveRecentTokenSuggestion({
+      currency,
+      issuer,
+      label: findPresetLabel({ currency, issuer }),
+    });
     setStatus("status.fetching_clob");
     const requestTimestamp = Date.now();
     const requestPayload = {
