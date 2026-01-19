@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>XSIC – Donate</title>
+  <meta name="description" content="Support XSIC development." />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="page-header">
+    <a class="home-link" href="/">← Back</a>
+    <h1>Donate</h1>
+  </header>
+
+  <main class="page">
+    <p>If this tool helps, you can support development via XRPL address:</p>
+
+    <div class="donate-box">
+      <code id="donate-addr">rsMuUUdLC1wxrJ2DvQnTrnKGRhVxoLrhEj</code>
+      <button id="copy-donate" class="btn" type="button">Copy</button>
+    </div>
+
+    <p class="donate-status" id="donate-status" aria-live="polite"></p>
+  </main>
+
+  <footer class="page-footer">
+    <nav class="page-links">
+      <a href="/methods.html">Methods</a>
+      <a href="/faq.html">FAQ</a>
+      <a href="/disclaimer.html">Disclaimer</a>
+      <a href="/credits.html">Credits</a>
+    </nav>
+  </footer>
+
+<script>
+(function(){
+  const addr = document.getElementById("donate-addr").textContent.trim();
+  const btn = document.getElementById("copy-donate");
+  const st = document.getElementById("donate-status");
+
+  function setStatus(msg, ok){
+    st.textContent = msg;
+    st.className = "donate-status " + (ok ? "ok" : "ng");
+  }
+
+  async function copyText(){
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(addr);
+        setStatus("Copied.", true);
+        return;
+      }
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = addr;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      setStatus(ok ? "Copied." : "Copy failed.", ok);
+    } catch (e) {
+      setStatus("Copy failed.", false);
+    }
+  }
+
+  btn.addEventListener("click", copyText);
+})();
+</script>
+</body>
+</html>
