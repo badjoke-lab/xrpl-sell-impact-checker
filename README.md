@@ -12,7 +12,9 @@ pnpm install
 pnpm run start
 ```
 
-Open `http://localhost:5173` in your browser.
+Production: https://xsic.badjoke-lab.com/
+
+Dev: Open `http://localhost:5173` in your browser.
 
 ### Deploy (Cloudflare Pages)
 
