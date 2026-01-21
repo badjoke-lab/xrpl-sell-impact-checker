@@ -1,17 +1,20 @@
-import { loadDictionary, t } from "./src/i18n/index.js";
+import {
+  applyTranslations,
+  bindLanguageSwitcher,
+  getActiveLang,
+  getTranslationOrFallback,
+  loadDictionary,
+  normalizeLang,
+  resolvePreferredLang,
+  setActiveLang,
+  storeLang,
+  t,
+} from "./src/i18n/index.js";
 import { normalizeCurrencyInput } from "./shared/normalizeCurrency.js";
 import copyToClipboard from "./shared/copyToClipboard.js";
 
 const BOOK_OFFERS_API = "/api/book-offers";
 const AMM_INFO_API = "/api/amm-info";
-
-const getTranslationOrFallback = (key, fallback = "…") => {
-  const value = t(key);
-  if (!value || value.startsWith("[[")) {
-    return fallback;
-  }
-  return value;
-};
 
 const API_ERROR_CODES = new Set([
   "missing_params",
@@ -134,8 +137,6 @@ const THRESHOLD_VALUES = new Set([1, 2, 5, 10, 20]);
 const DEFAULT_SLIPPAGE_PERCENT = 5;
 const DEFAULT_THIN_CUTOFF_PERCENT = 20;
 const FIAT_VALUES = new Set(["USD", "JPY"]);
-const SUPPORTED_LANGS = new Set(["en", "ja"]);
-const DEFAULT_LANG = "en";
 const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
 const VENUE_CLOB = "CLOB";
@@ -163,38 +164,6 @@ const EXAMPLE_CANDIDATES = [
   },
 ];
 
-const applyTranslations = () => {
-  document.querySelectorAll("[data-i18n]").forEach((element) => {
-    const { i18n } = element.dataset;
-    element.textContent = getTranslationOrFallback(i18n);
-  });
-
-  document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
-    const key = element.dataset.i18nPlaceholder;
-    if ("placeholder" in element) {
-      element.placeholder = getTranslationOrFallback(key);
-    }
-  });
-
-  document.querySelectorAll("[data-i18n-value]").forEach((element) => {
-    const key = element.dataset.i18nValue;
-    if ("value" in element) {
-      element.value = getTranslationOrFallback(key);
-    }
-  });
-
-  document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
-    const key = element.dataset.i18nAriaLabel;
-    element.setAttribute("aria-label", getTranslationOrFallback(key));
-  });
-
-  document.querySelectorAll("[data-i18n-content]").forEach((element) => {
-    const key = element.dataset.i18nContent;
-    const fallback = element.getAttribute("content") || "";
-    element.setAttribute("content", getTranslationOrFallback(key, fallback));
-  });
-};
-
 const getStatusLine = () =>
   document.querySelector('.status[data-i18n="status.waiting"]') ||
   document.querySelector(".status");
@@ -214,17 +183,28 @@ const showI18nError = () => {
 };
 
 const initI18n = async () => {
-  applyTranslations();
   try {
-    const url = await loadDictionary();
+    await loadDictionary(getActiveLang());
     applyTranslations();
     if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
-      console.info("i18n loaded", url.href);
+      console.info("i18n loaded", getActiveLang());
     }
   } catch (error) {
     applyTranslations();
     showI18nError();
   }
+
+  bindLanguageSwitcher({
+    updateUrl: false,
+    onChange: () => {
+      updateImpactThresholdHelp(getImpactThresholdPct());
+      updateMaxSellLabel(getImpactThresholdPct());
+      updateLiquiditySplitLabel(getImpactThresholdPct());
+      setEstimateButtonBusy(Boolean(estimateButton?.disabled));
+      refreshStatusLine();
+      scheduleShareUrlUpdate({ immediate: true });
+    },
+  });
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -366,43 +346,39 @@ const debugState = {
   },
 };
 
+const preferredLang = resolvePreferredLang();
+if (preferredLang) {
+  setActiveLang(preferredLang);
+  storeLang(preferredLang);
+}
+
 if (debugPanel) {
   debugPanel.hidden = !isDebugEnabled;
 }
+
+let lastStatusKey = null;
 
 const setStatus = (key, params) => {
   const statusLine = getStatusLine();
   if (!statusLine) {
     return;
   }
+  lastStatusKey = key;
   statusLine.textContent = t(key, params);
   statusLine.hidden = false;
   statusLine.classList?.remove?.("error");
 };
 
-const setStatusText = (message, { isError = false } = {}) => {
+const setReadyStatus = () => {
+  setStatus("status.ready");
+};
+
+const refreshStatusLine = () => {
   const statusLine = getStatusLine();
-  if (!statusLine) {
+  if (!statusLine || !lastStatusKey || statusLine.classList.contains("error")) {
     return;
   }
-  statusLine.textContent = message || "";
-  statusLine.hidden = !message;
-  if (isError) {
-    statusLine.classList?.add?.("error");
-  } else {
-    statusLine.classList?.remove?.("error");
-  }
-};
-
-const READY_STATUS_LABELS = {
-  en: "Ready",
-  ja: "準備OK",
-};
-
-const setReadyStatus = () => {
-  const lang = getActiveLang();
-  const fallback = READY_STATUS_LABELS.en;
-  setStatusText(READY_STATUS_LABELS[lang] || fallback);
+  setStatus(lastStatusKey);
 };
 
 const setEstimateButtonBusy = (isBusy) => {
@@ -941,23 +917,6 @@ const formatTime = (timestamp) =>
 
 const clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
 
-const normalizeLang = (value) => {
-  if (!value) {
-    return null;
-  }
-  const trimmed = String(value).trim().toLowerCase();
-  return SUPPORTED_LANGS.has(trimmed) ? trimmed : null;
-};
-
-const getActiveLang = () => normalizeLang(document.documentElement.lang) || DEFAULT_LANG;
-
-const setActiveLang = (lang) => {
-  if (!lang) {
-    return;
-  }
-  document.documentElement.lang = lang;
-};
-
 const sanitizeCurrency = (value) => {
   const result = normalizeCurrencyInput(value);
   if (result.error) {
@@ -1276,6 +1235,7 @@ const applyShareParamsFromUrl = () => {
   const lang = normalizeLang(langParam);
   if (langParam && lang) {
     setActiveLang(lang);
+    storeLang(lang);
   }
 
   let issuer = issuerParam ? sanitizeIssuer(issuerParam) : null;

@@ -30,35 +30,62 @@
 </head>
 <body>
   <header class="page-header">
-    <a class="home-link" href="/">← Back</a>
-    <h1>Methods</h1>
+    <div class="page-header__row">
+      <a class="home-link" href="/" data-i18n="nav.back"></a>
+      <div
+        class="lang-switch"
+        role="group"
+        aria-label="Language"
+        data-i18n-aria-label="language.label"
+      >
+        <span class="lang-switch__label" data-i18n="language.label"></span>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="en"
+          aria-pressed="false"
+        >
+          EN
+        </button>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="ja"
+          aria-pressed="false"
+        >
+          JA
+        </button>
+      </div>
+    </div>
+    <h1 data-i18n="pages.methods.title"></h1>
   </header>
 
   <main class="page">
-    <h2>What this tool does</h2>
-    <p>XSIC estimates how selling an IOU token into XRP may impact price/liquidity on XRPL.</p>
+    <h2 data-i18n="pages.methods.what_title"></h2>
+    <p data-i18n="pages.methods.what_body"></p>
 
-    <h2>Data sources</h2>
+    <h2 data-i18n="pages.methods.data_title"></h2>
     <ul>
-      <li>CLOB (Order Book Offers) via XRPL JSON-RPC</li>
-      <li>AMM pool info via XRPL JSON-RPC</li>
+      <li data-i18n="pages.methods.data_item_clob"></li>
+      <li data-i18n="pages.methods.data_item_amm"></li>
     </ul>
 
-    <h2>Key notes</h2>
+    <h2 data-i18n="pages.methods.notes_title"></h2>
     <ul>
-      <li>XRP is the settlement asset. You must enter an IOU token (currency + issuer).</li>
-      <li>Results are estimates. Network conditions and on-ledger changes can differ.</li>
-      <li>Limits and pagination may cap how much depth we can read per request.</li>
+      <li data-i18n="pages.methods.notes_item_1"></li>
+      <li data-i18n="pages.methods.notes_item_2"></li>
+      <li data-i18n="pages.methods.notes_item_3"></li>
     </ul>
   </main>
 
   <footer class="page-footer">
     <nav class="page-links">
-      <a href="/faq.html">FAQ</a>
-      <a href="/disclaimer.html">Disclaimer</a>
-      <a href="/credits.html">Credits</a>
-      <a href="/donate.html">Donate</a>
+      <a href="/faq.html" data-i18n="nav.faq"></a>
+      <a href="/disclaimer.html" data-i18n="nav.disclaimer"></a>
+      <a href="/credits.html" data-i18n="nav.credits"></a>
+      <a href="/donate.html" data-i18n="nav.donate"></a>
     </nav>
   </footer>
+  <script type="module" src="/src/i18n/page-init.js"></script>
 </body>
 </html>

@@ -20,73 +20,90 @@
       <header class="app__header">
         <div class="app__header-top">
           <div>
-            <p class="eyebrow">XSIC</p>
-            <h1>XRPL Sell Impact Checker</h1>
+            <p class="eyebrow" data-i18n="app.eyebrow"></p>
+            <h1 data-i18n="app.title"></h1>
+          </div>
+          <div
+            class="lang-switch"
+            role="group"
+            aria-label="Language"
+            data-i18n-aria-label="language.label"
+          >
+            <span class="lang-switch__label" data-i18n="language.label"></span>
+            <button
+              class="ghost-button lang-switch__button"
+              type="button"
+              data-lang-switch="en"
+              aria-pressed="false"
+            >
+              EN
+            </button>
+            <button
+              class="ghost-button lang-switch__button"
+              type="button"
+              data-lang-switch="ja"
+              aria-pressed="false"
+            >
+              JA
+            </button>
           </div>
         </div>
         <nav class="site-nav" aria-label="Primary">
-          <a href="/">Home</a>
-          <a href="/methods">Methods</a>
-          <a href="/faq">FAQ</a>
-          <a href="/disclaimer">Disclaimer</a>
-          <a href="/credits">Credits</a>
-          <a href="/donate">Donate</a>
+          <a href="/" data-i18n="nav.home"></a>
+          <a href="/methods" data-i18n="nav.methods"></a>
+          <a href="/faq" data-i18n="nav.faq"></a>
+          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
+          <a href="/credits" data-i18n="nav.credits"></a>
+          <a href="/donate" data-i18n="nav.donate"></a>
         </nav>
       </header>
 
       <main class="page__content">
         <section class="card">
-          <h2 class="page__title">FAQ</h2>
-          <p class="page__lede">Quick answers to common questions about XSIC.</p>
+          <h2 class="page__title" data-i18n="pages.faq.title"></h2>
+          <p class="page__lede" data-i18n="pages.faq.lede"></p>
         </section>
 
         <section class="card">
-          <h3>Why can’t I enter XRP alone?</h3>
-          <p>
-            XRPL XRP is the quote asset for most order books. XSIC estimates sell impact for IOUs
-            against XRP, so it requires both a currency code and issuer. For XRP/XRP there is no
-            order book to simulate.
-          </p>
+          <h3 data-i18n="pages.faq.q1_title"></h3>
+          <p data-i18n="pages.faq.q1_body"></p>
         </section>
 
         <section class="card">
-          <h3>How fresh is the data?</h3>
-          <p>
-            XSIC calls public XRPL endpoints in real time and records the fetch time shown in the
-            results. If live data is unavailable, cached values may be shown with a warning.
-          </p>
+          <h3 data-i18n="pages.faq.q2_title"></h3>
+          <p data-i18n="pages.faq.q2_body"></p>
         </section>
 
         <section class="card">
-          <h3>Why do CLOB and AMM results differ?</h3>
-          <p>
-            CLOB results are based on visible offers, while AMM results depend on pool reserves and
-            fees. XSIC compares both and uses the better outcome for your requested amount.
-          </p>
+          <h3 data-i18n="pages.faq.q3_title"></h3>
+          <p data-i18n="pages.faq.q3_body"></p>
         </section>
 
         <section class="card">
-          <h3>Is fiat pricing guaranteed?</h3>
-          <p>
-            No. Fiat amounts are optional and sourced from external feeds. If the feed is down, XSIC
-            will still show XRP values and note that fiat is unavailable.
-          </p>
+          <h3 data-i18n="pages.faq.q4_title"></h3>
+          <p data-i18n="pages.faq.q4_body"></p>
+        </section>
+
+        <section class="card">
+          <h3 data-i18n="pages.faq.q5_title"></h3>
+          <p data-i18n="pages.faq.q5_body"></p>
         </section>
       </main>
 
       <footer class="site-footer">
         <div class="site-footer__brand">
-          <p class="site-footer__title">XSIC by BadJoke-Lab</p>
-          <p class="site-footer__note">XRPL Sell Impact Checker for transparent estimates.</p>
+          <p class="site-footer__title" data-i18n="footer.brand"></p>
+          <p class="site-footer__note" data-i18n="footer.note"></p>
         </div>
         <nav class="site-footer__links" aria-label="Footer">
-          <a href="/methods">Methods</a>
-          <a href="/faq">FAQ</a>
-          <a href="/disclaimer">Disclaimer</a>
-          <a href="/credits">Credits</a>
-          <a href="/donate">Donate</a>
+          <a href="/methods" data-i18n="nav.methods"></a>
+          <a href="/faq" data-i18n="nav.faq"></a>
+          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
+          <a href="/credits" data-i18n="nav.credits"></a>
+          <a href="/donate" data-i18n="nav.donate"></a>
         </nav>
       </footer>
     </div>
+    <script type="module" src="/src/i18n/page-init.js"></script>
   </body>
 </html>
