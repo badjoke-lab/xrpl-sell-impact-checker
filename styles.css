@@ -1,3 +1,5 @@
+ｂにしよう　今のcssをそれで組み替えてみろ　あとロゴ画像の色も変えなければいけない
+
 :root {
   color-scheme: light;
   font-family: "Inter", "Segoe UI", system-ui, sans-serif;
@@ -5,18 +7,12 @@
   font-weight: 400;
   color: #0f172a;
   background-color: #f8fafc;
-
-  /* Accent (B) */
-  --color-primary: #E84FEF;
-  --color-primary-strong: #D948E0;
-  --color-primary-soft: rgba(232, 79, 239, 0.14);
-  --color-primary-muted: rgba(232, 79, 239, 0.2);
-  --color-primary-ink: #8A2E91;
-  --color-focus-ring: rgba(232, 79, 239, 0.32);
-
-  /* Borders / tints (上品寄り) */
-  --color-border: #EEEAF3;
-  --color-tint: #FFF0FE;
+  --color-primary: #6f63c2;
+  --color-primary-strong: #5e53b5;
+  --color-primary-soft: rgba(111, 99, 194, 0.14);
+  --color-primary-muted: rgba(111, 99, 194, 0.2);
+  --color-primary-ink: #4a4096;
+  --color-focus-ring: rgba(111, 99, 194, 0.35);
 }
 
 * {
@@ -76,7 +72,6 @@ body {
   border-color: #1e293b;
   color: #ffffff;
 }
-
 .site-nav {
   display: flex;
   flex-wrap: wrap;
@@ -174,7 +169,7 @@ h2 {
 .field input,
 .field select {
   border-radius: 10px;
-  border: 1px solid var(--color-border);
+  border: 1px solid #cbd5f5;
   padding: 10px 12px;
   font-size: 1rem;
   color: #0f172a;
@@ -193,7 +188,7 @@ h2 {
   max-height: 240px;
   overflow-y: auto;
   background: #ffffff;
-  border: 1px solid var(--color-border);
+  border: 1px solid #cbd5f5;
   border-radius: 12px;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
   padding: 6px;
@@ -364,7 +359,7 @@ h2 {
 }
 
 .secondary-button {
-  border: 1px solid var(--color-border);
+  border: 1px solid #cbd5f5;
   border-radius: 10px;
   padding: 10px 14px;
   background: #ffffff;
@@ -380,7 +375,7 @@ h2 {
 }
 
 .ghost-button {
-  border: 1px solid var(--color-border);
+  border: 1px solid #cbd5f5;
   border-radius: 10px;
   padding: 10px 14px;
   background: #ffffff;
@@ -645,7 +640,7 @@ a:hover {
 }
 
 .chart__axis {
-  stroke: var(--color-border);
+  stroke: #cbd5f5;
   stroke-width: 1;
 }
 
@@ -845,6 +840,7 @@ a:hover {
     align-items: center;
   }
 }
+
 
 /* xsic-static-pages */
 .page-header { max-width: 980px; margin: 24px auto 12px; padding: 0 16px; }
