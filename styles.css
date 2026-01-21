@@ -48,6 +48,28 @@ body {
   justify-content: space-between;
 }
 
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.lang-switch__label {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.lang-switch__button {
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.lang-switch__button--active {
+  background: #1e293b;
+  border-color: #1e293b;
+  color: #ffffff;
+}
 .site-nav {
   display: flex;
   flex-wrap: wrap;
@@ -820,6 +842,7 @@ a:hover {
 
 /* xsic-static-pages */
 .page-header { max-width: 980px; margin: 24px auto 12px; padding: 0 16px; }
+.page-header__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .page-header h1 { margin: 10px 0 0; font-size: 24px; }
 .home-link { text-decoration: none; }
 .page { max-width: 980px; margin: 0 auto; padding: 0 16px 24px; }
@@ -836,4 +859,3 @@ a:hover {
 .donate-status { margin-top: 10px; min-height: 1.2em; }
 .donate-status.ok { opacity: 0.9; }
 .donate-status.ng { opacity: 0.9; }
-

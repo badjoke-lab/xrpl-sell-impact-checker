@@ -20,65 +20,90 @@
       <header class="app__header">
         <div class="app__header-top">
           <div>
-            <p class="eyebrow">XSIC</p>
-            <h1>XRPL Sell Impact Checker</h1>
+            <p class="eyebrow" data-i18n="app.eyebrow"></p>
+            <h1 data-i18n="app.title"></h1>
+          </div>
+          <div
+            class="lang-switch"
+            role="group"
+            aria-label="Language"
+            data-i18n-aria-label="language.label"
+          >
+            <span class="lang-switch__label" data-i18n="language.label"></span>
+            <button
+              class="ghost-button lang-switch__button"
+              type="button"
+              data-lang-switch="en"
+              aria-pressed="false"
+            >
+              EN
+            </button>
+            <button
+              class="ghost-button lang-switch__button"
+              type="button"
+              data-lang-switch="ja"
+              aria-pressed="false"
+            >
+              JA
+            </button>
           </div>
         </div>
         <nav class="site-nav" aria-label="Primary">
-          <a href="/">Home</a>
-          <a href="/methods">Methods</a>
-          <a href="/faq">FAQ</a>
-          <a href="/disclaimer">Disclaimer</a>
-          <a href="/credits">Credits</a>
-          <a href="/donate">Donate</a>
+          <a href="/" data-i18n="nav.home"></a>
+          <a href="/methods" data-i18n="nav.methods"></a>
+          <a href="/faq" data-i18n="nav.faq"></a>
+          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
+          <a href="/credits" data-i18n="nav.credits"></a>
+          <a href="/donate" data-i18n="nav.donate"></a>
         </nav>
       </header>
 
       <main class="page__content">
         <section class="card">
-          <h2 class="page__title">Credits</h2>
-          <p class="page__lede">Thanks to the open infrastructure that keeps XSIC running.</p>
+          <h2 class="page__title" data-i18n="pages.credits.title"></h2>
+          <p class="page__lede" data-i18n="pages.credits.lede"></p>
         </section>
 
         <section class="card">
-          <h3>Data sources</h3>
+          <h3 data-i18n="pages.credits.data_title"></h3>
           <ul class="info-list">
-            <li>XRPL public rippled endpoints (s1.ripple.com, s2.ripple.com).</li>
-            <li>XRPL methods: <code>book_offers</code> and <code>amm_info</code>.</li>
-            <li>XRP fiat pricing via CoinGecko.</li>
+            <li data-i18n="pages.credits.data_item_1"></li>
+            <li data-i18n="pages.credits.data_item_2"></li>
+            <li data-i18n="pages.credits.data_item_3"></li>
           </ul>
         </section>
 
         <section class="card">
-          <h3>Infrastructure</h3>
+          <h3 data-i18n="pages.credits.infra_title"></h3>
           <ul class="info-list">
-            <li>Cloudflare Pages + Functions for hosting and API proxying.</li>
-            <li>XRPL open protocols and documentation.</li>
+            <li data-i18n="pages.credits.infra_item_1"></li>
+            <li data-i18n="pages.credits.infra_item_2"></li>
           </ul>
         </section>
 
         <section class="card">
-          <h3>Libraries</h3>
+          <h3 data-i18n="pages.credits.libraries_title"></h3>
           <ul class="info-list">
-            <li>Vanilla JavaScript + Web APIs.</li>
-            <li>Inter font family and system UI fonts.</li>
+            <li data-i18n="pages.credits.libraries_item_1"></li>
+            <li data-i18n="pages.credits.libraries_item_2"></li>
           </ul>
         </section>
       </main>
 
       <footer class="site-footer">
         <div class="site-footer__brand">
-          <p class="site-footer__title">XSIC by BadJoke-Lab</p>
-          <p class="site-footer__note">XRPL Sell Impact Checker for transparent estimates.</p>
+          <p class="site-footer__title" data-i18n="footer.brand"></p>
+          <p class="site-footer__note" data-i18n="footer.note"></p>
         </div>
         <nav class="site-footer__links" aria-label="Footer">
-          <a href="/methods">Methods</a>
-          <a href="/faq">FAQ</a>
-          <a href="/disclaimer">Disclaimer</a>
-          <a href="/credits">Credits</a>
-          <a href="/donate">Donate</a>
+          <a href="/methods" data-i18n="nav.methods"></a>
+          <a href="/faq" data-i18n="nav.faq"></a>
+          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
+          <a href="/credits" data-i18n="nav.credits"></a>
+          <a href="/donate" data-i18n="nav.donate"></a>
         </nav>
       </footer>
     </div>
+    <script type="module" src="/src/i18n/page-init.js"></script>
   </body>
 </html>

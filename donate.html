@@ -30,16 +30,42 @@
 </head>
 <body>
   <header class="page-header">
-    <a class="home-link" href="/">← Back</a>
-    <h1>Donate</h1>
+    <div class="page-header__row">
+      <a class="home-link" href="/" data-i18n="nav.back"></a>
+      <div
+        class="lang-switch"
+        role="group"
+        aria-label="Language"
+        data-i18n-aria-label="language.label"
+      >
+        <span class="lang-switch__label" data-i18n="language.label"></span>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="en"
+          aria-pressed="false"
+        >
+          EN
+        </button>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="ja"
+          aria-pressed="false"
+        >
+          JA
+        </button>
+      </div>
+    </div>
+    <h1 data-i18n="pages.donate.title"></h1>
   </header>
 
   <main class="page">
-    <p>If this tool helps, you can support development via XRPL address:</p>
+    <p data-i18n="pages.donate.lede_short"></p>
 
     <div class="donate-box">
       <code id="donate-addr">rsMuUUdLC1wxrJ2DvQnTrnKGRhVxoLrhEj</code>
-      <button id="copy-donate" class="btn" type="button">Copy</button>
+      <button id="copy-donate" class="btn" type="button" data-i18n="pages.donate.copy_button"></button>
     </div>
 
     <p class="donate-status" id="donate-status" aria-live="polite"></p>
@@ -47,49 +73,62 @@
 
   <footer class="page-footer">
     <nav class="page-links">
-      <a href="/methods.html">Methods</a>
-      <a href="/faq.html">FAQ</a>
-      <a href="/disclaimer.html">Disclaimer</a>
-      <a href="/credits.html">Credits</a>
+      <a href="/methods.html" data-i18n="nav.methods"></a>
+      <a href="/faq.html" data-i18n="nav.faq"></a>
+      <a href="/disclaimer.html" data-i18n="nav.disclaimer"></a>
+      <a href="/credits.html" data-i18n="nav.credits"></a>
     </nav>
   </footer>
 
-<script>
-(function(){
-  const addr = document.getElementById("donate-addr").textContent.trim();
-  const btn = document.getElementById("copy-donate");
-  const st = document.getElementById("donate-status");
+<script type="module">
+  import { initI18nPage } from "/src/i18n/page.js";
+  import { t } from "/src/i18n/index.js";
 
-  function setStatus(msg, ok){
-    st.textContent = msg;
-    st.className = "donate-status " + (ok ? "ok" : "ng");
-  }
+  const i18nReady = initI18nPage();
+  const addressNode = document.getElementById("donate-addr");
+  const button = document.getElementById("copy-donate");
+  const status = document.getElementById("donate-status");
 
-  async function copyText(){
+  const setStatus = (key, ok) => {
+    status.textContent = t(key);
+    status.className = `donate-status ${ok ? "ok" : "ng"}`;
+  };
+
+  const fallbackCopy = (text) => {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return ok;
+  };
+
+  const handleCopy = async () => {
+    await i18nReady;
+    const text = addressNode?.textContent?.trim();
+    if (!text) {
+      setStatus("pages.donate.address_unavailable", false);
+      return;
+    }
+
     try {
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(addr);
-        setStatus("Copied.", true);
+        await navigator.clipboard.writeText(text);
+        setStatus("pages.donate.copy_success", true);
         return;
       }
-      // fallback
-      const ta = document.createElement("textarea");
-      ta.value = addr;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-      setStatus(ok ? "Copied." : "Copy failed.", ok);
-    } catch (e) {
-      setStatus("Copy failed.", false);
+      const ok = fallbackCopy(text);
+      setStatus(ok ? "pages.donate.copy_success" : "pages.donate.copy_failed", ok);
+    } catch (error) {
+      setStatus("pages.donate.copy_failed", false);
     }
-  }
+  };
 
-  btn.addEventListener("click", copyText);
-})();
+  button.addEventListener("click", handleCopy);
 </script>
 </body>
 </html>

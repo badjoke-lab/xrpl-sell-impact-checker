@@ -1,0 +1,422 @@
+{
+  "app": {
+    "title": "XRPL Sell Impact Checker",
+    "eyebrow": "XRPL Sell Impact Checker",
+    "tagline": "売却インパクトを見積もる",
+    "description": "取引前に売却インパクトと受取額を見積もります。"
+  },
+  "header": {
+    "connect_wallet": "ウォレット接続",
+    "wallet_not_required": "不要"
+  },
+  "language": {
+    "label": "言語"
+  },
+  "nav": {
+    "home": "ホーム",
+    "back": "← 戻る",
+    "methods": "方法",
+    "faq": "FAQ",
+    "disclaimer": "免責事項",
+    "credits": "クレジット",
+    "donate": "寄付"
+  },
+  "footer": {
+    "brand": "BadJoke-Lab の XSIC",
+    "note": "透明な見積もりのための XRPL Sell Impact Checker。"
+  },
+  "sections": {
+    "inputs": "入力",
+    "results_summary": "結果サマリー",
+    "execution_details": "実行詳細",
+    "depth_curve": "板の厚み",
+    "impact_curve": "インパクト曲線",
+    "faq": "FAQ",
+    "disclaimer": "免責事項",
+    "sources": "データソース",
+    "advanced_controls": "詳細設定"
+  },
+  "modes": {
+    "simple": "シンプル",
+    "advanced": "詳細"
+  },
+  "fields": {
+    "currency": {
+      "label": "通貨（必須）",
+      "placeholder": "USD（3文字）または40桁hex"
+    },
+    "token_preset": {
+      "label": "トークンプリセット（任意）",
+      "placeholder": "プリセット/最近使ったトークンを検索",
+      "helper": "プリセットを選ぶと通貨と発行者が入力されます。"
+    },
+    "issuer": {
+      "label": "発行者（XRP以外は必須）",
+      "placeholder": "r........（XRPLアドレス）",
+      "helper": "発行者はトークンの発行アドレスです。"
+    },
+    "amount": {
+      "label": "数量（必須）",
+      "placeholder": "例: 1000"
+    },
+    "orderbook_limit": {
+      "label": "板取得件数（任意）",
+      "placeholder": "50 / 100 / 200"
+    },
+    "impact_threshold": {
+      "label": "インパクト閾値",
+      "helper": "X%以内の最大売却に使用します。",
+      "helper_dynamic": "閾値 {threshold} 以内の最大売却に使用します。",
+      "option_1": "1%",
+      "option_2": "2%",
+      "option_5": "5%",
+      "option_10": "10%",
+      "option_20": "20%"
+    },
+    "thin_cutoff": {
+      "label": "薄い板の閾値（%）",
+      "placeholder": "20",
+      "helper": "CLOB比率がこれ未満ならAMMを優先します。"
+    },
+    "fiat_currency": {
+      "label": "法定通貨",
+      "helper": "法定通貨の見積は後で反映。XRPは先に表示されます。",
+      "option_jpy": "JPY",
+      "option_usd": "USD"
+    }
+  },
+  "actions": {
+    "estimate": "インパクトを見積もる",
+    "estimating": "見積中…",
+    "try_example": "例を試す",
+    "try_example_note": "利用可能な場合はアクティブな例を選びます。",
+    "copy_link": "リンクをコピー",
+    "reset": "リセット"
+  },
+  "status": {
+    "ready": "準備完了",
+    "waiting": "入力待ち...",
+    "queuedAt": "{time}に見積をキューしました。データ接続後に計算します。",
+    "validating": "検証中...",
+    "validation_failed": "検証に失敗しました。",
+    "fetching_clob": "CLOB取得中...",
+    "fetching_amm": "AMM取得中...",
+    "simulating": "約定をシミュレーション中...",
+    "rendering": "表示中...",
+    "done": "完了。",
+    "error": "板情報を取得できません。",
+    "fetched_offers": "{endpointLabel}から{count}件取得しました。",
+    "endpoint_switched": "{endpointLabel}に切り替えました。",
+    "endpoint_in_use": "{endpointLabel}を使用中（{cacheStatus}）",
+    "endpoint_stale": "{endpointLabel}の古いキャッシュを表示中（上流が利用不可）。",
+    "cache_state": {
+      "live": "最新",
+      "cached": "キャッシュ",
+      "stale": "古いキャッシュ"
+    },
+    "loaded_from_link": "リンクから読み込みました。",
+    "example_selected": "例: {label}",
+    "examples_unavailable": "現在例を取得できません。",
+    "copy_success": "リンクをコピーしました。",
+    "copy_failed": "リンクのコピーに失敗しました。"
+  },
+  "results": {
+    "sellability": {
+      "label": "売却可能性",
+      "full": "全量",
+      "none": "流動性なし",
+      "empty": "流動性なし（offers=0）",
+      "partial": "一部",
+      "error": "取得失敗（{code}）",
+      "filled_line": "{requested} のうち {filled}（{pct}）約定"
+    },
+    "receive": {
+      "label": "受取",
+      "value": "{amount} {currency}",
+      "with_fiat": "{amount} XRP（約 {fiat}）",
+      "fiat_pending": "法定通貨: 保留中",
+      "fiat_loading": "取得中...",
+      "fiat_unavailable": "利用不可",
+      "fiat_warning": "現在法定通貨の価格が取得できません。XRPLの結果は正確です。",
+      "rate_line": "1 XRP = {rate}（{time} 時点の {status}）",
+      "rate_unavailable": "1 XRP = --（レート不明）",
+      "rate_status": {
+        "live": "最新",
+        "cached": "キャッシュ",
+        "stale": "古い"
+      }
+    },
+    "freshness": {
+      "label": "鮮度",
+      "fetched_at": "XRPLデータ取得時刻: {time}",
+      "endpoint": "エンドポイント: {endpointLabel}（{cacheStatus}）"
+    },
+    "slippage": {
+      "label": "スリッページ（推定）",
+      "help": "板が薄いほど、売却量が増えるとレートが悪化します。"
+    },
+    "max_sell": {
+      "label": "インパクト{threshold}以内の最大売却（推定）",
+      "value_with_fiat": "{amount} {currency}（約 {fiat}）",
+      "value_with_xrp": "{amount} {currency}（約 {xrp} XRP）",
+      "xrp_line": "受取見積: {amount} XRP",
+      "fiat_unavailable": "法定通貨が利用不可",
+      "not_available": "利用不可（全量約定に十分な流動性がありません）"
+    },
+    "used_venue": {
+      "label": "使用経路"
+    },
+    "why_line": "この売却は上位{count}件のオファーを消費します。",
+    "why_line_amm": "この売却はAMMプールの価格を使用します。",
+    "warnings": {
+      "partial": "注意: {pct}% しか売却できません。",
+      "none": "注文板が空です（offers=0）。",
+      "high_slippage": "注意: 推定スリッページが10%を超えています。"
+    }
+  },
+  "details": {
+    "order_count": "注文数",
+    "best_price": "最良価格",
+    "worst_price": "最悪価格",
+    "liquidity_split": "流動性内訳（{threshold}以内）",
+    "liquidity_split_value": "CLOB {clob} / AMM {amm}",
+    "liquidity_split_value_no_amm": "CLOB {clob} / AMM {amm}（AMMなし）",
+    "liquidity_split_not_applicable": "該当なし",
+    "amm_reserves": "AMM準備金",
+    "amm_reserves_value": "{token} {currency} / {xrp} XRP",
+    "amm_fee": "AMM手数料",
+    "used_venue": "使用経路",
+    "amm_not_found": "AMMが見つかりません",
+    "amm_not_applicable": "該当なし",
+    "endpoint_tried": "試行エンドポイント"
+  },
+  "graphs": {
+    "empty": {
+      "no_liquidity": "流動性なし"
+    },
+    "liquidity_end": "流動性の終端",
+    "legend": {
+      "your_amount": "あなたの数量",
+      "max_under": "{threshold}以内の最大"
+    },
+    "placeholder": "グラフエリア",
+    "depth": {
+      "helper": "板の厚みは累積流動性と消費するオファーを示します。",
+      "aria_label": "注文板の深さと消費流動性",
+      "axis_sell": "累積売却量",
+      "axis_receive": "累積受取（XRP）",
+      "note_no_liquidity": "このペアには流動性がありません。",
+      "note_exhausted": "売却量の全量に達する前に板が尽きました。",
+      "note_exhausted_fiat_unavailable": "流動性が早期に尽きました。法定通貨が取得できないためXRPで表示します。",
+      "note_fiat_unavailable": "法定通貨レートが取得できないためXRPで表示します。",
+      "summary_empty": "見積を実行すると板の深さが表示されます。",
+      "summary": "深さは合計{total} {currency}（約{receive}）をカバーします。現在の売却は{filled} {currency}です。",
+      "summary_partial": "{requested} {currency} のうち {filled} {currency} のみ約定（約{receive}）。",
+      "receive_xrp": "{amount} XRP"
+    },
+    "impact": {
+      "helper": "受取曲線は売却量の増加に伴う受取額の変化を示します。",
+      "aria_label": "売却量と受取額の関係",
+      "axis_sell": "売却量",
+      "axis_receive": "受取",
+      "axis_receive_fiat": "受取（{fiat}）",
+      "axis_receive_xrp": "受取（XRP）",
+      "note_no_liquidity": "このペアには流動性がありません。",
+      "note_insufficient": "流動性不足のため曲線は途中で終了します。",
+      "note_insufficient_fiat_unavailable": "流動性が早期に尽き、法定通貨が取得できないためXRPで表示します。",
+      "note_fiat_unavailable": "法定通貨レートが取得できないためXRPで表示します。",
+      "summary_empty": "見積を実行すると受取曲線が表示されます。",
+      "summary": "{sell} {currency} を売却すると約 {receive} を受け取ります。",
+      "summary_partial": "{requested} {currency} のうち {filled} {currency} のみ約定し、約 {receive} を受け取ります。",
+      "receive_xrp": "{amount} XRP"
+    }
+  },
+  "faq": {
+    "q1": "XRPLのどの板を見ていますか？",
+    "a1": "XRPLの公開JSON-RPCで提供される注文板（book_offers）を使用します。",
+    "q2": "AMMの情報は含まれますか？",
+    "a2": "対象がIOUの場合、AMMプールがあるときはamm_infoで取得します。"
+  },
+  "disclaimer": {
+    "text": "これは情報提供のみを目的としており、投資助言ではありません。"
+  },
+  "sources": {
+    "xrpl": "XRPL DEX 注文板",
+    "trades": "オンレジャー取引履歴",
+    "feeds": "外部価格フィード（任意）"
+  },
+  "pages": {
+    "methods": {
+      "title": "方法",
+      "lede": "XRPLの注文板とAMMプールを使った見積もり方法です。",
+      "lede_long": "XSICはXRPLの注文板（CLOB）とAMMプールに対する約定シミュレーションを行い、要求数量に最適な経路を選択して売却インパクトを見積もります。",
+      "what_title": "このツールが行うこと",
+      "what_body": "XSICは、IOUトークンをXRPに売却する際の価格・流動性への影響を見積もります。",
+      "data_title": "データソース",
+      "data_item_clob": "XRPL JSON-RPCのCLOB（注文板）。",
+      "data_item_amm": "XRPL JSON-RPCのAMMプール情報。",
+      "inputs_title": "入力データ",
+      "inputs_item_1": "XRPL book_offers によるCLOB注文板。",
+      "inputs_item_2": "XRPL amm_info によるAMM準備金と手数料。",
+      "inputs_item_3": "CoinGeckoによる任意の法定通貨レート（XRP→法定通貨）。",
+      "flow_title": "計算の流れ",
+      "flow_item_1": "トークン（通貨+発行者）と売却数量を検証。",
+      "flow_item_2": "指定した件数まで注文板を取得。",
+      "flow_item_3": "板に対する約定をシミュレーションし、平均価格とスリッページを計算。",
+      "flow_item_4": "AMM準備金を取得し、同数量のAMMスワップ結果を見積もる。",
+      "flow_item_5": "受取額が多い経路（CLOBまたはAMM）を選択。",
+      "limits_title": "重要な制限",
+      "limits_item_1": "注文板の深さは「板取得件数」で上限があり、それ以上の深さに流動性がある場合は過小評価になる可能性があります。",
+      "limits_item_2": "AMM見積は現在のプール準備金を前提とし、将来のスワップやガバナンスは考慮しません。",
+      "limits_item_3": "法定通貨の値は外部レートの利用可能性に依存します。",
+      "results_title": "結果の読み方",
+      "results_item_1": "売却可能性は要求数量が約定できるかを示します。",
+      "results_item_2": "スリッページはサイズ増加で平均価格が悪化する度合いです。",
+      "results_item_3": "X%以内の最大売却は、選択した閾値を超えない最大数量です。",
+      "notes_title": "注意点",
+      "notes_item_1": "決済資産はXRPです。IOUトークン（通貨+発行者）を入力してください。",
+      "notes_item_2": "結果は推定値です。ネットワーク状況や台帳更新で変わる場合があります。",
+      "notes_item_3": "取得件数やページングにより深さが制限されることがあります。"
+    },
+    "faq": {
+      "title": "FAQ",
+      "lede": "XSICに関するよくある質問です。",
+      "q1_title": "なぜXRP単体は入力できませんか？",
+      "q1_body": "XRPLではXRPは多くの板で見積もりの基軸となります。XSICはIOU→XRPの売却インパクトを計算するため、通貨コードと発行者が必要です。XRP/XRPの板は存在しません。",
+      "q2_title": "データの鮮度は？",
+      "q2_body": "公開XRPLエンドポイントをリアルタイムで参照し、取得時刻を結果に表示します。ライブ取得が不可の場合はキャッシュが表示され、警告が出ます。",
+      "q3_title": "最大売却量が低いのはなぜ？",
+      "q3_body": "最大売却量は、選択したインパクト閾値内での板の厚みやAMM準備金に基づきます。板が薄い場合やスリッページ制限が厳しい場合は小さくなります。",
+      "q4_title": "CLOBとAMMの結果が違うのはなぜ？",
+      "q4_body": "CLOBは可視の注文に基づき、AMMはプール準備金と手数料に依存します。XSICは両者を比較し、要求数量に対して良い結果を採用します。",
+      "q5_title": "法定通貨の価格は保証されますか？",
+      "q5_body": "いいえ。法定通貨の金額は外部フィードに依存します。フィードが停止してもXRP値は表示され、法定通貨が利用不可である旨を示します。"
+    },
+    "faq_short": {
+      "title": "FAQ",
+      "q1_title": "通貨をXRPにすると使えないのは？",
+      "q1_body": "XRPは決済資産です。本ツールはIOU→XRPの売却見積もりのため、IOU（通貨+発行者）が必要です。",
+      "q2_title": "これは投資助言ですか？",
+      "q2_body": "いいえ。情報提供のみで、見積値を示します。",
+      "q3_title": "DEXと結果が違うのはなぜ？",
+      "q3_body": "台帳状態は常に変化します。取得と実行の間に注文やAMM流動性が変わることがあります。"
+    },
+    "disclaimer": {
+      "title": "免責事項",
+      "lede": "XSICは情報提供の見積もりのみで、投資・法務・税務の助言ではありません。",
+      "advice_title": "投資助言ではありません",
+      "advice_body": "XSICは売却インパクトを見積もる研究ツールです。取引判断はご自身の責任で行い、データは独自に確認してください。",
+      "limits_title": "精度の制限",
+      "limits_item_1": "見積は変動の大きいXRPL公開データに依存します。",
+      "limits_item_2": "結果は注文板の深さとAMM準備金のスナップショットに制限されます。",
+      "limits_item_3": "法定通貨換算は任意で、遅延または利用不可の場合があります。",
+      "warranty_title": "保証なし",
+      "warranty_body": "XSICは現状有姿で提供され、いかなる保証もありません。BadJoke-LabおよびXSIC運営は、本ツールの利用により生じた損失や損害について責任を負いません。",
+      "body_1": "本ツールは情報提供のみを目的としており、金融・投資助言ではありません。",
+      "body_2": "出力はリクエスト時点の公開台帳データに基づく推定です。正確性は保証されません。",
+      "body_3": "利用は自己責任でお願いします。"
+    },
+    "credits": {
+      "title": "クレジット",
+      "lede": "XSICを支えるオープンなインフラに感謝します。",
+      "data_title": "データソース",
+      "data_item_1": "XRPLの公開rippledエンドポイント（s1.ripple.com, s2.ripple.com）。",
+      "data_item_2": "XRPLメソッド: book_offers / amm_info。",
+      "data_item_3": "XRPの法定通貨価格（CoinGecko）。",
+      "infra_title": "インフラ",
+      "infra_item_1": "Cloudflare Pages + Functions によるホスティングとAPIプロキシ。",
+      "infra_item_2": "XRPLのオープンプロトコルとドキュメント。",
+      "libraries_title": "ライブラリ",
+      "libraries_item_1": "Vanilla JavaScript + Web APIs。",
+      "libraries_item_2": "InterフォントとシステムUIフォント。",
+      "project_title": "プロジェクト",
+      "project_body": "XSIC（BadJoke-Lab）。"
+    },
+    "donate": {
+      "title": "寄付",
+      "lede": "XSICは無料で利用できます。役に立った場合は運用・保守費用の支援をご検討ください。",
+      "lede_short": "このツールが役立った場合、XRPLアドレスへの支援が可能です:",
+      "address_title": "XRP寄付アドレス",
+      "address_note": "送金前にアドレスを再確認してください。このアドレスに宛先タグは不要です。",
+      "copy_button": "アドレスをコピー",
+      "copy_success": "アドレスをコピーしました。",
+      "copy_failed": "コピーに失敗しました。手動でコピーしてください。",
+      "address_unavailable": "アドレスが取得できません。"
+    }
+  },
+  "common": {
+    "estimate": "見積",
+    "loading": "読み込み中",
+    "done": "完了",
+    "placeholder": "--",
+    "not_available": "利用不可"
+  },
+  "errors": {
+    "amount_required": "0より大きい売却数量を入力してください。",
+    "currency_required": "通貨コードを入力してください。",
+    "currency_invalid": "通貨は3文字または40桁のhexで入力してください。",
+    "currency_invalid_length": "通貨は3文字、4〜20文字のASCII、または40桁hexです。",
+    "currency_non_ascii": "通貨はASCIIの印字可能文字のみ使用できます。",
+    "currency_hex_invalid": "通貨は40桁のhex（0-9, A-F）で入力してください。",
+    "issuer_required": "XRP以外のトークンには発行者が必要です。",
+    "issuer_invalid": "発行者は有効なXRPLアドレスに見える必要があります。",
+    "limit_invalid": "取得件数は正の数を入力してください。",
+    "fetch_failed": {
+      "title": "注文板の取得に失敗しました。",
+      "hint": "再度見積もるか、少し待ってから試してください。"
+    },
+    "fetch_timeout": {
+      "title": "注文板の取得がタイムアウトしました。",
+      "hint": "再度見積もるか、取得件数を減らしてください。"
+    },
+    "network_unreachable": {
+      "title": "XRPLノードへ接続できません。",
+      "hint": "接続を確認するか、後でもう一度試してください。"
+    },
+    "missing_params": {
+      "title": "入力が不足しています。",
+      "hint": "通貨と発行者を入力して再度実行してください。"
+    },
+    "xrp_not_supported": {
+      "title": "XRPは決済資産です。",
+      "hint": "IOUトークン（通貨+発行者）を入力してXRPへの売却を見積もってください。"
+    },
+    "issueMalformed": {
+      "title": "XRPLが通貨または発行者を拒否しました。",
+      "hint": "通貨コードと発行者アドレスを確認してください。"
+    },
+    "no_liquidity": {
+      "title": "このペアには流動性がありません。",
+      "hint": "別の発行者や少額で試してください。"
+    },
+    "upstream_fail": {
+      "title": "上流サービスが応答しませんでした。",
+      "hint": "少し待って再試行するか、エンドポイントを切り替えてください。"
+    },
+    "default": {
+      "title": "問題が発生しました。",
+      "hint": "入力を確認して再度試してください。"
+    },
+    "i18n_failed": "翻訳の読み込みに失敗しました。ページを再読み込みしてください。"
+  },
+  "notes": {
+    "limit_autofix": "取得件数をデフォルトの{limit}に戻しました。"
+  },
+  "endpoints": {
+    "api": {
+      "label": "同一オリジンAPI"
+    },
+    "xrplcluster": {
+      "label": "XRPL Cluster"
+    },
+    "xrplws": {
+      "label": "XRPL WS"
+    },
+    "s1": {
+      "label": "Ripple S1"
+    },
+    "s2": {
+      "label": "Ripple S2"
+    }
+  }
+}

@@ -30,23 +30,50 @@
 </head>
 <body>
   <header class="page-header">
-    <a class="home-link" href="/">← Back</a>
-    <h1>Disclaimer</h1>
+    <div class="page-header__row">
+      <a class="home-link" href="/" data-i18n="nav.back"></a>
+      <div
+        class="lang-switch"
+        role="group"
+        aria-label="Language"
+        data-i18n-aria-label="language.label"
+      >
+        <span class="lang-switch__label" data-i18n="language.label"></span>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="en"
+          aria-pressed="false"
+        >
+          EN
+        </button>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="ja"
+          aria-pressed="false"
+        >
+          JA
+        </button>
+      </div>
+    </div>
+    <h1 data-i18n="pages.disclaimer.title"></h1>
   </header>
 
   <main class="page">
-    <p>This tool is provided for informational purposes only and does not constitute financial or investment advice.</p>
-    <p>All outputs are estimates based on public ledger data at the time of request. Accuracy is not guaranteed.</p>
-    <p>Use at your own risk.</p>
+    <p data-i18n="pages.disclaimer.body_1"></p>
+    <p data-i18n="pages.disclaimer.body_2"></p>
+    <p data-i18n="pages.disclaimer.body_3"></p>
   </main>
 
   <footer class="page-footer">
     <nav class="page-links">
-      <a href="/methods.html">Methods</a>
-      <a href="/faq.html">FAQ</a>
-      <a href="/credits.html">Credits</a>
-      <a href="/donate.html">Donate</a>
+      <a href="/methods.html" data-i18n="nav.methods"></a>
+      <a href="/faq.html" data-i18n="nav.faq"></a>
+      <a href="/credits.html" data-i18n="nav.credits"></a>
+      <a href="/donate.html" data-i18n="nav.donate"></a>
     </nav>
   </footer>
+  <script type="module" src="/src/i18n/page-init.js"></script>
 </body>
 </html>

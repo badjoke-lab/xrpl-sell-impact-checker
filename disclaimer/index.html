@@ -20,67 +20,84 @@
       <header class="app__header">
         <div class="app__header-top">
           <div>
-            <p class="eyebrow">XSIC</p>
-            <h1>XRPL Sell Impact Checker</h1>
+            <p class="eyebrow" data-i18n="app.eyebrow"></p>
+            <h1 data-i18n="app.title"></h1>
+          </div>
+          <div
+            class="lang-switch"
+            role="group"
+            aria-label="Language"
+            data-i18n-aria-label="language.label"
+          >
+            <span class="lang-switch__label" data-i18n="language.label"></span>
+            <button
+              class="ghost-button lang-switch__button"
+              type="button"
+              data-lang-switch="en"
+              aria-pressed="false"
+            >
+              EN
+            </button>
+            <button
+              class="ghost-button lang-switch__button"
+              type="button"
+              data-lang-switch="ja"
+              aria-pressed="false"
+            >
+              JA
+            </button>
           </div>
         </div>
         <nav class="site-nav" aria-label="Primary">
-          <a href="/">Home</a>
-          <a href="/methods">Methods</a>
-          <a href="/faq">FAQ</a>
-          <a href="/disclaimer">Disclaimer</a>
-          <a href="/credits">Credits</a>
-          <a href="/donate">Donate</a>
+          <a href="/" data-i18n="nav.home"></a>
+          <a href="/methods" data-i18n="nav.methods"></a>
+          <a href="/faq" data-i18n="nav.faq"></a>
+          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
+          <a href="/credits" data-i18n="nav.credits"></a>
+          <a href="/donate" data-i18n="nav.donate"></a>
         </nav>
       </header>
 
       <main class="page__content">
         <section class="card">
-          <h2 class="page__title">Disclaimer</h2>
-          <p class="page__lede">
-            XSIC provides informational estimates only. It is not investment, legal, or tax advice.
-          </p>
+          <h2 class="page__title" data-i18n="pages.disclaimer.title"></h2>
+          <p class="page__lede" data-i18n="pages.disclaimer.lede"></p>
         </section>
 
         <section class="card">
-          <h3>Not investment advice</h3>
-          <p>
-            XSIC is a research tool that estimates potential sell impact. You are responsible for
-            your own trading decisions and should verify data independently.
-          </p>
+          <h3 data-i18n="pages.disclaimer.advice_title"></h3>
+          <p data-i18n="pages.disclaimer.advice_body"></p>
         </section>
 
         <section class="card">
-          <h3>Accuracy limits</h3>
+          <h3 data-i18n="pages.disclaimer.limits_title"></h3>
           <ul class="info-list">
-            <li>Estimates depend on public XRPL data that can change rapidly.</li>
-            <li>Results are limited by order book depth and AMM reserve snapshots.</li>
-            <li>Fiat conversions are optional and may be delayed or unavailable.</li>
+            <li data-i18n="pages.disclaimer.limits_item_1"></li>
+            <li data-i18n="pages.disclaimer.limits_item_2"></li>
+            <li data-i18n="pages.disclaimer.limits_item_3"></li>
           </ul>
         </section>
 
         <section class="card">
-          <h3>No warranties</h3>
-          <p>
-            XSIC is provided “as is” without warranties of any kind. BadJoke-Lab and XSIC maintainers
-            are not liable for losses or damages arising from the use of this tool.
-          </p>
+          <h3 data-i18n="pages.disclaimer.warranty_title"></h3>
+          <p data-i18n="pages.disclaimer.warranty_body"></p>
         </section>
       </main>
 
       <footer class="site-footer">
         <div class="site-footer__brand">
-          <p class="site-footer__title">XSIC by BadJoke-Lab</p>
-          <p class="site-footer__note">XRPL Sell Impact Checker for transparent estimates.</p>
+          <p class="site-footer__title" data-i18n="footer.brand"></p>
+          <p class="site-footer__note" data-i18n="footer.note"></p>
         </div>
         <nav class="site-footer__links" aria-label="Footer">
-          <a href="/methods">Methods</a>
-          <a href="/faq">FAQ</a>
-          <a href="/disclaimer">Disclaimer</a>
-          <a href="/credits">Credits</a>
-          <a href="/donate">Donate</a>
+          <a href="/methods" data-i18n="nav.methods"></a>
+          <a href="/faq" data-i18n="nav.faq"></a>
+          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
+          <a href="/credits" data-i18n="nav.credits"></a>
+          <a href="/donate" data-i18n="nav.donate"></a>
         </nav>
       </footer>
     </div>
+    <script type="module" src="/src/i18n/page-init.js"></script>
   </body>
 </html>

@@ -30,27 +30,54 @@
 </head>
 <body>
   <header class="page-header">
-    <a class="home-link" href="/">← Back</a>
-    <h1>Credits</h1>
+    <div class="page-header__row">
+      <a class="home-link" href="/" data-i18n="nav.back"></a>
+      <div
+        class="lang-switch"
+        role="group"
+        aria-label="Language"
+        data-i18n-aria-label="language.label"
+      >
+        <span class="lang-switch__label" data-i18n="language.label"></span>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="en"
+          aria-pressed="false"
+        >
+          EN
+        </button>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="ja"
+          aria-pressed="false"
+        >
+          JA
+        </button>
+      </div>
+    </div>
+    <h1 data-i18n="pages.credits.title"></h1>
   </header>
 
   <main class="page">
-    <h2>Data</h2>
+    <h2 data-i18n="pages.credits.data_title"></h2>
     <ul>
-      <li>XRPL JSON-RPC endpoints (for order book and AMM info)</li>
+      <li data-i18n="pages.credits.data_item_1"></li>
     </ul>
 
-    <h2>Project</h2>
-    <p>XSIC (BadJoke-Lab)</p>
+    <h2 data-i18n="pages.credits.project_title"></h2>
+    <p data-i18n="pages.credits.project_body"></p>
   </main>
 
   <footer class="page-footer">
     <nav class="page-links">
-      <a href="/methods.html">Methods</a>
-      <a href="/faq.html">FAQ</a>
-      <a href="/disclaimer.html">Disclaimer</a>
-      <a href="/donate.html">Donate</a>
+      <a href="/methods.html" data-i18n="nav.methods"></a>
+      <a href="/faq.html" data-i18n="nav.faq"></a>
+      <a href="/disclaimer.html" data-i18n="nav.disclaimer"></a>
+      <a href="/donate.html" data-i18n="nav.donate"></a>
     </nav>
   </footer>
+  <script type="module" src="/src/i18n/page-init.js"></script>
 </body>
 </html>

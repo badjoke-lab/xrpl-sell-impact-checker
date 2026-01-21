@@ -9,7 +9,12 @@
     "connect_wallet": "Connect Wallet",
     "wallet_not_required": "Not required"
   },
+  "language": {
+    "label": "Language"
+  },
   "nav": {
+    "home": "Home",
+    "back": "← Back",
     "methods": "Methods",
     "faq": "FAQ",
     "disclaimer": "Disclaimer",
@@ -89,6 +94,7 @@
     "reset": "Reset"
   },
   "status": {
+    "ready": "Ready",
     "waiting": "Waiting for input...",
     "queuedAt": "Estimate queued at {time}. Connect data sources to compute.",
     "validating": "Validating...",
@@ -238,6 +244,105 @@
     "xrpl": "XRPL DEX order books",
     "trades": "On-ledger trade history",
     "feeds": "External price feeds (optional)"
+  },
+  "pages": {
+    "methods": {
+      "title": "Methods",
+      "lede": "How XSIC estimates sell impact using XRPL order books and AMM pools.",
+      "lede_long": "XSIC estimates sell impact by simulating fills against XRPL order books (CLOB) and AMM pools, then choosing the best venue for the requested trade size.",
+      "what_title": "What this tool does",
+      "what_body": "XSIC estimates how selling an IOU token into XRP may impact price and liquidity on XRPL.",
+      "data_title": "Data sources",
+      "data_item_clob": "CLOB (order book offers) via XRPL JSON-RPC.",
+      "data_item_amm": "AMM pool info via XRPL JSON-RPC.",
+      "inputs_title": "Data inputs",
+      "inputs_item_1": "CLOB order books via XRPL book_offers.",
+      "inputs_item_2": "AMM pool reserves and trading fee via XRPL amm_info.",
+      "inputs_item_3": "Optional fiat rates (XRP → fiat) from CoinGecko.",
+      "flow_title": "Computation flow",
+      "flow_item_1": "Validate token (currency + issuer) and requested sell amount.",
+      "flow_item_2": "Fetch order book offers up to the limit you select.",
+      "flow_item_3": "Simulate fills against the book, computing average price and slippage.",
+      "flow_item_4": "Fetch AMM reserves and estimate the AMM swap output for the same amount.",
+      "flow_item_5": "Pick the venue that yields the higher receive amount (CLOB or AMM).",
+      "limits_title": "Important limits",
+      "limits_item_1": "Order book depth is capped by the Orderbook limit; large trades can be under-estimated if liquidity exists deeper than the limit.",
+      "limits_item_2": "AMM estimates assume current pool reserves and do not include future swaps or governance actions.",
+      "limits_item_3": "Fiat values are informational and depend on the external rate feed availability.",
+      "results_title": "How to read results",
+      "results_item_1": "Sellability indicates whether the requested amount can fill.",
+      "results_item_2": "Slippage estimates how much the average price worsens as size grows.",
+      "results_item_3": "Max sell under X% shows the largest size that stays below a chosen impact threshold.",
+      "notes_title": "Key notes",
+      "notes_item_1": "XRP is the settlement asset. Enter an IOU token (currency + issuer).",
+      "notes_item_2": "Results are estimates. Network conditions and on-ledger changes can differ.",
+      "notes_item_3": "Limits and pagination may cap how much depth we can read per request."
+    },
+    "faq": {
+      "title": "FAQ",
+      "lede": "Quick answers to common questions about XSIC.",
+      "q1_title": "Why can’t I enter XRP alone?",
+      "q1_body": "XRPL XRP is the quote asset for most order books. XSIC estimates sell impact for IOUs against XRP, so it requires both a currency code and issuer. For XRP/XRP there is no order book to simulate.",
+      "q2_title": "How fresh is the data?",
+      "q2_body": "XSIC calls public XRPL endpoints in real time and records the fetch time shown in the results. If live data is unavailable, cached values may be shown with a warning.",
+      "q3_title": "Why is my max sell lower than I expected?",
+      "q3_body": "The max sell values are based on available order book depth or AMM reserves within the chosen impact threshold. Thin books or high slippage limits reduce the estimate.",
+      "q4_title": "Why do CLOB and AMM results differ?",
+      "q4_body": "CLOB results are based on visible offers, while AMM results depend on pool reserves and fees. XSIC compares both and uses the better outcome for your requested amount.",
+      "q5_title": "Is fiat pricing guaranteed?",
+      "q5_body": "No. Fiat amounts are optional and sourced from external feeds. If the feed is down, XSIC will still show XRP values and note that fiat is unavailable."
+    },
+    "faq_short": {
+      "title": "FAQ",
+      "q1_title": "Why can't I set currency = XRP?",
+      "q1_body": "XRP is the settlement asset. This tool estimates selling an IOU token into XRP, so you must provide an IOU (currency + issuer).",
+      "q2_title": "Is this financial advice?",
+      "q2_body": "No. This is an informational tool and provides estimates only.",
+      "q3_title": "Why can results differ from a DEX?",
+      "q3_body": "Ledger state changes constantly. Offers and AMM liquidity can change between reads and execution."
+    },
+    "disclaimer": {
+      "title": "Disclaimer",
+      "lede": "XSIC provides informational estimates only. It is not investment, legal, or tax advice.",
+      "advice_title": "Not investment advice",
+      "advice_body": "XSIC is a research tool that estimates potential sell impact. You are responsible for your own trading decisions and should verify data independently.",
+      "limits_title": "Accuracy limits",
+      "limits_item_1": "Estimates depend on public XRPL data that can change rapidly.",
+      "limits_item_2": "Results are limited by order book depth and AMM reserve snapshots.",
+      "limits_item_3": "Fiat conversions are optional and may be delayed or unavailable.",
+      "warranty_title": "No warranties",
+      "warranty_body": "XSIC is provided as is without warranties of any kind. BadJoke-Lab and XSIC maintainers are not liable for losses or damages arising from the use of this tool.",
+      "body_1": "This tool is provided for informational purposes only and does not constitute financial or investment advice.",
+      "body_2": "All outputs are estimates based on public ledger data at the time of request. Accuracy is not guaranteed.",
+      "body_3": "Use at your own risk."
+    },
+    "credits": {
+      "title": "Credits",
+      "lede": "Thanks to the open infrastructure that keeps XSIC running.",
+      "data_title": "Data sources",
+      "data_item_1": "XRPL public rippled endpoints (s1.ripple.com, s2.ripple.com).",
+      "data_item_2": "XRPL methods: book_offers and amm_info.",
+      "data_item_3": "XRP fiat pricing via CoinGecko.",
+      "infra_title": "Infrastructure",
+      "infra_item_1": "Cloudflare Pages + Functions for hosting and API proxying.",
+      "infra_item_2": "XRPL open protocols and documentation.",
+      "libraries_title": "Libraries",
+      "libraries_item_1": "Vanilla JavaScript + Web APIs.",
+      "libraries_item_2": "Inter font family and system UI fonts.",
+      "project_title": "Project",
+      "project_body": "XSIC (BadJoke-Lab)."
+    },
+    "donate": {
+      "title": "Donate",
+      "lede": "XSIC is free to use. If this tool helps you, consider supporting the ongoing hosting and maintenance costs.",
+      "lede_short": "If this tool helps, you can support development via XRPL address:",
+      "address_title": "XRP donation address",
+      "address_note": "Please double-check the address before sending. There is no destination tag required for this address.",
+      "copy_button": "Copy address",
+      "copy_success": "Address copied.",
+      "copy_failed": "Copy failed. Please copy manually.",
+      "address_unavailable": "Address unavailable."
+    }
   },
   "common": {
     "estimate": "Estimate",

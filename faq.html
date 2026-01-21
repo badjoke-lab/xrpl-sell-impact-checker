@@ -30,28 +30,55 @@
 </head>
 <body>
   <header class="page-header">
-    <a class="home-link" href="/">← Back</a>
-    <h1>FAQ</h1>
+    <div class="page-header__row">
+      <a class="home-link" href="/" data-i18n="nav.back"></a>
+      <div
+        class="lang-switch"
+        role="group"
+        aria-label="Language"
+        data-i18n-aria-label="language.label"
+      >
+        <span class="lang-switch__label" data-i18n="language.label"></span>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="en"
+          aria-pressed="false"
+        >
+          EN
+        </button>
+        <button
+          class="ghost-button lang-switch__button"
+          type="button"
+          data-lang-switch="ja"
+          aria-pressed="false"
+        >
+          JA
+        </button>
+      </div>
+    </div>
+    <h1 data-i18n="pages.faq_short.title"></h1>
   </header>
 
   <main class="page">
-    <h2>Why can't I set currency = XRP?</h2>
-    <p>XRP is the settlement asset. This tool estimates selling an IOU token into XRP, so you must provide an IOU (currency + issuer).</p>
+    <h2 data-i18n="pages.faq_short.q1_title"></h2>
+    <p data-i18n="pages.faq_short.q1_body"></p>
 
-    <h2>Is this financial advice?</h2>
-    <p>No. This is an informational tool and provides estimates only.</p>
+    <h2 data-i18n="pages.faq_short.q2_title"></h2>
+    <p data-i18n="pages.faq_short.q2_body"></p>
 
-    <h2>Why can results differ from a DEX?</h2>
-    <p>Ledger state changes constantly. Offers/AMM liquidity can change between reads and execution.</p>
+    <h2 data-i18n="pages.faq_short.q3_title"></h2>
+    <p data-i18n="pages.faq_short.q3_body"></p>
   </main>
 
   <footer class="page-footer">
     <nav class="page-links">
-      <a href="/methods.html">Methods</a>
-      <a href="/disclaimer.html">Disclaimer</a>
-      <a href="/credits.html">Credits</a>
-      <a href="/donate.html">Donate</a>
+      <a href="/methods.html" data-i18n="nav.methods"></a>
+      <a href="/disclaimer.html" data-i18n="nav.disclaimer"></a>
+      <a href="/credits.html" data-i18n="nav.credits"></a>
+      <a href="/donate.html" data-i18n="nav.donate"></a>
     </nav>
   </footer>
+  <script type="module" src="/src/i18n/page-init.js"></script>
 </body>
 </html>
