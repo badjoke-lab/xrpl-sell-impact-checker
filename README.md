@@ -14,7 +14,7 @@ pnpm run start
 
 Production: https://xsic.badjoke-lab.com/
 
-Dev: Open `http://localhost:5173` in your browser.
+Dev: Open `http://0.0.0.0:5173` in your browser.
 
 ### Deploy (Cloudflare Pages)
 
