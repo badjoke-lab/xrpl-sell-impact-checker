@@ -4,7 +4,7 @@ const args = process.argv.slice(2);
 const baseUrl = args[0] || process.env.PAGES_BASE_URL;
 
 if (!baseUrl) {
-  console.error("Usage: node scripts/test-pages-function.mjs <http://localhost:8788|https://your-pages-domain> [currency] [issuer] [limit]");
+  console.error("Usage: node scripts/test-pages-function.mjs <http://0.0.0.0:8788|https://your-pages-domain> [currency] [issuer] [limit]");
   process.exit(1);
 }
 
