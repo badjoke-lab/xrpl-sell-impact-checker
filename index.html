@@ -128,16 +128,18 @@
               />
               <p class="field__error" id="amount-error" data-error-for="amount" hidden></p>
             </label>
-            <label class="field field--full">
+            <label class="field field--full field--suggestions">
               <span class="field__label field__label--subtle" data-i18n="inputs.quickFillLabel"></span>
               <input
                 id="token-suggest-input"
                 type="text"
-                list="token-suggestions"
                 data-i18n-placeholder="inputs.quickFillPlaceholder"
                 autocomplete="off"
+                aria-controls="token-suggestions"
+                aria-expanded="false"
+                aria-autocomplete="list"
               />
-              <datalist id="token-suggestions"></datalist>
+              <ul id="token-suggestions" class="suggestions" role="listbox" hidden></ul>
               <p class="field__help" data-i18n="fields.token_preset.helper"></p>
               <div class="quick-fill">
                 <div class="quick-fill__section">
