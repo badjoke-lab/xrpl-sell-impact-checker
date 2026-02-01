@@ -144,6 +144,8 @@ const VENUE_AMM = "AMM";
 const TOKEN_PRESETS_URL = "./data/token-presets.json";
 const RECENT_TOKENS_STORAGE_KEY = "xsic.recentTokens.v1";
 const MAX_RECENT_TOKENS = 10;
+const QUICK_FILL_RECENT_LIMIT = 6;
+const QUICK_FILL_PRESET_LIMIT = 6;
 const DEFAULT_TOKEN = {
   currency: "ARMY",
   issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
@@ -186,11 +188,13 @@ const initI18n = async () => {
   try {
     await loadDictionary(getActiveLang());
     applyTranslations();
+    renderQuickFillSuggestions();
     if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
       console.info("i18n loaded", getActiveLang());
     }
   } catch (error) {
     applyTranslations();
+    renderQuickFillSuggestions();
     showI18nError();
   }
 
@@ -201,6 +205,7 @@ const initI18n = async () => {
       updateMaxSellLabel(getImpactThresholdPct());
       updateLiquiditySplitLabel(getImpactThresholdPct());
       setEstimateButtonBusy(Boolean(estimateButton?.disabled));
+      renderQuickFillSuggestions();
       refreshStatusLine();
       scheduleShareUrlUpdate({ immediate: true });
     },
@@ -222,6 +227,8 @@ const currencyInput = document.querySelector("#currency-input");
 const issuerInput = document.querySelector("#issuer-input");
 const tokenSuggestionInput = document.querySelector("#token-suggest-input");
 const tokenSuggestionList = document.querySelector("#token-suggestions");
+const quickFillRecentList = document.querySelector("#quick-fill-recent");
+const quickFillResultsList = document.querySelector("#quick-fill-results");
 const amountInput = document.querySelector("#sell-amount-input");
 const limitInput = document.querySelector("#limit-input");
 const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
@@ -555,6 +562,50 @@ const renderTokenSuggestionOptions = () => {
   presetTokenSuggestions.forEach(addTokenOption);
 };
 
+const renderQuickFillTokens = (list, tokens, badgeKey, limit) => {
+  if (!list) {
+    return;
+  }
+  const section = list.closest(".quick-fill__section");
+  list.innerHTML = "";
+  const visibleTokens = tokens.slice(0, limit);
+  if (section) {
+    section.hidden = visibleTokens.length === 0;
+  }
+  visibleTokens.forEach((token) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "quick-fill__button";
+    const label = document.createElement("span");
+    label.className = "quick-fill__text";
+    label.textContent = getTokenLabel(token);
+    button.appendChild(label);
+    if (badgeKey) {
+      const badge = document.createElement("span");
+      badge.className = "quick-fill__badge quick-fill__badge--inline";
+      badge.textContent = t(badgeKey);
+      button.appendChild(badge);
+    }
+    button.addEventListener("click", () => applyTokenSuggestion(token));
+    list.appendChild(button);
+  });
+};
+
+const renderQuickFillSuggestions = () => {
+  renderQuickFillTokens(
+    quickFillRecentList,
+    recentTokenSuggestions,
+    "presets.badgeRecent",
+    QUICK_FILL_RECENT_LIMIT
+  );
+  renderQuickFillTokens(
+    quickFillResultsList,
+    presetTokenSuggestions,
+    "presets.badgePopular",
+    QUICK_FILL_PRESET_LIMIT
+  );
+};
+
 const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
   if (!currency || !issuer) {
     return;
@@ -589,6 +640,7 @@ const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
     // Ignore storage failures.
   }
   renderTokenSuggestionOptions();
+  renderQuickFillSuggestions();
 };
 
 const applyTokenSuggestion = (token) => {
@@ -3393,6 +3445,7 @@ const initTokenSuggestions = async () => {
     presetTokenSuggestions = [];
   }
   renderTokenSuggestionOptions();
+  renderQuickFillSuggestions();
 
   const handleSuggestionInput = () => {
     const value = tokenSuggestionInput.value.trim();

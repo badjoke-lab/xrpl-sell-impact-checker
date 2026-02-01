@@ -73,7 +73,7 @@
             </button>
           </div>
         </div>
-        <p class="app__catchcopy" data-i18n="app.tagline"></p>
+        <p class="app__catchcopy" data-i18n="header.tagline"></p>
         <nav class="site-nav" aria-label="Primary">
           <a href="/methods.html" data-i18n="nav.methods"></a>
           <a href="/faq.html" data-i18n="nav.faq"></a>
@@ -95,16 +95,40 @@
 
           <div class="grid two-column">
             <label class="field">
-              <span class="field__label" data-i18n="fields.token_preset.label"></span>
+              <span class="field__label" data-i18n="inputs.quickFillLabel"></span>
               <input
                 id="token-suggest-input"
                 type="text"
                 list="token-suggestions"
-                data-i18n-placeholder="fields.token_preset.placeholder"
+                data-i18n-placeholder="inputs.quickFillPlaceholder"
                 autocomplete="off"
               />
               <datalist id="token-suggestions"></datalist>
               <p class="field__help" data-i18n="fields.token_preset.helper"></p>
+              <div class="quick-fill">
+                <div class="quick-fill__section">
+                  <p class="quick-fill__label" data-i18n="presets.sectionRecent"></p>
+                  <div class="quick-fill__items" id="quick-fill-recent"></div>
+                </div>
+                <div class="quick-fill__section">
+                  <p class="quick-fill__label" data-i18n="presets.sectionResults"></p>
+                  <div class="quick-fill__items" id="quick-fill-results"></div>
+                </div>
+                <p class="quick-fill__legend">
+                  <span
+                    class="quick-fill__badge quick-fill__badge--recent"
+                    data-i18n="presets.badgeRecent"
+                  ></span>
+                  <span
+                    class="quick-fill__badge quick-fill__badge--popular"
+                    data-i18n="presets.badgePopular"
+                  ></span>
+                  <span
+                    class="quick-fill__badge quick-fill__badge--verified"
+                    data-i18n="presets.badgeVerified"
+                  ></span>
+                </p>
+              </div>
             </label>
             <label class="field">
               <span class="field__label" data-i18n="fields.currency.label"></span>
