@@ -31,7 +31,10 @@
 <body>
   <header class="page-header">
     <div class="page-header__row">
-      <a class="home-link" href="/" data-i18n="nav.back"></a>
+      <div class="page-header__brand" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <img class="page-header__logo" src="/xsic_logo.png" alt="XRPL Sell Impact Checker logo" width="36" height="36" />
+        <span class="page-header__title" style="font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; word-break: keep-all;">XRPL SELL IMPACT CHECKER</span>
+      </div>
       <div
         class="lang-switch"
         role="group"
@@ -57,10 +60,18 @@
         </button>
       </div>
     </div>
-    <h1 data-i18n="pages.disclaimer.title"></h1>
+    <p class="page-header__catchcopy" data-i18n="app.tagline"></p>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="/methods.html" data-i18n="nav.methods"></a>
+      <a href="/faq.html" data-i18n="nav.faq"></a>
+      <a href="/disclaimer.html" data-i18n="nav.disclaimer"></a>
+      <a href="/credits.html" data-i18n="nav.credits"></a>
+      <a href="/donate.html" data-i18n="nav.donate"></a>
+    </nav>
   </header>
 
   <main class="page">
+    <h1 class="page__title" data-i18n="pages.disclaimer.title"></h1>
     <p data-i18n="pages.disclaimer.body_1"></p>
     <p data-i18n="pages.disclaimer.body_2"></p>
     <p data-i18n="pages.disclaimer.body_3"></p>
