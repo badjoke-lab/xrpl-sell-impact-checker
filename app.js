@@ -142,7 +142,8 @@ const DEBUG_RESPONSE_LIMIT = 600;
 const VENUE_CLOB = "CLOB";
 const VENUE_AMM = "AMM";
 const TOKEN_PRESETS_URL = "./data/token-presets.json";
-const RECENT_TOKENS_STORAGE_KEY = "xsic.recentTokens.v1";
+const RECENT_TOKENS_STORAGE_KEY = "xsic_recent_tokens_v1";
+const LEGACY_RECENT_TOKENS_STORAGE_KEY = "xsic.recentTokens.v1";
 const MAX_RECENT_TOKENS = 10;
 const QUICK_FILL_RECENT_LIMIT = 6;
 const QUICK_FILL_PRESET_LIMIT = 6;
@@ -229,6 +230,8 @@ const tokenSuggestionInput = document.querySelector("#token-suggest-input");
 const tokenSuggestionList = document.querySelector("#token-suggestions");
 const quickFillRecentList = document.querySelector("#quick-fill-recent");
 const quickFillResultsList = document.querySelector("#quick-fill-results");
+const recentTokenSection = document.querySelector("#recent-token-section");
+const recentTokenChips = document.querySelector("#recent-token-chips");
 const amountInput = document.querySelector("#sell-amount-input");
 const limitInput = document.querySelector("#limit-input");
 const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
@@ -496,25 +499,30 @@ const normalizePresetToken = (item) => {
   };
 };
 
-const normalizeRecentToken = (item) => {
+const normalizeRecentTokenRecord = (item) => {
   if (!item || typeof item !== "object") {
     return null;
   }
-  const label = typeof item.label === "string" ? item.label.trim() : "";
   const issuer = typeof item.issuer === "string" ? item.issuer.trim() : "";
-  const rawCurrency = typeof item.currency === "string" ? item.currency.trim() : "";
-  if (!issuer || !rawCurrency) {
+  const rawSymbol =
+    typeof item.symbol === "string"
+      ? item.symbol.trim()
+      : typeof item.currency === "string"
+      ? item.currency.trim()
+      : "";
+  if (!issuer || !rawSymbol) {
     return null;
   }
-  const normalized = normalizeCurrencyInput(rawCurrency);
-  const currency = normalized.currencyNormalized || normalized.currencyInput?.trim() || "";
-  if (!currency || currency === "XRP") {
+  const normalized = normalizeCurrencyInput(rawSymbol);
+  const symbol = normalized.currencyNormalized || normalized.currencyInput?.trim() || "";
+  if (!symbol || symbol === "XRP") {
     return null;
   }
+  const ts = Number.isFinite(item.ts) ? item.ts : null;
   return {
-    label: label || formatCurrencyForDisplay(currency),
-    currency,
+    symbol,
     issuer,
+    ts,
   };
 };
 
@@ -523,6 +531,7 @@ const getTokenKey = (token) =>
 const getTokenLabel = (token) =>
   token.label?.trim() || formatCurrencyForDisplay(token.currency);
 let presetTokenSuggestions = [];
+let recentTokenRecords = [];
 let recentTokenSuggestions = [];
 let tokenSuggestionPool = [];
 let tokenSuggestionMatches = [];
@@ -543,16 +552,40 @@ const setExampleStatus = (message) => {
   exampleStatus.hidden = !message;
 };
 
-const loadRecentTokenSuggestions = () => {
+const parseRecentTokenRecords = (raw) => {
+  const parsed = raw ? JSON.parse(raw) : [];
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  return parsed
+    .map(normalizeRecentTokenRecord)
+    .filter((token) => token && token.symbol && token.issuer);
+};
+
+const buildRecentTokenSuggestions = (records) =>
+  records.map((record) => ({
+    currency: record.symbol,
+    issuer: record.issuer,
+    label:
+      findPresetLabel({ currency: record.symbol, issuer: record.issuer }) ||
+      formatCurrencyForDisplay(record.symbol),
+    ts: record.ts,
+  }));
+
+const loadRecentTokenRecords = () => {
   try {
     const raw = localStorage.getItem(RECENT_TOKENS_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) {
-      return [];
+    const parsed = parseRecentTokenRecords(raw);
+    if (parsed.length) {
+      return parsed;
     }
-    return parsed
-      .map(normalizeRecentToken)
-      .filter((token) => token && token.currency && token.issuer);
+    const legacyRaw = localStorage.getItem(LEGACY_RECENT_TOKENS_STORAGE_KEY);
+    const legacyParsed = parseRecentTokenRecords(legacyRaw);
+    if (legacyParsed.length) {
+      localStorage.setItem(RECENT_TOKENS_STORAGE_KEY, JSON.stringify(legacyParsed));
+      localStorage.removeItem(LEGACY_RECENT_TOKENS_STORAGE_KEY);
+    }
+    return legacyParsed;
   } catch (error) {
     return [];
   }
@@ -811,11 +844,29 @@ const renderQuickFillSuggestions = () => {
     "presets.badgeRecent",
     QUICK_FILL_RECENT_LIMIT
   );
+  renderRecentTokenChips();
   renderGroupedPresetTokens(
     quickFillResultsList,
     presetTokenSuggestions,
     QUICK_FILL_PRESET_LIMIT
   );
+};
+
+const renderRecentTokenChips = () => {
+  if (!recentTokenSection || !recentTokenChips) {
+    return;
+  }
+  recentTokenChips.innerHTML = "";
+  const visibleTokens = recentTokenSuggestions.slice(0, MAX_RECENT_TOKENS);
+  recentTokenSection.hidden = visibleTokens.length === 0;
+  visibleTokens.forEach((token) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "recent-chip";
+    button.textContent = formatCurrencyForDisplay(token.currency);
+    button.addEventListener("click", () => applyTokenSuggestion(token));
+    recentTokenChips.appendChild(button);
+  });
 };
 
 const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
@@ -830,24 +881,24 @@ const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
   if (!normalizedCurrency || normalizedCurrency === "XRP") {
     return;
   }
-  const resolvedLabel =
-    label || findPresetLabel({ currency: normalizedCurrency, issuer }) || getTokenLabel({
-      currency: normalizedCurrency,
-      issuer,
-      label,
-    });
   const tokenRecord = {
-    label: resolvedLabel,
-    currency: normalizedCurrency,
+    symbol: normalizedCurrency,
     issuer,
+    ts: Date.now(),
   };
-  const key = getTokenKey(tokenRecord);
-  const deduped = recentTokenSuggestions.filter(
-    (item) => getTokenKey(item) !== key
+  const key = getTokenKey({ currency: normalizedCurrency, issuer });
+  const deduped = recentTokenRecords.filter(
+    (item) => getTokenKey({ currency: item.symbol, issuer: item.issuer }) !== key
   );
-  recentTokenSuggestions = [tokenRecord, ...deduped].slice(0, MAX_RECENT_TOKENS);
+  recentTokenRecords = [tokenRecord, ...deduped].slice(0, MAX_RECENT_TOKENS);
+  recentTokenSuggestions = buildRecentTokenSuggestions(recentTokenRecords).map(
+    (token) => ({
+      ...token,
+      label: label && getTokenKey(token) === key ? label : token.label,
+    })
+  );
   try {
-    localStorage.setItem(RECENT_TOKENS_STORAGE_KEY, JSON.stringify(recentTokenSuggestions));
+    localStorage.setItem(RECENT_TOKENS_STORAGE_KEY, JSON.stringify(recentTokenRecords));
   } catch (error) {
     // Ignore storage failures.
   }
@@ -3645,7 +3696,8 @@ const initTokenSuggestions = async () => {
   if (!tokenSuggestionInput || !tokenSuggestionList) {
     return;
   }
-  recentTokenSuggestions = loadRecentTokenSuggestions();
+  recentTokenRecords = loadRecentTokenRecords();
+  recentTokenSuggestions = buildRecentTokenSuggestions(recentTokenRecords);
 
   try {
     const response = await fetch(TOKEN_PRESETS_URL, { cache: "no-store" });
@@ -3663,6 +3715,7 @@ const initTokenSuggestions = async () => {
   } catch (error) {
     presetTokenSuggestions = [];
   }
+  recentTokenSuggestions = buildRecentTokenSuggestions(recentTokenRecords);
   refreshTokenSuggestionPool();
   renderQuickFillSuggestions();
 
@@ -4014,11 +4067,6 @@ estimateButton?.addEventListener("click", async () => {
       return;
     }
 
-    saveRecentTokenSuggestion({
-      currency,
-      issuer,
-      label: findPresetLabel({ currency, issuer }),
-    });
     setStatus("status.fetching_clob");
     const requestTimestamp = Date.now();
     const requestPayload = {
@@ -4245,6 +4293,11 @@ estimateButton?.addEventListener("click", async () => {
         networkMs: debugInfo?.timings?.networkMs ?? null,
         parseMs: debugInfo?.timings?.parseMs ?? null,
       },
+    });
+    saveRecentTokenSuggestion({
+      currency,
+      issuer,
+      label: findPresetLabel({ currency, issuer }),
     });
     setStatus("status.done");
   } catch (error) {
