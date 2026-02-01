@@ -63,13 +63,17 @@ body {
 }
 
 .lang-switch__button {
-  padding: 6px 10px;
+  min-height: 38px;
+  padding: 6px 12px;
   border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .lang-switch__button--active {
-  background: #1e293b;
-  border-color: #1e293b;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
   color: #ffffff;
 }
 .site-nav {
