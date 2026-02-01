@@ -215,6 +215,7 @@ h2 {
   background: transparent;
   text-align: left;
   padding: 8px 10px;
+  min-height: 40px;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
@@ -986,6 +987,39 @@ a:hover {
   .app__header {
     flex-direction: row;
     align-items: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .app {
+    padding: 20px 12px 40px;
+  }
+
+  .app__header {
+    gap: 12px;
+  }
+
+  .app__header-top {
+    gap: 12px;
+  }
+
+  .site-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .site-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .site-nav a {
+    white-space: nowrap;
+  }
+
+  .suggestions {
+    max-height: min(220px, 45vh);
   }
 }
 
