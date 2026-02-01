@@ -95,7 +95,41 @@
 
           <div class="grid two-column">
             <label class="field">
-              <span class="field__label" data-i18n="inputs.quickFillLabel"></span>
+              <span class="field__label" data-i18n="fields.currency.label"></span>
+              <input
+                id="currency-input"
+                type="text"
+                data-i18n-placeholder="fields.currency.placeholder"
+                aria-describedby="currency-error"
+                autocomplete="off"
+              />
+              <p class="field__error" id="currency-error" data-error-for="currency" hidden></p>
+            </label>
+            <label class="field">
+              <span class="field__label" data-i18n="fields.issuer.label"></span>
+              <input
+                id="issuer-input"
+                type="text"
+                data-i18n-placeholder="fields.issuer.placeholder"
+                aria-describedby="issuer-help issuer-error"
+              />
+              <p class="field__help" id="issuer-help" data-i18n="fields.issuer.helper"></p>
+              <p class="field__error" id="issuer-error" data-error-for="issuer" hidden></p>
+            </label>
+            <label class="field">
+              <span class="field__label" data-i18n="fields.amount.label"></span>
+              <input
+                id="sell-amount-input"
+                type="number"
+                min="0"
+                step="any"
+                data-i18n-placeholder="fields.amount.placeholder"
+                aria-describedby="amount-error"
+              />
+              <p class="field__error" id="amount-error" data-error-for="amount" hidden></p>
+            </label>
+            <label class="field field--full">
+              <span class="field__label field__label--subtle" data-i18n="inputs.quickFillLabel"></span>
               <input
                 id="token-suggest-input"
                 type="text"
@@ -129,40 +163,6 @@
                   ></span>
                 </p>
               </div>
-            </label>
-            <label class="field">
-              <span class="field__label" data-i18n="fields.currency.label"></span>
-              <input
-                id="currency-input"
-                type="text"
-                data-i18n-placeholder="fields.currency.placeholder"
-                aria-describedby="currency-error"
-                autocomplete="off"
-              />
-              <p class="field__error" id="currency-error" data-error-for="currency" hidden></p>
-            </label>
-            <label class="field">
-              <span class="field__label" data-i18n="fields.issuer.label"></span>
-              <input
-                id="issuer-input"
-                type="text"
-                data-i18n-placeholder="fields.issuer.placeholder"
-                aria-describedby="issuer-help issuer-error"
-              />
-              <p class="field__help" id="issuer-help" data-i18n="fields.issuer.helper"></p>
-              <p class="field__error" id="issuer-error" data-error-for="issuer" hidden></p>
-            </label>
-            <label class="field">
-              <span class="field__label" data-i18n="fields.amount.label"></span>
-              <input
-                id="sell-amount-input"
-                type="number"
-                min="0"
-                step="any"
-                data-i18n-placeholder="fields.amount.placeholder"
-                aria-describedby="amount-error"
-              />
-              <p class="field__error" id="amount-error" data-error-for="amount" hidden></p>
             </label>
             <label class="field">
               <span class="field__label" data-i18n="fields.orderbook_limit.label"></span>
