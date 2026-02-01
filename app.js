@@ -446,14 +446,28 @@ const formatIssuerShort = (issuer) => {
   return `${issuer.slice(0, 5)}...`;
 };
 
+const normalizePresetTags = (tags) => {
+  if (!Array.isArray(tags)) {
+    return [];
+  }
+  return tags
+    .filter((tag) => typeof tag === "string")
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean);
+};
+
 const normalizePresetToken = (item) => {
   if (!item || typeof item !== "object") {
     return null;
   }
-  const label = typeof item.label === "string" ? item.label.trim() : "";
   const issuer = typeof item.issuer === "string" ? item.issuer.trim() : "";
-  const rawCurrency = typeof item.currency === "string" ? item.currency.trim() : "";
-  if (!label || !issuer || !rawCurrency) {
+  const rawCurrency =
+    typeof item.symbol === "string"
+      ? item.symbol.trim()
+      : typeof item.currency === "string"
+      ? item.currency.trim()
+      : "";
+  if (!issuer || !rawCurrency) {
     return null;
   }
   const normalized = normalizeCurrencyInput(rawCurrency);
@@ -461,10 +475,19 @@ const normalizePresetToken = (item) => {
   if (!currency || currency === "XRP") {
     return null;
   }
+  const label =
+    (typeof item.label === "string" && item.label.trim()) ||
+    (typeof item.name === "string" && item.name.trim()
+      ? `${formatCurrencyForDisplay(currency)} — ${item.name.trim()}`
+      : formatCurrencyForDisplay(currency));
+  const group = typeof item.group === "string" ? item.group.trim() : "";
+  const tags = normalizePresetTags(item.tags);
   return {
     label,
     currency,
     issuer,
+    tags,
+    group,
   };
 };
 
@@ -562,6 +585,21 @@ const renderTokenSuggestionOptions = () => {
   presetTokenSuggestions.forEach(addTokenOption);
 };
 
+const buildPresetBadgeKeys = (token, fallbackKey) => {
+  if (fallbackKey) {
+    return [fallbackKey];
+  }
+  const tags = Array.isArray(token.tags) ? token.tags : [];
+  const badgeKeys = [];
+  if (tags.includes("popular")) {
+    badgeKeys.push("presets.badgePopular");
+  }
+  if (tags.includes("verified")) {
+    badgeKeys.push("presets.badgeVerified");
+  }
+  return badgeKeys;
+};
+
 const renderQuickFillTokens = (list, tokens, badgeKey, limit) => {
   if (!list) {
     return;
@@ -580,14 +618,54 @@ const renderQuickFillTokens = (list, tokens, badgeKey, limit) => {
     label.className = "quick-fill__text";
     label.textContent = getTokenLabel(token);
     button.appendChild(label);
-    if (badgeKey) {
+    const badgeKeys = buildPresetBadgeKeys(token, badgeKey);
+    badgeKeys.forEach((key) => {
       const badge = document.createElement("span");
       badge.className = "quick-fill__badge quick-fill__badge--inline";
-      badge.textContent = t(badgeKey);
+      badge.textContent = t(key);
       button.appendChild(badge);
-    }
+    });
     button.addEventListener("click", () => applyTokenSuggestion(token));
     list.appendChild(button);
+  });
+};
+
+const renderGroupedPresetTokens = (list, tokens, limit) => {
+  if (!list) {
+    return;
+  }
+  const section = list.closest(".quick-fill__section");
+  list.innerHTML = "";
+  const visibleTokens = tokens.slice(0, limit);
+  if (section) {
+    section.hidden = visibleTokens.length === 0;
+  }
+  const groups = [];
+  const groupIndex = new Map();
+  visibleTokens.forEach((token) => {
+    const groupLabel = typeof token.group === "string" ? token.group.trim() : "";
+    const key = groupLabel || "__ungrouped__";
+    if (!groupIndex.has(key)) {
+      const entry = { label: groupLabel, tokens: [] };
+      groupIndex.set(key, entry);
+      groups.push(entry);
+    }
+    groupIndex.get(key).tokens.push(token);
+  });
+  groups.forEach((group) => {
+    const groupWrapper = document.createElement("div");
+    groupWrapper.className = "quick-fill__group";
+    if (group.label) {
+      const groupLabel = document.createElement("p");
+      groupLabel.className = "quick-fill__group-label";
+      groupLabel.textContent = group.label;
+      groupWrapper.appendChild(groupLabel);
+    }
+    const items = document.createElement("div");
+    items.className = "quick-fill__items";
+    renderQuickFillTokens(items, group.tokens, null, group.tokens.length);
+    groupWrapper.appendChild(items);
+    list.appendChild(groupWrapper);
   });
 };
 
@@ -598,10 +676,9 @@ const renderQuickFillSuggestions = () => {
     "presets.badgeRecent",
     QUICK_FILL_RECENT_LIMIT
   );
-  renderQuickFillTokens(
+  renderGroupedPresetTokens(
     quickFillResultsList,
     presetTokenSuggestions,
-    "presets.badgePopular",
     QUICK_FILL_PRESET_LIMIT
   );
 };
@@ -3435,10 +3512,11 @@ const initTokenSuggestions = async () => {
       throw new Error("Token presets not available");
     }
     const payload = await response.json();
-    if (!Array.isArray(payload)) {
+    const items = Array.isArray(payload) ? payload : payload?.items;
+    if (!Array.isArray(items)) {
       throw new Error("Token presets invalid");
     }
-    presetTokenSuggestions = payload
+    presetTokenSuggestions = items
       .map(normalizePresetToken)
       .filter((token) => token && token.currency && token.issuer);
   } catch (error) {
