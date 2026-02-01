@@ -443,7 +443,10 @@ const formatIssuerShort = (issuer) => {
   if (!issuer) {
     return "";
   }
-  return `${issuer.slice(0, 5)}...`;
+  if (issuer.length <= 10) {
+    return issuer;
+  }
+  return `${issuer.slice(0, 6)}…${issuer.slice(-4)}`;
 };
 
 const normalizePresetTags = (tags) => {
@@ -475,10 +478,11 @@ const normalizePresetToken = (item) => {
   if (!currency || currency === "XRP") {
     return null;
   }
+  const name = typeof item.name === "string" ? item.name.trim() : "";
   const label =
     (typeof item.label === "string" && item.label.trim()) ||
-    (typeof item.name === "string" && item.name.trim()
-      ? `${formatCurrencyForDisplay(currency)} — ${item.name.trim()}`
+    (name
+      ? `${formatCurrencyForDisplay(currency)} — ${name}`
       : formatCurrencyForDisplay(currency));
   const group = typeof item.group === "string" ? item.group.trim() : "";
   const tags = normalizePresetTags(item.tags);
@@ -486,6 +490,7 @@ const normalizePresetToken = (item) => {
     label,
     currency,
     issuer,
+    name,
     tags,
     group,
   };
@@ -517,14 +522,15 @@ const getTokenKey = (token) =>
   `${String(token.currency).toUpperCase()}|${String(token.issuer).toUpperCase()}`;
 const getTokenLabel = (token) =>
   token.label?.trim() || formatCurrencyForDisplay(token.currency);
-const getTokenOptionValue = (token) => {
-  const issuerShort = formatIssuerShort(token.issuer);
-  return issuerShort ? `${getTokenLabel(token)} (${issuerShort})` : getTokenLabel(token);
-};
-
 let presetTokenSuggestions = [];
 let recentTokenSuggestions = [];
-let tokenSuggestionIndex = new Map();
+let tokenSuggestionPool = [];
+let tokenSuggestionMatches = [];
+let activeTokenSuggestionIndex = -1;
+let tokenSuggestionDebounce = null;
+
+const TOKEN_SUGGESTION_LIMIT = 8;
+const TOKEN_SUGGESTION_DEBOUNCE_MS = 150;
 
 const buildExampleLabel = (candidate) =>
   `${candidate.currency} (issuer ${formatIssuerShort(candidate.issuer)})`;
@@ -558,31 +564,160 @@ const findPresetLabel = ({ currency, issuer }) => {
   return match?.label || "";
 };
 
-const renderTokenSuggestionOptions = () => {
-  if (!tokenSuggestionList) {
-    return;
-  }
-  tokenSuggestionList.innerHTML = "";
-  tokenSuggestionIndex = new Map();
-
+const buildTokenSuggestionPool = () => {
   const seen = new Set();
-  const addTokenOption = (token) => {
+  const pool = [];
+  const addToken = (token, meta) => {
     const key = getTokenKey(token);
     if (seen.has(key)) {
       return;
     }
     seen.add(key);
-    const option = document.createElement("option");
-    const optionValue = getTokenOptionValue(token);
-    option.value = optionValue;
-    option.dataset.currency = token.currency;
-    option.dataset.issuer = token.issuer;
-    tokenSuggestionIndex.set(optionValue, token);
-    tokenSuggestionList.appendChild(option);
+    pool.push({
+      ...token,
+      ...meta,
+    });
   };
+  recentTokenSuggestions.forEach((token) => addToken(token, { isRecent: true }));
+  presetTokenSuggestions.forEach((token) => addToken(token, { isPreset: true }));
+  return pool;
+};
 
-  recentTokenSuggestions.forEach(addTokenOption);
-  presetTokenSuggestions.forEach(addTokenOption);
+const refreshTokenSuggestionPool = () => {
+  tokenSuggestionPool = buildTokenSuggestionPool();
+};
+
+const getSuggestionBadges = (token) => {
+  const badges = [];
+  if (token.isRecent) {
+    badges.push(t("presets.badgeRecent"));
+  }
+  if (token.group) {
+    badges.push(token.group);
+  }
+  if (Array.isArray(token.tags)) {
+    if (token.tags.includes("popular")) {
+      badges.push(t("presets.badgePopular"));
+    }
+    if (token.tags.includes("verified")) {
+      badges.push(t("presets.badgeVerified"));
+    }
+  }
+  return badges;
+};
+
+const closeTokenSuggestions = () => {
+  if (!tokenSuggestionList || !tokenSuggestionInput) {
+    return;
+  }
+  tokenSuggestionList.hidden = true;
+  tokenSuggestionList.innerHTML = "";
+  tokenSuggestionMatches = [];
+  activeTokenSuggestionIndex = -1;
+  tokenSuggestionInput.setAttribute("aria-expanded", "false");
+  tokenSuggestionInput.removeAttribute("aria-activedescendant");
+};
+
+const openTokenSuggestions = () => {
+  if (!tokenSuggestionList || !tokenSuggestionInput) {
+    return;
+  }
+  tokenSuggestionList.hidden = false;
+  tokenSuggestionInput.setAttribute("aria-expanded", "true");
+};
+
+const renderTokenSuggestions = (matches) => {
+  if (!tokenSuggestionList || !tokenSuggestionInput) {
+    return;
+  }
+  tokenSuggestionList.innerHTML = "";
+  tokenSuggestionMatches = matches;
+  if (!matches.length) {
+    closeTokenSuggestions();
+    return;
+  }
+  matches.forEach((token, index) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "suggestion-item";
+    button.id = `token-suggestion-${index}`;
+    button.setAttribute("role", "option");
+    const isActive = index === activeTokenSuggestionIndex;
+    if (isActive) {
+      button.classList.add("is-active");
+      button.setAttribute("aria-selected", "true");
+    } else {
+      button.setAttribute("aria-selected", "false");
+    }
+
+    const row = document.createElement("div");
+    row.className = "suggestion-item__row";
+    const symbol = formatCurrencyForDisplay(token.currency);
+    const title = document.createElement("span");
+    title.textContent = token.name ? `${symbol} — ${token.name}` : symbol;
+    const issuer = document.createElement("span");
+    issuer.className = "suggestion-item__issuer";
+    issuer.textContent = formatIssuerShort(token.issuer);
+    row.appendChild(title);
+    row.appendChild(issuer);
+    button.appendChild(row);
+
+    const badges = getSuggestionBadges(token);
+    if (badges.length) {
+      const meta = document.createElement("div");
+      meta.className = "suggestion-item__meta suggestion-item__badges";
+      badges.forEach((badgeLabel) => {
+        const badge = document.createElement("span");
+        badge.className = "quick-fill__badge";
+        badge.textContent = badgeLabel;
+        meta.appendChild(badge);
+      });
+      button.appendChild(meta);
+    }
+
+    button.addEventListener("click", () => {
+      applyTokenSuggestion(token);
+      closeTokenSuggestions();
+    });
+    item.appendChild(button);
+    tokenSuggestionList.appendChild(item);
+  });
+  openTokenSuggestions();
+};
+
+const getTokenSuggestionMatches = (query) => {
+  if (!query) {
+    return [];
+  }
+  const queryUpper = query.toUpperCase();
+  const queryLower = query.toLowerCase();
+  const matches = tokenSuggestionPool
+    .map((token, order) => {
+      const symbol = String(token.currency || "").toUpperCase();
+      if (!symbol) {
+        return null;
+      }
+      if (symbol.startsWith(queryUpper)) {
+        return { token, rank: 0, order };
+      }
+      if (symbol.includes(queryUpper)) {
+        return { token, rank: 1, order };
+      }
+      const name = token.name ? token.name.toLowerCase() : "";
+      if (name && name.includes(queryLower)) {
+        return { token, rank: 2, order };
+      }
+      return null;
+    })
+    .filter(Boolean);
+  matches.sort((a, b) => {
+    if (a.rank !== b.rank) {
+      return a.rank - b.rank;
+    }
+    return a.order - b.order;
+  });
+  return matches.slice(0, TOKEN_SUGGESTION_LIMIT).map((match) => match.token);
 };
 
 const buildPresetBadgeKeys = (token, fallbackKey) => {
@@ -716,7 +851,12 @@ const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
   } catch (error) {
     // Ignore storage failures.
   }
-  renderTokenSuggestionOptions();
+  refreshTokenSuggestionPool();
+  if (tokenSuggestionInput?.value?.trim()) {
+    const matches = getTokenSuggestionMatches(tokenSuggestionInput.value.trim());
+    activeTokenSuggestionIndex = matches.length ? 0 : -1;
+    renderTokenSuggestions(matches);
+  }
   renderQuickFillSuggestions();
 };
 
@@ -731,6 +871,7 @@ const applyTokenSuggestion = (token) => {
   saveRecentTokenSuggestion(token);
   handleShareInputChange();
   currencyInput.focus();
+  closeTokenSuggestions();
 };
 
 const setFieldError = (key, message) => {
@@ -3522,23 +3663,92 @@ const initTokenSuggestions = async () => {
   } catch (error) {
     presetTokenSuggestions = [];
   }
-  renderTokenSuggestionOptions();
+  refreshTokenSuggestionPool();
   renderQuickFillSuggestions();
 
   const handleSuggestionInput = () => {
     const value = tokenSuggestionInput.value.trim();
     if (!value) {
+      closeTokenSuggestions();
       return;
     }
-    const token = tokenSuggestionIndex.get(value);
-    if (!token) {
-      return;
+    const matches = getTokenSuggestionMatches(value);
+    activeTokenSuggestionIndex = matches.length ? 0 : -1;
+    renderTokenSuggestions(matches);
+    if (activeTokenSuggestionIndex >= 0) {
+      tokenSuggestionInput.setAttribute(
+        "aria-activedescendant",
+        `token-suggestion-${activeTokenSuggestionIndex}`
+      );
     }
-    applyTokenSuggestion(token);
   };
 
-  tokenSuggestionInput.addEventListener("input", handleSuggestionInput);
-  tokenSuggestionInput.addEventListener("change", handleSuggestionInput);
+  const scheduleSuggestionUpdate = () => {
+    if (tokenSuggestionDebounce) {
+      clearTimeout(tokenSuggestionDebounce);
+    }
+    tokenSuggestionDebounce = window.setTimeout(
+      () => handleSuggestionInput(),
+      TOKEN_SUGGESTION_DEBOUNCE_MS
+    );
+  };
+
+  tokenSuggestionInput.addEventListener("input", scheduleSuggestionUpdate);
+  tokenSuggestionInput.addEventListener("focus", scheduleSuggestionUpdate);
+
+  tokenSuggestionInput.addEventListener("keydown", (event) => {
+    if (!tokenSuggestionMatches.length) {
+      if (event.key === "Escape") {
+        closeTokenSuggestions();
+      }
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      activeTokenSuggestionIndex =
+        (activeTokenSuggestionIndex + 1) % tokenSuggestionMatches.length;
+      renderTokenSuggestions(tokenSuggestionMatches);
+      tokenSuggestionInput.setAttribute(
+        "aria-activedescendant",
+        `token-suggestion-${activeTokenSuggestionIndex}`
+      );
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      activeTokenSuggestionIndex =
+        (activeTokenSuggestionIndex - 1 + tokenSuggestionMatches.length) %
+        tokenSuggestionMatches.length;
+      renderTokenSuggestions(tokenSuggestionMatches);
+      tokenSuggestionInput.setAttribute(
+        "aria-activedescendant",
+        `token-suggestion-${activeTokenSuggestionIndex}`
+      );
+      return;
+    }
+    if (event.key === "Enter") {
+      const selected = tokenSuggestionMatches[activeTokenSuggestionIndex];
+      if (selected) {
+        event.preventDefault();
+        applyTokenSuggestion(selected);
+        closeTokenSuggestions();
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      closeTokenSuggestions();
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    const field = tokenSuggestionInput.closest(".field");
+    if (!field) {
+      return;
+    }
+    if (!field.contains(event.target)) {
+      closeTokenSuggestions();
+    }
+  });
 };
 
 void initTokenSuggestions();
