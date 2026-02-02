@@ -145,7 +145,6 @@ const TOKEN_PRESETS_URL = "/data/token-presets.json";
 const RECENT_TOKENS_STORAGE_KEY = "xsic_recent_tokens_v1";
 const LEGACY_RECENT_TOKENS_STORAGE_KEY = "xsic.recentTokens.v1";
 const MAX_RECENT_TOKENS = 10;
-const QUICK_FILL_RECENT_LIMIT = 6;
 const QUICK_FILL_PRESET_LIMIT = 6;
 const DEFAULT_TOKEN = {
   currency: "ARMY",
@@ -228,11 +227,8 @@ const currencyInput = document.querySelector("#currency-input");
 const issuerInput = document.querySelector("#issuer-input");
 const tokenSuggestionInput = currencyInput;
 const tokenSuggestionList = document.querySelector("#token-suggestions");
-const quickFillRecentList = document.querySelector("#quick-fill-recent");
 const quickFillResultsList = document.querySelector("#quick-fill-results");
-const HAS_QUICK_FILL = Boolean(quickFillRecentList && quickFillResultsList);
-const recentTokenSection = document.querySelector("#recent-token-section");
-const recentTokenChips = document.querySelector("#recent-token-chips");
+const HAS_QUICK_FILL = Boolean(quickFillResultsList);
 const amountInput = document.querySelector("#sell-amount-input");
 const limitInput = document.querySelector("#limit-input");
 const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
@@ -911,10 +907,8 @@ const renderQuickFillSuggestions = () => {
   // Keep recent chips, but skip quick-fill rendering when DOM is absent.
   if (HAS_QUICK_FILL) {
     renderQuickFillTokens(
-      quickFillRecentList,
       recentTokenSuggestions,
       "presets.badgeRecent",
-      QUICK_FILL_RECENT_LIMIT
     );
     renderGroupedPresetTokens(
       quickFillResultsList,
@@ -922,26 +916,7 @@ const renderQuickFillSuggestions = () => {
       QUICK_FILL_PRESET_LIMIT
     );
   }
-  renderRecentTokenChips();
 };
-
-const renderRecentTokenChips = () => {
-  if (!recentTokenSection || !recentTokenChips) {
-    return;
-  }
-  recentTokenChips.innerHTML = "";
-  const visibleTokens = recentTokenSuggestions.slice(0, MAX_RECENT_TOKENS);
-  recentTokenSection.hidden = visibleTokens.length === 0;
-  visibleTokens.forEach((token) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "recent-chip";
-    button.textContent = formatCurrencyForDisplay(token.currency);
-    button.addEventListener("click", () => applyTokenSuggestion(token));
-    recentTokenChips.appendChild(button);
-  });
-};
-
 const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
   if (!currency || !issuer) {
     return;
