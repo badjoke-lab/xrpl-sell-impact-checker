@@ -664,35 +664,38 @@ const renderTokenSuggestions = (matches) => {
   if (!tokenSuggestionList || !tokenSuggestionInput) {
     return;
   }
+
   tokenSuggestionList.innerHTML = "";
-  tokenSuggestionMatches = matches;
-  if (!matches.length) {
+  tokenSuggestionMatches = Array.isArray(matches) ? matches : [];
+
+  if (!tokenSuggestionMatches.length) {
     closeTokenSuggestions();
     return;
   }
-  matches.forEach((token, index) => {
-    const item = document.createElement("li");
+
+  tokenSuggestionMatches.forEach((token, index) => {
+    const li = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
     button.className = "suggestion-item";
     button.id = `token-suggestion-${index}`;
     button.setAttribute("role", "option");
+
     const isActive = index === activeTokenSuggestionIndex;
-    if (isActive) {
-      button.classList.add("is-active");
-      button.setAttribute("aria-selected", "true");
-    } else {
-      button.setAttribute("aria-selected", "false");
-    }
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
 
     const row = document.createElement("div");
     row.className = "suggestion-item__row";
+
     const symbol = formatCurrencyForDisplay(token.currency);
     const title = document.createElement("span");
     title.textContent = token.name ? `${symbol} — ${token.name}` : symbol;
+
     const issuer = document.createElement("span");
     issuer.className = "suggestion-item__issuer";
     issuer.textContent = formatIssuerShort(token.issuer);
+
     row.appendChild(title);
     row.appendChild(issuer);
     button.appendChild(row);
@@ -714,9 +717,11 @@ const renderTokenSuggestions = (matches) => {
       applyTokenSuggestion(token);
       closeTokenSuggestions();
     });
-    item.appendChild(button);
-    tokenSuggestionList.appendChild(item);
+
+    li.appendChild(button);
+    tokenSuggestionList.appendChild(li);
   });
+
   openTokenSuggestions();
 };
 
@@ -753,7 +758,7 @@ const getTokenSuggestionMatches = (query) => {
   });
   return matches.slice(0, TOKEN_SUGGESTION_LIMIT).map((match) => match.token);
 
-const mergeRecentIntoSuggestions = (rawQuery, presetMatches) => {
+const _mergeRecentIntoSuggestions = (rawQuery, presetMatches) => {
   const q = String(rawQuery || "").trim().toLowerCase();
 
   const keyOf = (t) => `${t?.currency || ""}:${t?.issuer || ""}`;
@@ -3760,6 +3765,44 @@ const initTokenSuggestions = async () => {
   recentTokenSuggestions = buildRecentTokenSuggestions(recentTokenRecords);
   refreshTokenSuggestionPool();
   renderQuickFillSuggestions();
+
+function mergeRecentIntoSuggestions(rawQuery, presetMatches) {
+  const q = String(rawQuery || "").trim().toLowerCase();
+  const keyOf = (t) => `${(t && t.currency) || ""}:${(t && t.issuer) || ""}`;
+
+  const recent = (typeof recentTokenSuggestions !== "undefined" && Array.isArray(recentTokenSuggestions))
+    ? recentTokenSuggestions
+        .filter((t) => {
+          if (!q) return true;
+          const hay = `${(t && t.label) || ""} ${(t && t.symbol) || ""} ${(t && t.name) || ""} ${(t && t.currency) || ""} ${(t && t.issuer) || ""}`.toLowerCase();
+          return hay.includes(q);
+        })
+        .map((t) => ({
+          ...t,
+          badgeKeys: Array.from(new Set([...(t.badgeKeys || []), "presets.badgeRecent"])),
+        }))
+    : [];
+
+  const seen = new Set();
+  const merged = [];
+  const pushUniq = (t) => {
+    const k = keyOf(t);
+    if (!k || seen.has(k)) return;
+    seen.add(k);
+    merged.push(t);
+  };
+
+  recent.forEach(pushUniq);
+  (Array.isArray(presetMatches) ? presetMatches : []).forEach(pushUniq);
+
+  const limit =
+    (typeof SUGGESTION_LIMIT === "number" ? SUGGESTION_LIMIT :
+     typeof MAX_SUGGESTIONS === "number" ? MAX_SUGGESTIONS :
+     8);
+
+  return merged.slice(0, limit);
+}
+
 
 
 
