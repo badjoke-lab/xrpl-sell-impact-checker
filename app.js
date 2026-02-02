@@ -141,7 +141,7 @@ const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
 const VENUE_CLOB = "CLOB";
 const VENUE_AMM = "AMM";
-const TOKEN_PRESETS_URL = "./data/token-presets.json";
+const TOKEN_PRESETS_URL = "/data/token-presets.json";
 const RECENT_TOKENS_STORAGE_KEY = "xsic_recent_tokens_v1";
 const LEGACY_RECENT_TOKENS_STORAGE_KEY = "xsic.recentTokens.v1";
 const MAX_RECENT_TOKENS = 10;
@@ -226,10 +226,11 @@ const tryExampleButton = document.querySelector("#try-example");
 const resetButton = document.querySelector("#reset-inputs");
 const currencyInput = document.querySelector("#currency-input");
 const issuerInput = document.querySelector("#issuer-input");
-const tokenSuggestionInput = document.querySelector("#token-suggest-input");
+const tokenSuggestionInput = currencyInput;
 const tokenSuggestionList = document.querySelector("#token-suggestions");
 const quickFillRecentList = document.querySelector("#quick-fill-recent");
 const quickFillResultsList = document.querySelector("#quick-fill-results");
+const HAS_QUICK_FILL = Boolean(quickFillRecentList && quickFillResultsList);
 const recentTokenSection = document.querySelector("#recent-token-section");
 const recentTokenChips = document.querySelector("#recent-token-chips");
 const amountInput = document.querySelector("#sell-amount-input");
@@ -663,19 +664,32 @@ const renderTokenSuggestions = (matches) => {
   if (!tokenSuggestionList || !tokenSuggestionInput) {
     return;
   }
-  tokenSuggestionList.innerHTML = "";
-  tokenSuggestionMatches = matches;
-  if (!matches.length) {
+
+  const list = tokenSuggestionList;
+  const items = Array.isArray(matches) ? matches : [];
+
+  list.innerHTML = "";
+  tokenSuggestionMatches = items;
+
+  // アクティブインデックスを安全に矯正
+  if (typeof activeTokenSuggestionIndex !== "number") activeTokenSuggestionIndex = 0;
+  if (activeTokenSuggestionIndex < 0) activeTokenSuggestionIndex = 0;
+  if (activeTokenSuggestionIndex >= items.length) activeTokenSuggestionIndex = 0;
+
+  if (!items.length) {
     closeTokenSuggestions();
     return;
   }
-  matches.forEach((token, index) => {
-    const item = document.createElement("li");
+
+  items.forEach((token, index) => {
+    const li = document.createElement("li");
+
     const button = document.createElement("button");
     button.type = "button";
     button.className = "suggestion-item";
     button.id = `token-suggestion-${index}`;
     button.setAttribute("role", "option");
+
     const isActive = index === activeTokenSuggestionIndex;
     if (isActive) {
       button.classList.add("is-active");
@@ -684,28 +698,43 @@ const renderTokenSuggestions = (matches) => {
       button.setAttribute("aria-selected", "false");
     }
 
+    // 1行目：SYMBOL — Name / Label + issuer短縮
     const row = document.createElement("div");
     row.className = "suggestion-item__row";
+
     const symbol = formatCurrencyForDisplay(token.currency);
     const title = document.createElement("span");
-    title.textContent = token.name ? `${symbol} — ${token.name}` : symbol;
+    const label = (token.name || token.label || "").trim();
+    title.textContent = label ? `${symbol} — ${label}` : symbol;
+
     const issuer = document.createElement("span");
     issuer.className = "suggestion-item__issuer";
-    issuer.textContent = formatIssuerShort(token.issuer);
+    const short =
+      (typeof formatIssuerShort === "function")
+        ? formatIssuerShort(token.issuer)
+        : (typeof shortenIssuerForDisplay === "function")
+          ? shortenIssuerForDisplay(token.issuer)
+          : (token.issuer || "");
+    issuer.textContent = short;
+
     row.appendChild(title);
     row.appendChild(issuer);
     button.appendChild(row);
 
-    const badges = getSuggestionBadges(token);
-    if (badges.length) {
+    // 2行目：バッジ（Recent/Popular/Verified）
+    const badges = (typeof getSuggestionBadges === "function") ? getSuggestionBadges(token) : [];
+    if (Array.isArray(badges) && badges.length) {
       const meta = document.createElement("div");
       meta.className = "suggestion-item__meta suggestion-item__badges";
+
       badges.forEach((badgeLabel) => {
         const badge = document.createElement("span");
+        // 既存CSSに寄せる（quick-fill はUI消したがバッジ見た目は流用）
         badge.className = "quick-fill__badge";
         badge.textContent = badgeLabel;
         meta.appendChild(badge);
       });
+
       button.appendChild(meta);
     }
 
@@ -713,10 +742,13 @@ const renderTokenSuggestions = (matches) => {
       applyTokenSuggestion(token);
       closeTokenSuggestions();
     });
-    item.appendChild(button);
-    tokenSuggestionList.appendChild(item);
+
+    li.appendChild(button);
+    list.appendChild(li);
   });
-  openTokenSuggestions();
+
+  list.hidden = false;
+  tokenSuggestionInput.setAttribute("aria-expanded", "true");
 };
 
 const getTokenSuggestionMatches = (query) => {
@@ -751,6 +783,43 @@ const getTokenSuggestionMatches = (query) => {
     return a.order - b.order;
   });
   return matches.slice(0, TOKEN_SUGGESTION_LIMIT).map((match) => match.token);
+
+const _mergeRecentIntoSuggestions = (rawQuery, presetMatches) => {
+  const q = String(rawQuery || "").trim().toLowerCase();
+
+  const keyOf = (t) => `${t?.currency || ""}:${t?.issuer || ""}`;
+
+  const recent = (recentTokenSuggestions || [])
+    .filter((t) => {
+      if (!q) return true;
+      const hay = `${t?.label || ""} ${t?.symbol || ""} ${t?.name || ""} ${t?.currency || ""} ${t?.issuer || ""}`.toLowerCase();
+      return hay.includes(q);
+    })
+    .map((t) => ({
+      ...t,
+      badgeKeys: Array.from(new Set([...(t.badgeKeys || []), "presets.badgeRecent"])),
+    }));
+
+  const seen = new Set();
+  const merged = [];
+  const pushUniq = (t) => {
+    const k = keyOf(t);
+    if (!k || seen.has(k)) return;
+    seen.add(k);
+    merged.push(t);
+  };
+
+  recent.forEach(pushUniq);
+  (presetMatches || []).forEach(pushUniq);
+
+  const limit =
+    typeof SUGGESTION_LIMIT === "number" ? SUGGESTION_LIMIT :
+    typeof MAX_SUGGESTIONS === "number" ? MAX_SUGGESTIONS :
+    8;
+
+  return merged.slice(0, limit);
+};
+
 };
 
 const buildPresetBadgeKeys = (token, fallbackKey) => {
@@ -838,18 +907,22 @@ const renderGroupedPresetTokens = (list, tokens, limit) => {
 };
 
 const renderQuickFillSuggestions = () => {
-  renderQuickFillTokens(
-    quickFillRecentList,
-    recentTokenSuggestions,
-    "presets.badgeRecent",
-    QUICK_FILL_RECENT_LIMIT
-  );
+  // quick-fill UI was removed from index.html.
+  // Keep recent chips, but skip quick-fill rendering when DOM is absent.
+  if (HAS_QUICK_FILL) {
+    renderQuickFillTokens(
+      quickFillRecentList,
+      recentTokenSuggestions,
+      "presets.badgeRecent",
+      QUICK_FILL_RECENT_LIMIT
+    );
+    renderGroupedPresetTokens(
+      quickFillResultsList,
+      presetTokenSuggestions,
+      QUICK_FILL_PRESET_LIMIT
+    );
+  }
   renderRecentTokenChips();
-  renderGroupedPresetTokens(
-    quickFillResultsList,
-    presetTokenSuggestions,
-    QUICK_FILL_PRESET_LIMIT
-  );
 };
 
 const renderRecentTokenChips = () => {
@@ -3719,13 +3792,53 @@ const initTokenSuggestions = async () => {
   refreshTokenSuggestionPool();
   renderQuickFillSuggestions();
 
+function mergeRecentIntoSuggestions(rawQuery, presetMatches) {
+  const q = String(rawQuery || "").trim().toLowerCase();
+  const keyOf = (t) => `${(t && t.currency) || ""}:${(t && t.issuer) || ""}`;
+
+  const recent = (typeof recentTokenSuggestions !== "undefined" && Array.isArray(recentTokenSuggestions))
+    ? recentTokenSuggestions
+        .filter((t) => {
+          if (!q) return true;
+          const hay = `${(t && t.label) || ""} ${(t && t.symbol) || ""} ${(t && t.name) || ""} ${(t && t.currency) || ""} ${(t && t.issuer) || ""}`.toLowerCase();
+          return hay.includes(q);
+        })
+        .map((t) => ({
+          ...t,
+          badgeKeys: Array.from(new Set([...(t.badgeKeys || []), "presets.badgeRecent"])),
+        }))
+    : [];
+
+  const seen = new Set();
+  const merged = [];
+  const pushUniq = (t) => {
+    const k = keyOf(t);
+    if (!k || seen.has(k)) return;
+    seen.add(k);
+    merged.push(t);
+  };
+
+  recent.forEach(pushUniq);
+  (Array.isArray(presetMatches) ? presetMatches : []).forEach(pushUniq);
+
+  const limit =
+    (typeof SUGGESTION_LIMIT === "number" ? SUGGESTION_LIMIT :
+     typeof MAX_SUGGESTIONS === "number" ? MAX_SUGGESTIONS :
+     8);
+
+  return merged.slice(0, limit);
+}
+
+
+
+
   const handleSuggestionInput = () => {
     const value = tokenSuggestionInput.value.trim();
     if (!value) {
       closeTokenSuggestions();
       return;
     }
-    const matches = getTokenSuggestionMatches(value);
+    const matches = mergeRecentIntoSuggestions(value, getTokenSuggestionMatches(value));
     activeTokenSuggestionIndex = matches.length ? 0 : -1;
     renderTokenSuggestions(matches);
     if (activeTokenSuggestionIndex >= 0) {
