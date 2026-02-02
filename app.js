@@ -230,6 +230,7 @@ const tokenSuggestionInput = document.querySelector("#token-suggest-input");
 const tokenSuggestionList = document.querySelector("#token-suggestions");
 const quickFillRecentList = document.querySelector("#quick-fill-recent");
 const quickFillResultsList = document.querySelector("#quick-fill-results");
+const HAS_QUICK_FILL = Boolean(quickFillRecentList && quickFillResultsList);
 const recentTokenSection = document.querySelector("#recent-token-section");
 const recentTokenChips = document.querySelector("#recent-token-chips");
 const amountInput = document.querySelector("#sell-amount-input");
@@ -838,18 +839,22 @@ const renderGroupedPresetTokens = (list, tokens, limit) => {
 };
 
 const renderQuickFillSuggestions = () => {
-  renderQuickFillTokens(
-    quickFillRecentList,
-    recentTokenSuggestions,
-    "presets.badgeRecent",
-    QUICK_FILL_RECENT_LIMIT
-  );
+  // quick-fill UI was removed from index.html.
+  // Keep recent chips, but skip quick-fill rendering when DOM is absent.
+  if (HAS_QUICK_FILL) {
+    renderQuickFillTokens(
+      quickFillRecentList,
+      recentTokenSuggestions,
+      "presets.badgeRecent",
+      QUICK_FILL_RECENT_LIMIT
+    );
+    renderGroupedPresetTokens(
+      quickFillResultsList,
+      presetTokenSuggestions,
+      QUICK_FILL_PRESET_LIMIT
+    );
+  }
   renderRecentTokenChips();
-  renderGroupedPresetTokens(
-    quickFillResultsList,
-    presetTokenSuggestions,
-    QUICK_FILL_PRESET_LIMIT
-  );
 };
 
 const renderRecentTokenChips = () => {
