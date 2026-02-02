@@ -1112,3 +1112,150 @@ button:focus-visible{
 
 /* XSIC BACKGROUND FORCE WHITE */
 html, body { background: #ffffff !important; }
+
+
+/* xsic-suggestion-list */
+/* xsic-suggestion-list */
+.suggestions{
+  margin: 8px 0 0 0;
+  padding: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 12px;
+  background: #fff;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.suggestions > li{ list-style:none; margin:0; padding:0; }
+
+.suggestion-item{
+  width:100%;
+  text-align:left;
+  border:0;
+  background:transparent;
+  border-radius:10px;
+  padding:10px 10px;
+  cursor:pointer;
+}
+
+.suggestion-item:hover,
+.suggestion-item.is-active,
+.suggestion-item[aria-selected="true"]{
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.suggestion-item__row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.suggestion-item__row > span:first-child{
+  min-width:0;
+  font-weight:700;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.suggestion-item__issuer{
+  flex:0 0 auto;
+  font-size:12px;
+  opacity:0.72;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  white-space:nowrap;
+}
+
+.suggestion-item__meta.suggestion-item__badges{
+  margin-top:6px;
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+.suggestion-item__badges .quick-fill__badge{
+  font-size:11px;
+  padding:2px 8px;
+  border-radius:999px;
+  border:1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(15, 23, 42, 0.04);
+  white-space:nowrap;
+}
+
+/* FIX: token suggestions dropdown */
+.field--suggestions{
+  position: relative;
+  overflow: visible;
+}
+
+.field--suggestions .suggestions{
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 1000;
+
+  display: block;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+
+  max-height: 320px;
+  overflow: auto;
+  padding: 6px 0;
+}
+
+.field--suggestions .suggestions[hidden]{
+  display: none !important;
+}
+
+.field--suggestions .suggestions li{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* クリック可能領域を確保 */
+.field--suggestions .suggestion-item{
+  width: 100%;
+  text-align: left;
+}
+
+
+/* --- PATCH: suggestions positioning polish --- */
+.field--suggestions { position: relative; }
+
+.field--suggestions .suggestions{
+  position: absolute;
+  left: 0;
+  right: 0;          /* input幅に合わせる */
+  top: calc(100% + 8px);
+  z-index: 50;       /* 右カラムより上に */
+  max-height: 280px;
+  overflow: auto;
+}
+/* --- /PATCH --- */
+
+
+/* --- PATCH: suggestions should stick to input (no gap) --- */
+.field--suggestions { position: relative; }
+
+/* 入力欄のすぐ下に“密着”させる（1px重ねて境界の段差を消す） */
+.field--suggestions .suggestions{
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 1px);
+  margin-top: 0;
+  z-index: 60;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+/* --- /PATCH --- */
+
+
+/* --- PATCH: prevent grid row stretch from creating suggestion gap --- */
+.field--suggestions { align-self: start; }
+/* --- /PATCH --- */
