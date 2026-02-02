@@ -665,16 +665,25 @@ const renderTokenSuggestions = (matches) => {
     return;
   }
 
-  tokenSuggestionList.innerHTML = "";
-  tokenSuggestionMatches = Array.isArray(matches) ? matches : [];
+  const list = tokenSuggestionList;
+  const items = Array.isArray(matches) ? matches : [];
 
-  if (!tokenSuggestionMatches.length) {
+  list.innerHTML = "";
+  tokenSuggestionMatches = items;
+
+  // アクティブインデックスを安全に矯正
+  if (typeof activeTokenSuggestionIndex !== "number") activeTokenSuggestionIndex = 0;
+  if (activeTokenSuggestionIndex < 0) activeTokenSuggestionIndex = 0;
+  if (activeTokenSuggestionIndex >= items.length) activeTokenSuggestionIndex = 0;
+
+  if (!items.length) {
     closeTokenSuggestions();
     return;
   }
 
-  tokenSuggestionMatches.forEach((token, index) => {
+  items.forEach((token, index) => {
     const li = document.createElement("li");
+
     const button = document.createElement("button");
     button.type = "button";
     button.className = "suggestion-item";
@@ -682,34 +691,50 @@ const renderTokenSuggestions = (matches) => {
     button.setAttribute("role", "option");
 
     const isActive = index === activeTokenSuggestionIndex;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    if (isActive) {
+      button.classList.add("is-active");
+      button.setAttribute("aria-selected", "true");
+    } else {
+      button.setAttribute("aria-selected", "false");
+    }
 
+    // 1行目：SYMBOL — Name / Label + issuer短縮
     const row = document.createElement("div");
     row.className = "suggestion-item__row";
 
     const symbol = formatCurrencyForDisplay(token.currency);
     const title = document.createElement("span");
-    title.textContent = token.name ? `${symbol} — ${token.name}` : symbol;
+    const label = (token.name || token.label || "").trim();
+    title.textContent = label ? `${symbol} — ${label}` : symbol;
 
     const issuer = document.createElement("span");
     issuer.className = "suggestion-item__issuer";
-    issuer.textContent = formatIssuerShort(token.issuer);
+    const short =
+      (typeof formatIssuerShort === "function")
+        ? formatIssuerShort(token.issuer)
+        : (typeof shortenIssuerForDisplay === "function")
+          ? shortenIssuerForDisplay(token.issuer)
+          : (token.issuer || "");
+    issuer.textContent = short;
 
     row.appendChild(title);
     row.appendChild(issuer);
     button.appendChild(row);
 
-    const badges = getSuggestionBadges(token);
-    if (badges.length) {
+    // 2行目：バッジ（Recent/Popular/Verified）
+    const badges = (typeof getSuggestionBadges === "function") ? getSuggestionBadges(token) : [];
+    if (Array.isArray(badges) && badges.length) {
       const meta = document.createElement("div");
       meta.className = "suggestion-item__meta suggestion-item__badges";
+
       badges.forEach((badgeLabel) => {
         const badge = document.createElement("span");
+        // 既存CSSに寄せる（quick-fill はUI消したがバッジ見た目は流用）
         badge.className = "quick-fill__badge";
         badge.textContent = badgeLabel;
         meta.appendChild(badge);
       });
+
       button.appendChild(meta);
     }
 
@@ -719,10 +744,11 @@ const renderTokenSuggestions = (matches) => {
     });
 
     li.appendChild(button);
-    tokenSuggestionList.appendChild(li);
+    list.appendChild(li);
   });
 
-  openTokenSuggestions();
+  list.hidden = false;
+  tokenSuggestionInput.setAttribute("aria-expanded", "true");
 };
 
 const getTokenSuggestionMatches = (query) => {
