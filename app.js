@@ -3761,40 +3761,6 @@ const initTokenSuggestions = async () => {
   refreshTokenSuggestionPool();
   renderQuickFillSuggestions();
 
-const mergeRecentIntoSuggestionsGlobal = (rawQuery, presetMatches) => {
-  const q = String(rawQuery || "").trim().toLowerCase();
-  const keyOf = (t) => `${t?.currency || ""}:${t?.issuer || ""}`;
-
-  const recent = (recentTokenSuggestions || [])
-    .filter((t) => {
-      if (!q) return true;
-      const hay = `${t?.label || ""} ${t?.symbol || ""} ${t?.name || ""} ${t?.currency || ""} ${t?.issuer || ""}`.toLowerCase();
-      return hay.includes(q);
-    })
-    .map((t) => ({
-      ...t,
-      badgeKeys: Array.from(new Set([...(t.badgeKeys || []), "presets.badgeRecent"])),
-    }));
-
-  const seen = new Set();
-  const merged = [];
-  const pushUniq = (t) => {
-    const k = keyOf(t);
-    if (!k || seen.has(k)) return;
-    seen.add(k);
-    merged.push(t);
-  };
-
-  recent.forEach(pushUniq);
-  (presetMatches || []).forEach(pushUniq);
-
-  const limit =
-    typeof SUGGESTION_LIMIT === "number" ? SUGGESTION_LIMIT :
-    typeof MAX_SUGGESTIONS === "number" ? MAX_SUGGESTIONS :
-    8;
-
-  return merged.slice(0, limit);
-};
 
 
   const handleSuggestionInput = () => {
@@ -3803,7 +3769,7 @@ const mergeRecentIntoSuggestionsGlobal = (rawQuery, presetMatches) => {
       closeTokenSuggestions();
       return;
     }
-    const matches = mergeRecentIntoSuggestionsGlobal(value, getTokenSuggestionMatches(value));
+    const matches = mergeRecentIntoSuggestions(value, getTokenSuggestionMatches(value));
     activeTokenSuggestionIndex = matches.length ? 0 : -1;
     renderTokenSuggestions(matches);
     if (activeTokenSuggestionIndex >= 0) {
