@@ -1,0 +1,434 @@
+{
+  "app": {
+    "title": "XRPL Sell Impact Checker",
+    "eyebrow": "XRPL Sell Impact Checker",
+    "tagline": "Estimate sell impact in seconds.",
+    "description": "Estimate sell impact and receive amounts before you trade."
+  },
+  "header": {
+    "connect_wallet": "Connect Wallet",
+    "wallet_not_required": "Not required",
+    "tagline": "Estimate sell impact in seconds."
+  },
+  "inputs": {
+    "quickFillLabel": "Quick fill (optional)",
+    "quickFillPlaceholder": "Search presets or recent tokens"
+  },
+  "language": {
+    "label": "Language"
+  },
+  "presets": {
+    "sectionRecent": "Recent:",
+    "sectionResults": "Results",
+    "badgeRecent": "Recent",
+    "badgePopular": "Popular",
+    "badgeVerified": "Verified"
+  },
+  "nav": {
+    "home": "Home",
+    "back": "← Back",
+    "methods": "Methods",
+    "faq": "FAQ",
+    "disclaimer": "Disclaimer",
+    "credits": "Credits",
+    "donate": "Donate"
+  },
+  "footer": {
+    "brand": "XSIC by BadJoke-Lab",
+    "note": "XRPL Sell Impact Checker for transparent estimates."
+  },
+  "sections": {
+    "inputs": "Inputs",
+    "results_summary": "Result summary",
+    "execution_details": "Execution details",
+    "depth_curve": "Depth curve",
+    "impact_curve": "Impact curve",
+    "faq": "FAQ",
+    "disclaimer": "Disclaimer",
+    "sources": "Data sources",
+    "advanced_controls": "Advanced controls"
+  },
+  "modes": {
+    "simple": "Simple",
+    "advanced": "Advanced"
+  },
+  "fields": {
+    "currency": {
+      "label": "Currency (required)",
+      "placeholder": "USD (3 letters) or 40-hex"
+    },
+    "token_preset": {
+      "label": "Token preset (optional)",
+      "placeholder": "Search presets or recent tokens",
+      "helper": "Choose a preset to fill currency and issuer."
+    },
+    "issuer": {
+      "label": "Issuer (required for non-XRP IOU)",
+      "placeholder": "r........ (XRPL address)",
+      "helper": "Issuer is the token issuer address."
+    },
+    "amount": {
+      "label": "Amount (required)",
+      "placeholder": "e.g. 1000"
+    },
+    "orderbook_limit": {
+      "label": "Orderbook limit (optional)",
+      "placeholder": "50 / 100 / 200"
+    },
+    "impact_threshold": {
+      "label": "Impact threshold",
+      "helper": "Max sell under X% uses this threshold.",
+      "helper_dynamic": "Max sell under {threshold} uses this threshold.",
+      "option_1": "1%",
+      "option_2": "2%",
+      "option_5": "5%",
+      "option_10": "10%",
+      "option_20": "20%"
+    },
+    "thin_cutoff": {
+      "label": "Thin cutoff (%)",
+      "placeholder": "20",
+      "helper": "If CLOB share is below this, favor AMM."
+    },
+    "fiat_currency": {
+      "label": "Fiat currency",
+      "helper": "Fiat estimate comes later; XRP is shown now.",
+      "option_jpy": "JPY",
+      "option_usd": "USD"
+    }
+  },
+  "actions": {
+    "estimate": "Estimate impact",
+    "estimating": "Estimating…",
+    "try_example": "Try example",
+    "try_example_note": "We'll pick a live example with active offers when available.",
+    "copy_link": "Copy link",
+    "reset": "Reset"
+  },
+  "status": {
+    "ready": "Ready",
+    "waiting": "Waiting for input...",
+    "queuedAt": "Estimate queued at {time}. Connect data sources to compute.",
+    "validating": "Validating...",
+    "validation_failed": "Validation failed.",
+    "fetching_clob": "Fetching CLOB...",
+    "fetching_amm": "Fetching AMM...",
+    "simulating": "Simulating fills...",
+    "rendering": "Rendering...",
+    "done": "Done.",
+    "error": "Unable to fetch order book.",
+    "fetched_offers": "Fetched {count} offers from {endpointLabel}.",
+    "endpoint_switched": "Switched to {endpointLabel} endpoint.",
+    "endpoint_in_use": "Using {endpointLabel} endpoint ({cacheStatus}).",
+    "endpoint_stale": "Showing stale cache from {endpointLabel} (upstream unavailable).",
+    "cache_state": {
+      "live": "live",
+      "cached": "cached",
+      "stale": "stale cache"
+    },
+    "loaded_from_link": "Loaded from link.",
+    "example_selected": "Example: {label}",
+    "examples_unavailable": "Examples unavailable right now.",
+    "copy_success": "Link copied.",
+    "copy_failed": "Unable to copy link."
+  },
+  "results": {
+    "sellability": {
+      "label": "Sellability",
+      "full": "Full",
+      "none": "No liquidity",
+      "empty": "No liquidity (offers=0)",
+      "partial": "Partial",
+      "error": "Fetch failed ({code})",
+      "filled_line": "Filled {filled} / {requested} ({pct})"
+    },
+    "receive": {
+      "label": "You receive",
+      "value": "{amount} {currency}",
+      "with_fiat": "{amount} XRP (≈ {fiat})",
+      "fiat_pending": "Fiat: pending",
+      "fiat_loading": "Fetching...",
+      "fiat_unavailable": "Unavailable",
+      "fiat_warning": "Fiat pricing is unavailable right now. XRPL results are still accurate.",
+      "rate_line": "1 XRP = {rate} ({status} at {time})",
+      "rate_unavailable": "1 XRP = -- (Rate unavailable)",
+      "rate_status": {
+        "live": "live",
+        "cached": "cached",
+        "stale": "stale"
+      }
+    },
+    "freshness": {
+      "label": "Freshness",
+      "fetched_at": "XRPL data fetched at {time}",
+      "endpoint": "Endpoint: {endpointLabel} ({cacheStatus})"
+    },
+    "slippage": {
+      "label": "Slippage (est.)",
+      "help": "When the book is thin, larger sells worsen the rate and reduce proceeds."
+    },
+    "used_venue": {
+      "label": "Used venue"
+    },
+    "max_sell": {
+      "label": "Max sell under {threshold} (est.)",
+      "value_with_fiat": "{amount} {currency} (≈ {fiat})",
+      "value_with_xrp": "{amount} {currency} (≈ {xrp} XRP)",
+      "xrp_line": "Estimated receive: {amount} XRP",
+      "fiat_unavailable": "Fiat unavailable",
+      "not_available": "Not available (insufficient liquidity for full fill)"
+    },
+    "why_line": "This sell consumes top {count} offers.",
+    "why_line_amm": "This sell uses AMM pool pricing.",
+    "warnings": {
+      "partial": "Warning: Only {pct}% can be sold.",
+      "none": "Order book empty (offers=0).",
+      "high_slippage": "Caution: Estimated slippage exceeds 10%."
+    }
+  },
+  "details": {
+    "order_count": "Order count",
+    "best_price": "Best price",
+    "worst_price": "Worst price",
+    "liquidity_split": "Liquidity split ({threshold})",
+    "liquidity_split_value": "CLOB {clob} / AMM {amm}",
+    "liquidity_split_value_no_amm": "CLOB {clob} / AMM {amm} (AMM not found)",
+    "liquidity_split_not_applicable": "Not applicable",
+    "amm_reserves": "AMM pool reserves",
+    "amm_reserves_value": "{token} {currency} / {xrp} XRP",
+    "amm_fee": "AMM trading fee",
+    "used_venue": "Used venue",
+    "amm_not_found": "AMM not found",
+    "amm_not_applicable": "Not applicable",
+    "endpoint_tried": "Endpoint tried"
+  },
+  "graphs": {
+    "empty": {
+      "no_liquidity": "No liquidity"
+    },
+    "liquidity_end": "Liquidity ends here",
+    "legend": {
+      "your_amount": "Your amount",
+      "max_under": "Max under {threshold}"
+    },
+    "placeholder": "Graph area",
+    "impact": {
+      "helper": "Receive curve shows how proceeds change as sell size grows.",
+      "aria_label": "Sell amount versus receive in fiat curve",
+      "axis_sell": "Sell amount",
+      "axis_receive": "Receive",
+      "axis_receive_fiat": "Receive ({fiat})",
+      "axis_receive_xrp": "Receive (XRP)",
+      "note_no_liquidity": "No liquidity available for this pair.",
+      "note_insufficient": "Insufficient liquidity: curve ends at available depth.",
+      "note_insufficient_fiat_unavailable": "Liquidity ends early and fiat is unavailable; chart is in XRP.",
+      "note_fiat_unavailable": "Fiat rate unavailable; chart is scaled in XRP.",
+      "summary_empty": "Run an estimate to see the receive curve.",
+      "summary": "Selling {sell} {currency} yields about {receive}.",
+      "summary_partial": "Only {filled} of {requested} {currency} fills, yielding about {receive}.",
+      "receive_xrp": "{amount} XRP"
+    },
+    "depth": {
+      "helper": "Depth shows cumulative liquidity and which offers your sell consumes.",
+      "aria_label": "Order book depth and consumed liquidity",
+      "axis_sell": "Cumulative sell",
+      "axis_receive": "Cumulative receive (XRP)",
+      "note_no_liquidity": "No liquidity available for this pair.",
+      "note_exhausted": "Order book exhausted before the full sell amount.",
+      "note_exhausted_fiat_unavailable": "Liquidity ends early; fiat is unavailable, depth remains in XRP.",
+      "note_fiat_unavailable": "Fiat rate unavailable; depth remains in XRP.",
+      "summary_empty": "Run an estimate to see order book depth.",
+      "summary": "Depth covers {total} {currency} (≈ {receive} total). Current sell uses {filled} {currency}.",
+      "summary_partial": "Only {filled} of {requested} {currency} fills (≈ {receive}).",
+      "receive_xrp": "{amount} XRP"
+    }
+  },
+  "faq": {
+    "q1": "How is the estimate calculated?",
+    "a1": "This is a placeholder for the pricing model.",
+    "q2": "Can I use advanced controls?",
+    "a2": "Toggle Advanced to reveal deeper settings."
+  },
+  "disclaimer": {
+    "text": "This tool provides estimates only and does not constitute financial advice."
+  },
+  "sources": {
+    "xrpl": "XRPL DEX order books",
+    "trades": "On-ledger trade history",
+    "feeds": "External price feeds (optional)"
+  },
+  "pages": {
+    "methods": {
+      "title": "Methods",
+      "lede": "How XSIC estimates sell impact using XRPL order books and AMM pools.",
+      "lede_long": "XSIC estimates sell impact by simulating fills against XRPL order books (CLOB) and AMM pools, then choosing the best venue for the requested trade size.",
+      "what_title": "What this tool does",
+      "what_body": "XSIC estimates how selling an IOU token into XRP may impact price and liquidity on XRPL.",
+      "data_title": "Data sources",
+      "data_item_clob": "CLOB (order book offers) via XRPL JSON-RPC.",
+      "data_item_amm": "AMM pool info via XRPL JSON-RPC.",
+      "inputs_title": "Data inputs",
+      "inputs_item_1": "CLOB order books via XRPL book_offers.",
+      "inputs_item_2": "AMM pool reserves and trading fee via XRPL amm_info.",
+      "inputs_item_3": "Optional fiat rates (XRP → fiat) from CoinGecko.",
+      "flow_title": "Computation flow",
+      "flow_item_1": "Validate token (currency + issuer) and requested sell amount.",
+      "flow_item_2": "Fetch order book offers up to the limit you select.",
+      "flow_item_3": "Simulate fills against the book, computing average price and slippage.",
+      "flow_item_4": "Fetch AMM reserves and estimate the AMM swap output for the same amount.",
+      "flow_item_5": "Pick the venue that yields the higher receive amount (CLOB or AMM).",
+      "limits_title": "Important limits",
+      "limits_item_1": "Order book depth is capped by the Orderbook limit; large trades can be under-estimated if liquidity exists deeper than the limit.",
+      "limits_item_2": "AMM estimates assume current pool reserves and do not include future swaps or governance actions.",
+      "limits_item_3": "Fiat values are informational and depend on the external rate feed availability.",
+      "results_title": "How to read results",
+      "results_item_1": "Sellability indicates whether the requested amount can fill.",
+      "results_item_2": "Slippage estimates how much the average price worsens as size grows.",
+      "results_item_3": "Max sell under X% shows the largest size that stays below a chosen impact threshold.",
+      "notes_title": "Key notes",
+      "notes_item_1": "XRP is the settlement asset. Enter an IOU token (currency + issuer).",
+      "notes_item_2": "Results are estimates. Network conditions and on-ledger changes can differ.",
+      "notes_item_3": "Limits and pagination may cap how much depth we can read per request."
+    },
+    "faq": {
+      "title": "FAQ",
+      "lede": "Quick answers to common questions about XSIC.",
+      "q1_title": "Why can’t I enter XRP alone?",
+      "q1_body": "XRPL XRP is the quote asset for most order books. XSIC estimates sell impact for IOUs against XRP, so it requires both a currency code and issuer. For XRP/XRP there is no order book to simulate.",
+      "q2_title": "How fresh is the data?",
+      "q2_body": "XSIC calls public XRPL endpoints in real time and records the fetch time shown in the results. If live data is unavailable, cached values may be shown with a warning.",
+      "q3_title": "Why is my max sell lower than I expected?",
+      "q3_body": "The max sell values are based on available order book depth or AMM reserves within the chosen impact threshold. Thin books or high slippage limits reduce the estimate.",
+      "q4_title": "Why do CLOB and AMM results differ?",
+      "q4_body": "CLOB results are based on visible offers, while AMM results depend on pool reserves and fees. XSIC compares both and uses the better outcome for your requested amount.",
+      "q5_title": "Is fiat pricing guaranteed?",
+      "q5_body": "No. Fiat amounts are optional and sourced from external feeds. If the feed is down, XSIC will still show XRP values and note that fiat is unavailable."
+    },
+    "faq_short": {
+      "title": "FAQ",
+      "q1_title": "Why can't I set currency = XRP?",
+      "q1_body": "XRP is the settlement asset. This tool estimates selling an IOU token into XRP, so you must provide an IOU (currency + issuer).",
+      "q2_title": "Is this financial advice?",
+      "q2_body": "No. This is an informational tool and provides estimates only.",
+      "q3_title": "Why can results differ from a DEX?",
+      "q3_body": "Ledger state changes constantly. Offers and AMM liquidity can change between reads and execution."
+    },
+    "disclaimer": {
+      "title": "Disclaimer",
+      "lede": "XSIC provides informational estimates only. It is not investment, legal, or tax advice.",
+      "advice_title": "Not investment advice",
+      "advice_body": "XSIC is a research tool that estimates potential sell impact. You are responsible for your own trading decisions and should verify data independently.",
+      "limits_title": "Accuracy limits",
+      "limits_item_1": "Estimates depend on public XRPL data that can change rapidly.",
+      "limits_item_2": "Results are limited by order book depth and AMM reserve snapshots.",
+      "limits_item_3": "Fiat conversions are optional and may be delayed or unavailable.",
+      "warranty_title": "No warranties",
+      "warranty_body": "XSIC is provided as is without warranties of any kind. BadJoke-Lab and XSIC maintainers are not liable for losses or damages arising from the use of this tool.",
+      "body_1": "This tool is provided for informational purposes only and does not constitute financial or investment advice.",
+      "body_2": "All outputs are estimates based on public ledger data at the time of request. Accuracy is not guaranteed.",
+      "body_3": "Use at your own risk."
+    },
+    "credits": {
+      "title": "Credits",
+      "lede": "Thanks to the open infrastructure that keeps XSIC running.",
+      "data_title": "Data sources",
+      "data_item_1": "XRPL public rippled endpoints (s1.ripple.com, s2.ripple.com).",
+      "data_item_2": "XRPL methods: book_offers and amm_info.",
+      "data_item_3": "XRP fiat pricing via CoinGecko.",
+      "infra_title": "Infrastructure",
+      "infra_item_1": "Cloudflare Pages + Functions for hosting and API proxying.",
+      "infra_item_2": "XRPL open protocols and documentation.",
+      "libraries_title": "Libraries",
+      "libraries_item_1": "Vanilla JavaScript + Web APIs.",
+      "libraries_item_2": "Inter font family and system UI fonts.",
+      "project_title": "Project",
+      "project_body": "XSIC (BadJoke-Lab)."
+    },
+    "donate": {
+      "title": "Donate",
+      "lede": "XSIC is free to use. If this tool helps you, consider supporting the ongoing hosting and maintenance costs.",
+      "lede_short": "If this tool helps, you can support development via XRPL address:",
+      "address_title": "XRP donation address",
+      "address_note": "Please double-check the address before sending. There is no destination tag required for this address.",
+      "copy_button": "Copy address",
+      "copy_success": "Address copied.",
+      "copy_failed": "Copy failed. Please copy manually.",
+      "address_unavailable": "Address unavailable."
+    }
+  },
+  "common": {
+    "estimate": "Estimate",
+    "loading": "Loading",
+    "done": "Done",
+    "placeholder": "--",
+    "not_available": "N/A"
+  },
+  "errors": {
+    "amount_required": "Enter a sell amount greater than zero.",
+    "currency_required": "Enter a currency code.",
+    "currency_invalid": "Currency must be 3 characters or 40 hex.",
+    "currency_invalid_length": "Currency must be 3 characters, 4–20 ASCII, or 40 hex.",
+    "currency_non_ascii": "Currency must use ASCII printable characters only.",
+    "currency_hex_invalid": "Currency must be 40 hex characters (0-9, A-F).",
+    "issuer_required": "Issuer is required for non-XRP tokens.",
+    "issuer_invalid": "Issuer must look like a valid XRPL address.",
+    "limit_invalid": "Limit must be a positive number.",
+    "fetch_failed": {
+      "title": "Order book request failed.",
+      "hint": "Retry the estimate or try again in a moment."
+    },
+    "fetch_timeout": {
+      "title": "Order book request timed out.",
+      "hint": "Retry the estimate or reduce the request size."
+    },
+    "network_unreachable": {
+      "title": "Network cannot reach XRPL nodes.",
+      "hint": "Check your connection or try again later."
+    },
+    "missing_params": {
+      "title": "Missing required inputs.",
+      "hint": "Enter both currency and issuer, then retry."
+    },
+    "xrp_not_supported": {
+      "title": "XRP is the settlement asset.",
+      "hint": "Enter an IOU token (currency + issuer) to estimate selling into XRP."
+    },
+    "issueMalformed": {
+      "title": "XRPL rejected this currency or issuer.",
+      "hint": "Double-check the currency code and issuer address."
+    },
+    "no_liquidity": {
+      "title": "No liquidity available for this pair.",
+      "hint": "Try a different issuer or a smaller amount."
+    },
+    "upstream_fail": {
+      "title": "Upstream service failed to respond.",
+      "hint": "Retry in a moment or switch endpoints."
+    },
+    "default": {
+      "title": "Something went wrong.",
+      "hint": "Retry the estimate or check your inputs."
+    },
+    "i18n_failed": "Translations failed to load. Please refresh the page."
+  },
+  "notes": {
+    "limit_autofix": "Limit reset to the default of {limit}."
+  },
+  "endpoints": {
+    "api": {
+      "label": "Same-origin API"
+    },
+    "xrplcluster": {
+      "label": "XRPL Cluster"
+    },
+    "xrplws": {
+      "label": "XRPL WS"
+    },
+    "s1": {
+      "label": "Ripple S1"
+    },
+    "s2": {
+      "label": "Ripple S2"
+    }
+  }
+}

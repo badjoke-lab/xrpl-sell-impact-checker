@@ -6,7 +6,7 @@
   line-height: 1.5;
   font-weight: 400;
   color: #0f172a;
-  background-color: #f8fafc;
+  background-color: #ffffff;
   --color-primary: #6f63c2;
   --color-primary-strong: #5e53b5;
   --color-primary-soft: rgba(111, 99, 194, 0.14);
@@ -22,7 +22,7 @@
 body {
   margin: 0;
   min-width: 360px;
-  background: #f1f5f9;
+  background: #ffffff;
 }
 
 .app {
@@ -328,7 +328,7 @@ h2 {
 }
 
 .recent-chip:hover {
-  background: #f1f5f9;
+  background: #ffffff;
 }
 
 .recent-chip:focus-visible {
@@ -380,7 +380,7 @@ h2 {
 .quick-fill__button {
   border: 1px solid #e2e8f0;
   border-radius: 999px;
-  background: #f8fafc;
+  background: #ffffff;
   padding: 4px 10px;
   display: inline-flex;
   align-items: center;
@@ -423,7 +423,7 @@ h2 {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 12px;
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 .advanced summary {
@@ -534,7 +534,7 @@ h2 {
 .ghost-button:disabled {
   cursor: not-allowed;
   color: #94a3b8;
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 button:focus-visible {
@@ -622,7 +622,7 @@ a:hover {
   padding: 16px;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 .address-card code {
@@ -754,7 +754,7 @@ a:hover {
 
 .chart {
   border-radius: 12px;
-  background: #f8fafc;
+  background: #ffffff;
   border: 1px solid #e2e8f0;
   padding: 8px;
   min-height: 200px;
@@ -944,7 +944,7 @@ a:hover {
 }
 
 .debug-panel__pre {
-  background: #f8fafc;
+  background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 8px;
@@ -957,7 +957,7 @@ a:hover {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 8px;
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 .debug-panel__details summary {
@@ -1043,3 +1043,72 @@ a:hover {
 .donate-status { margin-top: 10px; min-height: 1.2em; }
 .donate-status.ok { opacity: 0.9; }
 .donate-status.ng { opacity: 0.9; }
+
+/* =========================================================
+   XSIC VISIBILITY HOTFIX (force readable buttons/progress)
+   - If CSS vars are missing/overridden, buttons became white-on-white.
+   - This block forces safe fallbacks + explicit text colors.
+   ========================================================= */
+
+:root{
+  --xsic-primary: var(--color-primary, #6f63c2);
+  --xsic-primary-strong: var(--color-primary-strong, #5e53b5);
+  --xsic-primary-muted: var(--color-primary-muted, rgba(111, 99, 194, 0.20));
+  --xsic-focus: var(--color-focus-ring, rgba(111, 99, 194, 0.35));
+  --xsic-ink: #0f172a;
+  --xsic-surface: #ffffff;
+  --xsic-line: #cbd5f5;
+  --xsic-track: #e2e8f0;
+}
+
+/* Primary action MUST be visible */
+.primary-button{
+  background: var(--xsic-primary) !important;
+  color: #ffffff !important;
+}
+.primary-button:active:not(:disabled){
+  background: var(--xsic-primary-strong) !important;
+}
+.primary-button:disabled{
+  background: var(--xsic-primary-muted) !important;
+  color: #ffffff !important;
+  opacity: 0.75;
+}
+
+/* Secondary / ghost MUST NOT inherit white text */
+.secondary-button,
+.ghost-button{
+  background: var(--xsic-surface) !important;
+  color: var(--xsic-ink) !important;
+  border-color: var(--xsic-line) !important;
+}
+
+/* Language switch MUST be readable + active state colored */
+.lang-switch__button{
+  background: var(--xsic-surface) !important;
+  color: var(--xsic-ink) !important;
+  border-color: var(--xsic-line) !important;
+}
+.lang-switch__button--active{
+  background: var(--xsic-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--xsic-primary) !important;
+}
+
+/* Progress MUST be visible */
+.progress-bar{
+  background: var(--xsic-track) !important;
+}
+.progress-bar__fill{
+  background: var(--xsic-primary) !important;
+}
+
+/* Focus ring visible */
+button:focus-visible{
+  outline: 2px solid var(--xsic-focus) !important;
+  outline-offset: 2px;
+}
+
+
+/* XSIC BACKGROUND FORCE WHITE */
+html, body { background: #ffffff !important; }
