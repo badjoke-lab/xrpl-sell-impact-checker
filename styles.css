@@ -1378,3 +1378,40 @@ html, body { background: #ffffff !important; }
 .mobile-details[open] .mobile-details__summary {
   margin-bottom: 10px;
 }
+
+
+/* === P0-2 COLLAPSIBLE CHARTS PATCH (2026-02-03) === */
+.mobile-collapse {
+  margin-top: 12px;
+}
+.mobile-collapse > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,0.12);
+  font-weight: 700;
+}
+.mobile-collapse > summary::-webkit-details-marker {
+  display: none;
+}
+.mobile-collapse > summary::after {
+  content: "▾";
+  opacity: 0.7;
+}
+.mobile-collapse[open] > summary::after {
+  content: "▴";
+}
+.mobile-collapse > summary + * {
+  margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .mobile-collapse > summary {
+    padding: 12px 14px;
+  }
+}
