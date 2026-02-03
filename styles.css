@@ -1415,3 +1415,32 @@ html, body { background: #ffffff !important; }
     padding: 12px 14px;
   }
 }
+
+
+/* === XRPLMETA_SUGGEST_UI_PATCH_20260204 === */
+.suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 1px);
+  z-index: 70;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.98);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.10);
+}
+.suggestions__item {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 600;
+}
+.suggestions__item:hover {
+  background: rgba(0,0,0,0.04);
+}
+/* === /XRPLMETA_SUGGEST_UI_PATCH_20260204 === */
