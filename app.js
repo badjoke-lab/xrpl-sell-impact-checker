@@ -1,3 +1,122 @@
+
+  /* === XRPLMETA_SUGGEST_PATCH_20260204 ===
+   * Remote token suggestions via XRPL Meta /tokens
+   * Fills currency + issuer on select
+   * Keeps local presets as fallback
+   */
+  const XRPLMETA_BASE = "https://s1.xrplmeta.org";
+  const XRPLMETA_LIMIT = 30;
+  const XRPLMETA_TTL_MS = 5 * 60 * 1000;
+  const _xrplmetaCache = new Map(); // q -> { t, items }
+
+  function pick(obj, paths){
+    for(const path of paths){
+      let cur = obj;
+      let ok = true;
+      for(const k of path){
+        if(cur && typeof cur === "object" && k in cur){ cur = cur[k]; }
+        else { ok = false; break; }
+      }
+      if(ok && cur != null) return cur;
+    }
+    return null;
+  }
+
+  function normalizeTokenRow(row){
+    const currency = pick(row, [["currency"], ["token","currency"]]);
+    const issuer   = pick(row, [["issuer"], ["token","issuer"]]);
+    const name     = pick(row, [["name"], ["meta","name"], ["token","name"]]);
+    if(!currency || !issuer) return null;
+    const label = name ? `${name} (${currency})` : String(currency);
+    return { currency: String(currency), issuer: String(issuer), name: name ? String(name) : "", label };
+  }
+
+  async function xrplmetaSearchTokens(q){
+    const query = (q || "").trim();
+    if(query.length < 2) return [];
+    const key = query.toLowerCase();
+    const now = Date.now();
+    const hit = _xrplmetaCache.get(key);
+    if(hit && (now - hit.t) < XRPLMETA_TTL_MS) return hit.items;
+
+    const url = `${XRPLMETA_BASE}/tokens?name_like=${encodeURIComponent(query)}&limit=${XRPLMETA_LIMIT}&offset=0&sort_by=trustlines`;
+    let js;
+    try{
+      const res = await fetch(url, { mode: "cors" });
+      if(!res.ok) return [];
+      js = await res.json();
+    }catch(_e){
+      return [];
+    }
+    const arr = (js && js.tokens && Array.isArray(js.tokens)) ? js.tokens : [];
+    const items = [];
+    for(const row of arr){
+      const it = normalizeTokenRow(row);
+      if(it) items.push(it);
+    }
+    _xrplmetaCache.set(key, { t: now, items });
+    return items;
+  }
+
+  function attachRemoteSuggest(opts){
+    // opts: { inputEl, listEl, onPick(item) }
+    const { inputEl, listEl, onPick } = opts;
+    if(!inputEl || !listEl) return;
+
+    let timer = null;
+    let lastQ = "";
+    let active = [];
+
+    function clear(){
+      listEl.innerHTML = "";
+      active = [];
+      listEl.hidden = true;
+    }
+
+    function render(items){
+      listEl.innerHTML = "";
+      active = items.slice(0, XRPLMETA_LIMIT);
+      for(const it of active){
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "suggestions__item";
+        b.textContent = it.label;
+        b.addEventListener("click", () => {
+          clear();
+          onPick && onPick(it);
+        });
+        listEl.appendChild(b);
+      }
+      listEl.hidden = active.length === 0;
+    }
+
+    async function run(q){
+      const items = await xrplmetaSearchTokens(q);
+      // 入力が進んでるのに古い結果を出さない
+      if(inputEl.value.trim() !== q.trim()) return;
+      render(items);
+    }
+
+    inputEl.addEventListener("input", () => {
+      const q = inputEl.value.trim();
+      lastQ = q;
+      if(timer) clearTimeout(timer);
+      if(q.length < 2){ clear(); return; }
+      timer = setTimeout(() => run(q), 160);
+    });
+
+    // escape/blur
+    inputEl.addEventListener("keydown", (e) => {
+      if(e.key === "Escape") clear();
+    });
+    document.addEventListener("click", (e) => {
+      if(e.target === inputEl) return;
+      if(listEl.contains(e.target)) return;
+      clear();
+    });
+  }
+  /* === /XRPLMETA_SUGGEST_PATCH_20260204 === */
+
 import {
   applyTranslations,
   bindLanguageSwitcher,
@@ -4431,3 +4550,32 @@ estimateButton?.addEventListener("click", async () => {
     setEstimateButtonBusy(false);
   }
 });
+
+
+  // XRPLMETA remote suggest hook (currency input)
+  try{
+    const cur = document.getElementById("currency");
+    const iss = document.getElementById("issuer");
+    // suggestions list element: 既存の候補箱を優先。なければ作る
+    let box = document.querySelector(".suggestions");
+    if(!box && cur){
+      box = document.createElement("div");
+      box.className = "suggestions";
+      box.hidden = true;
+      cur.parentNode && cur.parentNode.appendChild(box);
+    }
+    if(cur && iss && box){
+      attachRemoteSuggest({
+        inputEl: cur,
+        listEl: box,
+        onPick: (it) => {
+          cur.value = it.currency;
+          iss.value = it.issuer;
+          // issuer 変更イベントが必要なら発火
+          try{ iss.dispatchEvent(new Event("input", { bubbles:true })); }catch(_e){}
+          try{ cur.dispatchEvent(new Event("input", { bubbles:true })); }catch(_e){}
+        }
+      });
+    }
+  }catch(_e){}
+
