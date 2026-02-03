@@ -213,6 +213,15 @@ const initI18n = async () => {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+// P0-2: collapse charts on mobile
+  try {
+    if (window.matchMedia && window.matchMedia("(max-width: 720px)").matches) {
+      document.querySelectorAll('details[data-mobile-details="1"]').forEach((d) => {
+        d.removeAttribute("open");
+      });
+    }
+  } catch (e) {}
+
   void initI18n().finally(() => {
     resetResults();
   });

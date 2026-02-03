@@ -85,7 +85,11 @@
       </header>
 
       <main class="app__main">
-        <section class="card" aria-labelledby="inputs-heading">
+        <div id="mobile-jump" class="mobile-jump" aria-label="Jump">
+          <a class="mobile-jump__btn" href="#inputs-section">Inputs</a>
+          <a class="mobile-jump__btn" href="#results-section">Results</a>
+        </div>
+        <section class="card" id="results-section" aria-labelledby="inputs-heading">
           <div class="card__header">
             <h2 id="inputs-heading" data-i18n="sections.inputs"></h2>
             <div class="pill-group">
@@ -389,7 +393,9 @@
               <h2 id="graph-depth" data-i18n="sections.depth_curve"></h2>
             </div>
             <p class="chart__help" data-i18n="graphs.depth.helper"></p>
-            <div class="chart" data-chart="depth">
+            <details class="mobile-details" data-mobile-details="1" open>
+  <summary class="mobile-details__summary">Depth chart</summary>
+<div class="chart" data-chart="depth">
               <svg
                 id="depth-chart"
                 class="chart__svg"
@@ -399,6 +405,7 @@
                 role="img"
               ></svg>
             </div>
+</details>
             <p class="chart__note" data-result="depth-note" hidden></p>
             <p class="chart__summary" data-result="depth-summary"></p>
           </article>
@@ -408,7 +415,9 @@
               <h2 id="graph-impact" data-i18n="sections.impact_curve"></h2>
             </div>
             <p class="chart__help" data-i18n="graphs.impact.helper"></p>
-            <div class="chart" data-chart="impact">
+            <details class="mobile-details" data-mobile-details="1" open>
+  <summary class="mobile-details__summary">Impact chart</summary>
+<div class="chart" data-chart="impact">
               <svg
                 id="impact-chart"
                 class="chart__svg"
@@ -418,6 +427,7 @@
                 role="img"
               ></svg>
             </div>
+</details>
             <p class="chart__note" data-result="impact-note" hidden></p>
             <p class="chart__summary" data-result="impact-summary"></p>
           </article>

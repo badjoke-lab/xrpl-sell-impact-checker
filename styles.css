@@ -1259,3 +1259,122 @@ html, body { background: #ffffff !important; }
 /* --- PATCH: prevent grid row stretch from creating suggestion gap --- */
 .field--suggestions { align-self: start; }
 /* --- /PATCH --- */
+
+
+/* === P0 MOBILE PATCH (2026-02-03) === */
+@media (max-width: 720px) {
+  /* 2-column -> 1-column */
+  .grid.two-column {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* buttons: full width, stacked */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .actions button {
+    width: 100%;
+  }
+
+  /* header/nav wrap */
+  .app__header-top {
+    align-items: flex-start;
+  }
+  .site-nav {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .site-nav a {
+    display: inline-block;
+  }
+
+  /* fixed jump (Inputs/Results) */
+  .mobile-jump {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    margin-bottom: 10px;
+    background: inherit;
+  }
+  .mobile-jump__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.12);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  /* reduce card padding a bit (optional, safe) */
+  .card {
+    padding: 14px;
+  }
+}
+
+
+/* === P0-2 RESULTS DENSITY PATCH (2026-02-03) === */
+/* Results: force label/value into dense rows on mobile */
+@media (max-width: 720px) {
+  /* Typical row containers used in this repo: keep it broad but safe */
+  #results-section .row,
+  #results-section .result-row,
+  #results-section li,
+  #results-section .kv,
+  #results-section .result-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  #results-section .label {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  #results-section .value {
+    flex: 0 0 auto;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* tighten spacing inside results */
+  #results-section ul,
+  #results-section ol {
+    padding-left: 0;
+    margin: 0;
+    list-style: none;
+  }
+  #results-section li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  #results-section li:last-child {
+    border-bottom: 0;
+  }
+}
+
+
+/* === P0-2 MOBILE DETAILS PATCH (2026-02-03) === */
+.mobile-details {
+  margin: 10px 0;
+}
+.mobile-details__summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+.mobile-details[open] .mobile-details__summary {
+  margin-bottom: 10px;
+}
