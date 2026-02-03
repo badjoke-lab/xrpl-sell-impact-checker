@@ -4431,3 +4431,208 @@ estimateButton?.addEventListener("click", async () => {
     setEstimateButtonBusy(false);
   }
 });
+
+
+/* === XSIC XRPLMETA TOKEN SUGGEST (AUTO) === */
+(function(){
+  try{
+    if (window.__XSIC_XRPLMETA_SUGGEST_INSTALLED__) return;
+    window.__XSIC_XRPLMETA_SUGGEST_INSTALLED__ = true;
+
+    const API_BASE = "https://s1.xrplmeta.org/tokens"; // Docs: GET /tokens (name_like, limit, offset, sort_by)  :contentReference[oaicite:1]{index=1}
+
+    function qs(sel){ return document.querySelector(sel); }
+    function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
+
+    function findInputByHints(hints){
+      // 1) id/name にヒント文字列が入るもの優先
+      const inputs = qsa("input, textarea");
+      for (const h of hints){
+        const hit = inputs.find(el =>
+          (el.id && el.id.toLowerCase().includes(h)) ||
+          (el.name && el.name.toLowerCase().includes(h)) ||
+          (el.getAttribute("placeholder") || "").toLowerCase().includes(h)
+        );
+        if (hit) return hit;
+      }
+      return null;
+    }
+
+    const currencyEl =
+      qs('input[name="currency"]') ||
+      qs('input#currency') ||
+      findInputByHints(["currency","token","symbol","code"]);
+    const issuerEl =
+      qs('input[name="issuer"]') ||
+      qs('input#issuer') ||
+      findInputByHints(["issuer","address"]);
+
+    if (!currencyEl || !issuerEl){
+      console.warn("[xsic] suggest: inputs not found", {currencyEl, issuerEl});
+      return;
+    }
+
+    // --- dropdown UI ---
+    const menu = document.createElement("div");
+    menu.id = "xsic-token-suggest-menu";
+    menu.className = "xsic-suggest-menu";
+    menu.style.display = "none";
+    document.body.appendChild(menu);
+
+    const state = {
+      timer: null,
+      abort: null,
+      lastQ: "",
+      open: false,
+    };
+
+    function esc(s){
+      return (s||"").toString()
+        .replaceAll("&","&amp;").replaceAll("<","&lt;")
+        .replaceAll(">","&gt;").replaceAll('"',"&quot;")
+        .replaceAll("'","&#39;");
+    }
+
+    function shortIssuer(addr){
+      if (!addr) return "";
+      const a = addr.toString();
+      if (a.length <= 16) return a;
+      return a.slice(0,6) + "…" + a.slice(-6);
+    }
+
+    function positionMenu(){
+      const r = currencyEl.getBoundingClientRect();
+      menu.style.position = "fixed";
+      menu.style.left = Math.round(r.left) + "px";
+      menu.style.top  = Math.round(r.bottom + 6) + "px";
+      menu.style.width = Math.round(r.width) + "px";
+      menu.style.maxHeight = "52vh";
+      menu.style.overflow = "auto";
+      menu.style.zIndex = "9999";
+    }
+
+    function closeMenu(){
+      menu.style.display = "none";
+      menu.innerHTML = "";
+      state.open = false;
+    }
+
+    function openMenu(){
+      positionMenu();
+      menu.style.display = "block";
+      state.open = true;
+    }
+
+    function emitInput(el){
+      try{ el.dispatchEvent(new Event("input", {bubbles:true})); }catch(_){}
+      try{ el.dispatchEvent(new Event("change", {bubbles:true})); }catch(_){}
+    }
+
+    async function fetchSuggest(q){
+      if (state.abort) state.abort.abort();
+      state.abort = new AbortController();
+
+      // name_like で検索 / sort_by=trustlines がデフォルト（docs）:contentReference[oaicite:2]{index=2}
+      const url = new URL(API_BASE);
+      url.searchParams.set("name_like", q);
+      url.searchParams.set("limit", "30");
+      url.searchParams.set("sort_by", "trustlines");
+
+      const res = await fetch(url.toString(), {
+        signal: state.abort.signal,
+        headers: { "accept": "application/json" },
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("suggest_fetch_failed:" + res.status);
+      const j = await res.json();
+      // docs: {tokens:[], count:int} :contentReference[oaicite:3]{index=3}
+      const tokens = Array.isArray(j.tokens) ? j.tokens : [];
+      return tokens;
+    }
+
+    function render(tokens){
+      if (!state.open) openMenu();
+      menu.innerHTML = "";
+
+      if (!tokens.length){
+        menu.innerHTML = '<div class="xsic-suggest-empty">No matches</div>';
+        return;
+      }
+
+      const frag = document.createDocumentFragment();
+      for (const t of tokens){
+        const currency = t.currency || t.code || t.symbol || "";
+        const issuer   = t.issuer || t.issuer_address || t.issuerAddress || "";
+        // 可能な限り名前を拾う（meta.name 等）
+        const name = (t.meta && (t.meta.name || t.meta.token || t.meta.symbol)) || t.name || currency;
+
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "xsic-suggest-item";
+        row.innerHTML = `
+          <div class="xsic-suggest-title">${esc(name)}</div>
+          <div class="xsic-suggest-sub">${esc(currency)} · ${esc(shortIssuer(issuer))}</div>
+        `;
+        row.addEventListener("click", () => {
+          currencyEl.value = currency;
+          issuerEl.value = issuer;
+          emitInput(currencyEl);
+          emitInput(issuerEl);
+          closeMenu();
+          currencyEl.focus();
+        });
+        frag.appendChild(row);
+      }
+      menu.appendChild(frag);
+    }
+
+    function schedule(q){
+      clearTimeout(state.timer);
+      state.timer = setTimeout(async () => {
+        try{
+          const tokens = await fetchSuggest(q);
+          render(tokens);
+        }catch(e){
+          // abort は黙る
+          if (String(e).includes("AbortError")) return;
+          menu.innerHTML = '<div class="xsic-suggest-empty">Suggest failed</div>';
+          openMenu();
+          console.warn("[xsic] suggest failed", e);
+        }
+      }, 180);
+    }
+
+    currencyEl.addEventListener("input", () => {
+      const q = (currencyEl.value || "").trim();
+      state.lastQ = q;
+      if (q.length < 2){
+        closeMenu();
+        return;
+      }
+      schedule(q);
+    });
+
+    currencyEl.addEventListener("focus", () => {
+      const q = (currencyEl.value || "").trim();
+      if (q.length >= 2) schedule(q);
+    });
+
+    window.addEventListener("resize", () => { if (state.open) positionMenu(); });
+    window.addEventListener("scroll",  () => { if (state.open) positionMenu(); }, true);
+
+    document.addEventListener("click", (ev) => {
+      if (!state.open) return;
+      const t = ev.target;
+      if (t === currencyEl) return;
+      if (menu.contains(t)) return;
+      closeMenu();
+    });
+
+    // 初期状態で issuer が空なら、currency 入力に寄せるUX
+    // （既存挙動は壊さない。ここは無理に触らない）
+    console.log("[xsic] xrplmeta suggest installed");
+  }catch(e){
+    console.warn("[xsic] xrplmeta suggest install error", e);
+  }
+})();
+
