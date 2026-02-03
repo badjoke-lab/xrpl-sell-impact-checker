@@ -1,6 +1,15 @@
-/methods        /methods.html       301
-/faq            /faq.html           301
-/disclaimer     /disclaimer.html    301
-/credits        /credits.html       301
-/donate         /donate.html        301
-/donate/        /donate.html        301
+# Canonicalize legacy .html routes → folder routes
+/index.html / 301
+/credits.html /credits/ 301
+/faq.html /faq/ 301
+/methods.html /methods/ 301
+/donate.html /donate/ 301
+/disclaimer.html /disclaimer/ 301
+/:splat.html /:splat/ 301
+
+# Ensure trailing slash for folder routes
+/credits /credits/ 301
+/faq /faq/ 301
+/methods /methods/ 301
+/donate /donate/ 301
+/disclaimer /disclaimer/ 301
