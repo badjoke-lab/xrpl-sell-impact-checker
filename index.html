@@ -86,10 +86,16 @@
 
       <main class="app__main">
         <div id="mobile-jump" class="mobile-jump" aria-label="Jump">
-          <a class="mobile-jump__btn" href="#inputs-section">Inputs</a>
-          <a class="mobile-jump__btn" href="#results-section">Results</a>
+          <a class="mobile-jump__btn" href="#inputs-section" data-i18n="mobile.jump_inputs"></a>
+          <a class="mobile-jump__btn" href="#results-section" data-i18n="mobile.jump_results"></a>
         </div>
-        <section class="card" id="results-section" aria-labelledby="inputs-heading">
+        
+<details class="mobile-collapse">
+  <summary data-i18n="mobile.charts_depth"></summary>
+
+<details class="mobile-collapse">
+  <summary data-i18n="mobile.charts_impact"></summary>
+<section class="card" id="results-section" aria-labelledby="inputs-heading">
           <div class="card__header">
             <h2 id="inputs-heading" data-i18n="sections.inputs"></h2>
             <div class="pill-group">
@@ -432,6 +438,10 @@
             <p class="chart__summary" data-result="impact-summary"></p>
           </article>
         </section>
+</details>
+
+</details>
+
 
         <section class="card" aria-labelledby="faq-heading">
           <div class="card__header">
