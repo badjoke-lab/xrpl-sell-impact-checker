@@ -1259,3 +1259,62 @@ html, body { background: #ffffff !important; }
 /* --- PATCH: prevent grid row stretch from creating suggestion gap --- */
 .field--suggestions { align-self: start; }
 /* --- /PATCH --- */
+
+
+/* === P0 MOBILE PATCH (2026-02-03) === */
+@media (max-width: 720px) {
+  /* 2-column -> 1-column */
+  .grid.two-column {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* buttons: full width, stacked */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .actions button {
+    width: 100%;
+  }
+
+  /* header/nav wrap */
+  .app__header-top {
+    align-items: flex-start;
+  }
+  .site-nav {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .site-nav a {
+    display: inline-block;
+  }
+
+  /* fixed jump (Inputs/Results) */
+  .mobile-jump {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    margin-bottom: 10px;
+    background: inherit;
+  }
+  .mobile-jump__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.12);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  /* reduce card padding a bit (optional, safe) */
+  .card {
+    padding: 14px;
+  }
+}
