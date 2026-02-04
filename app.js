@@ -847,6 +847,9 @@ const renderTokenSuggestions = (matches) => {
 
     // 2行目：バッジ（Recent/Popular/Verified）
     const badges = (typeof getSuggestionBadges === "function") ? getSuggestionBadges(token) : [];
+    if (token && typeof token.trustlines === "number" && Number.isFinite(token.trustlines)) {
+      badges.push(`TL ${formatCompactNumber(token.trustlines)}`);
+    }
     if (Array.isArray(badges) && badges.length) {
       const meta = document.createElement("div");
       meta.className = "suggestion-item__meta suggestion-item__badges";
@@ -907,44 +910,8 @@ const getTokenSuggestionMatches = (query) => {
     return a.order - b.order;
   });
   return matches.slice(0, TOKEN_SUGGESTION_LIMIT).map((match) => match.token);
-
-const _mergeRecentIntoSuggestions = (rawQuery, presetMatches) => {
-  const q = String(rawQuery || "").trim().toLowerCase();
-
-  const keyOf = (t) => `${t?.currency || ""}:${t?.issuer || ""}`;
-
-  const recent = (recentTokenSuggestions || [])
-    .filter((t) => {
-      if (!q) return true;
-      const hay = `${t?.label || ""} ${t?.symbol || ""} ${t?.name || ""} ${t?.currency || ""} ${t?.issuer || ""}`.toLowerCase();
-      return hay.includes(q);
-    })
-    .map((t) => ({
-      ...t,
-      badgeKeys: Array.from(new Set([...(t.badgeKeys || []), "presets.badgeRecent"])),
-    }));
-
-  const seen = new Set();
-  const merged = [];
-  const pushUniq = (t) => {
-    const k = keyOf(t);
-    if (!k || seen.has(k)) return;
-    seen.add(k);
-    merged.push(t);
-  };
-
-  recent.forEach(pushUniq);
-  (presetMatches || []).forEach(pushUniq);
-
-  const limit =
-    typeof SUGGESTION_LIMIT === "number" ? SUGGESTION_LIMIT :
-    typeof MAX_SUGGESTIONS === "number" ? MAX_SUGGESTIONS :
-    8;
-
-  return merged.slice(0, limit);
 };
 
-};
 
 const buildPresetBadgeKeys = (token, fallbackKey) => {
   if (fallbackKey) {
@@ -1083,6 +1050,8 @@ const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
     const matches = getTokenSuggestionMatches(tokenSuggestionInput.value.trim());
     activeTokenSuggestionIndex = matches.length ? 0 : -1;
     renderTokenSuggestions(matches);
+    // Fetch remote suggestions after rendering local presets.
+    scheduleRemoteUpdate(value, baseMatches);
   }
   renderQuickFillSuggestions();
 };
@@ -3932,8 +3901,51 @@ function mergeRecentIntoSuggestions(rawQuery, presetMatches) {
   return merged.slice(0, limit);
 }
 
+  // XRPL Meta remote suggestions (DEX-like)
+  let remoteSeq = 0;
+  let remoteDebounce = null;
 
+  const normalizeRemoteSuggestion = (it) => {
+    if (!it || !it.currency || !it.issuer) return null;
+    return {
+      currency: String(it.currency),
+      issuer: String(it.issuer),
+      name: it.name ? String(it.name) : "",
+      label: it.label ? String(it.label) : String(it.currency),
+      group: "XRPL Meta",
+      trustlines: (typeof it.trustlines === "number" ? it.trustlines : null),
+    };
+  };
 
+  const scheduleRemoteUpdate = (query, localMatches) => {
+    const q = String(query || "").trim();
+    if (q.length < 2) return;
+    if (remoteDebounce) clearTimeout(remoteDebounce);
+
+    const mySeq = ++remoteSeq;
+    remoteDebounce = window.setTimeout(async () => {
+      if (mySeq !== remoteSeq) return;
+      const items = await xrplmetaSearchTokens(q);
+      if (mySeq !== remoteSeq) return;
+      if (tokenSuggestionInput.value.trim() !== q) return;
+
+      const remote = (Array.isArray(items) ? items : [])
+        .map(normalizeRemoteSuggestion)
+        .filter(Boolean);
+
+      if (!remote.length) return;
+
+      const merged = mergeRecentIntoSuggestions(q, [...(localMatches || []), ...remote]);
+      activeTokenSuggestionIndex = merged.length ? 0 : -1;
+      renderTokenSuggestions(merged);
+      if (activeTokenSuggestionIndex >= 0) {
+        tokenSuggestionInput.setAttribute(
+          "aria-activedescendant",
+          `token-suggestion-${activeTokenSuggestionIndex}`
+        );
+      }
+    }, 220);
+  };
 
   const handleSuggestionInput = () => {
     const value = tokenSuggestionInput.value.trim();
@@ -3941,7 +3953,8 @@ function mergeRecentIntoSuggestions(rawQuery, presetMatches) {
       closeTokenSuggestions();
       return;
     }
-    const matches = mergeRecentIntoSuggestions(value, getTokenSuggestionMatches(value));
+    const baseMatches = getTokenSuggestionMatches(value);
+    const matches = mergeRecentIntoSuggestions(value, baseMatches);
     activeTokenSuggestionIndex = matches.length ? 0 : -1;
     renderTokenSuggestions(matches);
     if (activeTokenSuggestionIndex >= 0) {
@@ -4551,8 +4564,6 @@ estimateButton?.addEventListener("click", async () => {
   }
 });
 
-
-  // XRPLMETA remote suggest hook (currency input)
   try{
     const cur = document.getElementById("currency");
     const iss = document.getElementById("issuer");
