@@ -1064,7 +1064,10 @@ const applyTokenSuggestion = (token) => {
   if (!currencyInput || !issuerInput) {
     return;
   }
-  currencyInput.value = token.currency;
+  // UI: keep human-friendly symbol, do NOT replace with hex/raw
+  const __raw = token.currency;
+  currencyInput.value = formatCurrencyForDisplay(__raw);
+  currencyInput.dataset.currencyRaw = __raw;
   issuerInput.value = token.issuer;
   setFieldError("currency", null);
   setFieldError("issuer", null);
@@ -1719,7 +1722,9 @@ const applyShareParamsFromUrl = () => {
 
   isApplyingShareParams = true;
   if (currencyInput && currency) {
-    currencyInput.value = currency;
+    // UI: show decoded symbol if possible; keep raw in dataset for API/share
+    currencyInput.value = formatCurrencyForDisplay(currency);
+    currencyInput.dataset.currencyRaw = currency;
   }
   if (amountInput && amount) {
     amountInput.value = String(amount);
@@ -3752,6 +3757,9 @@ const bindFieldClear = (input, key) => {
   }
   input.addEventListener("input", () => {
     setFieldError(key, null);
+    if (key === "currency" && input.dataset) {
+      delete input.dataset.currencyRaw;
+    }
     if (key === "limit") {
       setLimitNote(null);
     }
@@ -3796,6 +3804,7 @@ const resetInputs = () => {
   }
   if (currencyInput) {
     currencyInput.value = "";
+    if (currencyInput.dataset) delete currencyInput.dataset.currencyRaw;
   }
   if (issuerInput) {
     issuerInput.value = "";
@@ -4069,7 +4078,8 @@ const initTokenSuggestions = async () => {
       seen.add(k);
 
       out.push({
-        currency: curRaw,      // 入力に入れるのは raw（hex含む）
+        currency: formatCurrencyForDisplay(curRaw),
+        currencyRaw: curRaw, // keep raw internally; never show hex in UI
         currencyDisp: curDisp, // 表示用
         issuer: iss,
         name,
@@ -4158,7 +4168,7 @@ const initTokenSuggestions = async () => {
       });
 
       btn.addEventListener("click", () => {
-        // 入力は raw を入れる（hex currency も許容）
+        // UIには表示用（ASCII/短縮）を入れる。raw(hex)はdatasetに保持する
         input.value = curRaw;
         issuer.value = iss;
         close();
@@ -4360,7 +4370,8 @@ tryExampleButton?.addEventListener("click", () => {
     }
 
     if (currencyInput) {
-      currencyInput.value = candidate.currency;
+      currencyInput.value = formatCurrencyForDisplay(candidate.currency);
+      currencyInput.dataset.currencyRaw = candidate.currency;
     }
     if (issuerInput) {
       issuerInput.value = candidate.issuer;
@@ -4411,7 +4422,10 @@ estimateButton?.addEventListener("click", async () => {
   }
   setEstimateButtonBusy(true);
   const estimateStart = performance.now();
-  const currencyResult = normalizeCurrencyInput(currencyInput?.value ?? "");
+  const __currencySource = (currencyInput && currencyInput.dataset && currencyInput.dataset.currencyRaw)
+    ? currencyInput.dataset.currencyRaw
+    : (currencyInput?.value ?? "");
+  const currencyResult = normalizeCurrencyInput(__currencySource);
   const currency = currencyResult.currencyNormalized || "";
   const issuer = issuerInput?.value?.trim() || "";
 
@@ -4782,8 +4796,10 @@ estimateButton?.addEventListener("click", async () => {
         inputEl: cur,
         listEl: box,
         onPick: (it) => {
-          cur.value = it.currency;
+          cur.value = formatCurrencyForDisplay(it.currency);
+          cur.dataset.currencyRaw = it.currency;
           iss.value = it.issuer;
+          if (cur && cur.dataset && it.currencyRaw) cur.dataset.currencyRaw = it.currencyRaw;
           // issuer 変更イベントが必要なら発火
           try{ iss.dispatchEvent(new Event("input", { bubbles:true })); }catch(_e){}
           try{ cur.dispatchEvent(new Event("input", { bubbles:true })); }catch(_e){}
