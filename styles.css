@@ -1444,3 +1444,32 @@ html, body { background: #ffffff !important; }
   background: rgba(0,0,0,0.04);
 }
 /* === /XRPLMETA_SUGGEST_UI_PATCH_20260204 === */
+
+
+/* XRPL Meta suggestion dropdown */
+
+/* XRPL Meta suggestion dropdown */
+#token-suggestions { display:none; }
+.token-suggestion-item { list-style:none; margin:0; padding:0; }
+.token-suggestion-btn {
+  width:100%;
+  text-align:left;
+  border:0;
+  background:transparent;
+  padding:10px 12px;
+  cursor:pointer;
+}
+.token-suggestion-btn:hover { background: rgba(127,127,127,0.12); }
+.ts-row { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.ts-main { display:flex; gap:8px; align-items:baseline; min-width:0; }
+.ts-cur { font-weight:700; }
+.ts-name { opacity:0.9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:42vw; }
+.ts-meta { display:flex; gap:8px; align-items:center; opacity:0.85; }
+.ts-badge {
+  font-size:12px;
+  padding:2px 6px;
+  border-radius:999px;
+  background: rgba(127,127,127,0.18);
+}
+.ts-issuer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
+
