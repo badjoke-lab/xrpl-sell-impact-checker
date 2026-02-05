@@ -260,9 +260,7 @@ const DEBUG_QUERY_PARAM = "debug";
 const DEBUG_RESPONSE_LIMIT = 600;
 const VENUE_CLOB = "CLOB";
 const VENUE_AMM = "AMM";
-const TOKEN_PRESETS_URL = "/data/token-presets.json"; // local presets for input suggestions
-const scheduleRemoteUpdate = () => { /* disabled: offline-safe */ };
-// NOTE: scheduleRemoteUpdate was referenced by older suggest code; keep no-op to avoid runtime crash.
+const TOKEN_PRESETS_URL = "/data/token-presets.json"; // NOTE: NOT used for input suggestions anymore (XRPL Meta only)
 const RECENT_TOKENS_STORAGE_KEY = "xsic_recent_tokens_v1";
 const LEGACY_RECENT_TOKENS_STORAGE_KEY = "xsic.recentTokens.v1";
 const MAX_RECENT_TOKENS = 10;
@@ -1053,9 +1051,7 @@ const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
     activeTokenSuggestionIndex = matches.length ? 0 : -1;
     renderTokenSuggestions(matches);
     // Fetch remote suggestions after rendering local presets.
-    // NOTE: remote suggest disabled (was crashing: value/baseMatches undefined)
-    // scheduleRemoteUpdate(tokenSuggestionInput?.value, matches);
-
+    scheduleRemoteUpdate(value, baseMatches);
   }
   renderQuickFillSuggestions();
 };
@@ -3842,250 +3838,36 @@ const handleShareInputChange = () => {
 };
 
 const initTokenSuggestions = async () => {
-  // --- Suggest dropdown CSS injection (no styles.css changes) ---
-  (function ensureSuggestStyle(){
-    if (document.getElementById("xsic-suggest-style")) return;
-    const st = document.createElement("style");
-    st.id = "xsic-suggest-style";
-    st.textContent = `
-      ul#token-suggestions.suggestions, ul#token-suggestion-list.suggestions {
-        position: fixed !important;
-        display: none;
-        max-height: 320px;
-        overflow: auto;
-        background: var(--panel, #fff);
-        border: 1px solid rgba(0,0,0,0.14);
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.14);
-        padding: 6px 0;
-        margin: 0;
-        list-style: none;
-      }
-
-      .token-suggestion-item { margin: 0; padding: 0; }
-
-      .token-suggestion-btn{
-        width: 100%;
-        text-align: left;
-        background: transparent;
-        border: 0;
-        padding: 10px 12px;
-        cursor: pointer;
-        display: block;
-      }
-      .token-suggestion-btn:hover{ background: rgba(0,0,0,0.04); }
-
-      .ts-row{
-        display:flex;
-        align-items:flex-start;
-        justify-content:space-between;
-        gap:12px;
-      }
-
-      .ts-main{ min-width: 0; }
-      .ts-cur{
-        font-weight: 700;
-        font-size: 13px;
-        line-height: 1.2;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-        max-width: 240px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .ts-name{
-        font-size: 12px;
-        opacity: .8;
-        max-width: 260px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        margin-top: 2px;
-      }
-
-      .ts-meta{
-        display:flex;
-        align-items:center;
-        gap:8px;
-        flex-shrink: 0;
-      }
-      .ts-issuer{
-        font-size: 12px;
-        opacity: .75;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-        max-width: 120px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .ts-badge{
-        font-size: 11px;
-        padding: 2px 6px;
-        border: 1px solid rgba(0,0,0,0.12);
-        border-radius: 999px;
-        opacity: .85;
-      }
-    `;
-    document.head.appendChild(st);
-  })();
+  // XRPL Meta ONLY suggestion dropdown bound to the real DOM:
+  // - input: #currency-input
+  // - list : #token-suggestions (ul)
+  // NEVER use local token presets for input suggestions.
 
   const input = document.getElementById("currency-input");
   const issuer = document.getElementById("issuer-input");
-  const list =
-    document.getElementById("token-suggestions") ||
-    document.getElementById("token-suggestion-list");
-
+  const list = document.getElementById("token-suggestions");
   if (!input || !issuer || !list) return;
 
-  // ---------- helpers (no external deps) ----------
-  const esc = (x) =>
-    String(x ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-
-  const norm = (x) => String(x || "").trim();
-
-  const shorten = (addr) => {
-    const a = norm(addr);
-    if (!a) return "";
-    if (a.length <= 14) return a;
-    return a.slice(0, 6) + "…" + a.slice(-4);
-  };
-
-  const fmtCompact = (n) => {
-    try {
-      const x = Number(n);
-      if (!Number.isFinite(x)) return "";
-      // ざっくり compact
-      if (x >= 1e9) return (x / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
-      if (x >= 1e6) return (x / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
-      if (x >= 1e3) return (x / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
-      return String(Math.round(x));
-    } catch (_e) {
-      return "";
-    }
-  };
-
-  const isIssuer = (x) => /^r[1-9A-HJ-NP-Za-km-z]{20,}$/.test(norm(x));
-
-  // 160-bit hex currency → ASCII (printable) 変換（表示用）
-  const hexToAscii = (hex40) => {
-    const h = String(hex40 || "");
-    if (!/^[A-Fa-f0-9]{40}$/.test(h)) return "";
-    try {
-      let out = "";
-      for (let i = 0; i < 40; i += 2) {
-        const b = parseInt(h.slice(i, i + 2), 16);
-        if (b === 0x00) continue; // padding
-        if (b < 0x20 || b > 0x7e) return ""; // non-printable
-        out += String.fromCharCode(b);
-      }
-      out = out.trim();
-      // それっぽい通貨コードだけ採用
-      if (!out) return "";
-      if (!/^[A-Za-z0-9._\-]{2,12}$/.test(out)) return "";
-      return out;
-    } catch (_e) {
-      return "";
-    }
-  };
-
-  // ---------- dropdown placement ----------
+    // Ensure the suggestion list is visible (render to <body> to avoid overflow clipping)
   try {
-    if (list.parentElement !== document.body) document.body.appendChild(list);
-  } catch (_e) {}
+    if (list.parentElement !== document.body) {
+      document.body.appendChild(list);
+    }
 
-  const place = () => {
-    const r = input.getBoundingClientRect();
-    list.style.position = "fixed";
-    list.style.left = Math.max(8, r.left) + "px";
-    list.style.top = (r.bottom + 6) + "px";
-    list.style.width = Math.max(240, r.width) + "px";
-    list.style.zIndex = "2147483647";
-  };
+    const place = () => {
+      const r = input.getBoundingClientRect();
+      // fixed dropdown under input
+      list.style.position = "fixed";
+      list.style.left = Math.max(8, r.left) + "px";
+      list.style.top = (r.bottom + 6) + "px";
+      list.style.width = Math.max(220, r.width) + "px";
+      list.style.zIndex = "2147483647";
+    };
 
-  const open = () => {
     place();
-    list.style.display = "block";
-    list.setAttribute("data-open", "1");
-    input.setAttribute("aria-expanded", "true");
-  };
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place, true);
 
-  const close = () => {
-    list.style.display = "none";
-    list.removeAttribute("data-open");
-    input.setAttribute("aria-expanded", "false");
-    input.removeAttribute("aria-activedescendant");
-  };
-
-  window.addEventListener("scroll", place, true);
-  window.addEventListener("resize", place, true);
-
-  // ---------- load presets ----------
-  let pool = [];
-  try {
-    const r = await fetch(TOKEN_PRESETS_URL, { cache: "no-store" });
-    if (!r.ok) throw new Error("preset fetch failed: " + r.status);
-    pool = await r.json();
-    if (!Array.isArray(pool)) throw new Error("preset json is not array");
-    console.log("[suggest] pool loaded", pool.length);
-  } catch (e) {
-    console.warn("[suggest] failed to load local presets:", e);
-    pool = [];
-  }
-
-  // ---------- match ----------
-  const buildMatches = (q) => {
-    const query = norm(q).toLowerCase();
-    if (query.length < 1) return [];
-
-    const out = [];
-    const seen = new Set();
-
-    for (const t of pool) {
-      if (!t) continue;
-
-      const curRaw = norm(t.currency);
-      const iss = norm(t.issuer);
-      if (!curRaw || !iss) continue;
-      if (curRaw === "???" || curRaw === "XRP") continue;
-      if (!isIssuer(iss)) continue;
-
-      const name = norm(t.name || t.label || "");
-      const curAscii = hexToAscii(curRaw);
-      const curDisp = curAscii || curRaw;
-
-      const hit =
-        curDisp.toLowerCase().startsWith(query) ||
-        (name && name.toLowerCase().includes(query));
-
-      if (!hit) continue;
-
-      const k = (curRaw + ":" + iss).toLowerCase();
-      if (seen.has(k)) continue;
-      seen.add(k);
-
-      out.push({
-        currency: curRaw,      // 入力に入れるのは raw（hex含む）
-        currencyDisp: curDisp, // 表示用
-        issuer: iss,
-        name,
-        trustlines:
-          typeof t.trustlines === "number" && Number.isFinite(t.trustlines)
-            ? t.trustlines
-            : null,
-      });
-
-      if (out.length >= 30) break;
-    }
-    return out;
-  };
-
-  // ---------- render (NO overflow garbage) ----------
-  const applyListStyle = () => {
     list.style.maxHeight = "320px";
     list.style.overflowY = "auto";
     list.style.background = "var(--panel, #fff)";
@@ -4094,145 +3876,209 @@ const initTokenSuggestions = async () => {
     list.style.boxShadow = "0 10px 30px rgba(0,0,0,0.12)";
     list.style.padding = "6px 0";
     list.style.margin = "0";
+  } catch (_e) {}
+
+
+  let activeIndex = -1;
+  let items = [];
+  let seq = 0;
+  let debounce = null;
+
+  const short = (s) => {
+    const x = String(s || "");
+    if (x.length <= 12) return x;
+    return x.slice(0, 6) + "..." + x.slice(-4);
   };
 
-  const render = (items) => {
+  const close = () => {
+    list.innerHTML = "";
+    list.style.display = "none";
+    activeIndex = -1;
+    items = [];
+  };
+
+  const open = () => {
+    list.style.display = "block";
+  };
+
+  const render = () => {
     list.innerHTML = "";
     if (!items.length) {
       close();
       return;
     }
-    applyListStyle();
+    open();
 
-    items.forEach((t, idx) => {
+    items.forEach((t, i) => {
       const li = document.createElement("li");
-      li.style.listStyle = "none";
-      li.style.margin = "0";
-      li.style.padding = "0";
+      li.className = "token-suggestion-item";
+      li.id = `token-suggestion-${i}`;
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", i === activeIndex ? "true" : "false");
 
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.id = `token-suggestion-${idx}`;
       btn.className = "token-suggestion-btn";
+      btn.tabIndex = -1;
 
-      // ボタン自体を100%幅、overflowを完全に隠す
-      btn.style.display = "block";
-      btn.style.width = "100%";
-      btn.style.textAlign = "left";
-      btn.style.border = "0";
-      btn.style.background = "transparent";
-      btn.style.padding = "10px 12px";
-      btn.style.cursor = "pointer";
-
-      // 3カラム：currency / name / issuer(+TL)
-      const tl = t.trustlines ? fmtCompact(t.trustlines) : "";
-      const name = norm(t.name);
-      const curDisp = norm(t.currencyDisp);
-      const curRaw = norm(t.currency);
-      const iss = norm(t.issuer);
+      const name = (t.name || t.label || "").trim();
+      const tl = (typeof t.trustlines === "number" && Number.isFinite(t.trustlines)) ? t.trustlines : null;
 
       btn.innerHTML = `
-        <div style="display:flex; gap:10px; align-items:center; min-width:0;">
-          <div style="flex: 0 0 40%; min-width:0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color: rgba(0,0,0,0.80); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${esc(curDisp)}
+        <div class="ts-row">
+          <div class="ts-main">
+            <span class="ts-cur">${t.currency}</span>
+            ${name ? `<span class="ts-name">${escapeHtml(name)}</span>` : ""}
           </div>
-          <div style="flex: 1 1 auto; min-width:0; font-size:13px; color: rgba(0,0,0,0.90); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${esc(name || "")}
-          </div>
-          <div style="flex: 0 0 34%; min-width:0; display:flex; justify-content:flex-end; gap:8px; align-items:center;">
-            ${tl ? `<span style="font-size:11px; padding:2px 6px; border-radius:999px; background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.75); white-space:nowrap;">TL ${esc(tl)}</span>` : ""}
-            <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color: rgba(0,0,0,0.70); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px;">
-              ${esc(shorten(iss))}
-            </span>
+          <div class="ts-meta">
+            ${tl !== null ? `<span class="ts-badge">TL ${formatCompactNumber(tl)}</span>` : ""}
+            <span class="ts-issuer">${short(t.issuer)}</span>
+            <span class="ts-badge">XRPL Meta</span>
           </div>
         </div>
       `;
 
-      btn.addEventListener("mousedown", (e) => e.preventDefault());
-      btn.addEventListener("mouseenter", () => {
-        // hover
-        btn.style.background = "rgba(0,0,0,0.04)";
-      });
-      btn.addEventListener("mouseleave", () => {
-        btn.style.background = "transparent";
-      });
-
       btn.addEventListener("click", () => {
-        // 入力は raw を入れる（hex currency も許容）
-        input.value = curRaw;
-        issuer.value = iss;
-        close();
-        input.focus();
+        input.value = t.currency;
+        issuer.value = t.issuer;
 
-        // downstream
+        // trigger any listeners/validation
         input.dispatchEvent(new Event("input", { bubbles: true }));
         issuer.dispatchEvent(new Event("input", { bubbles: true }));
+
+        close();
+        input.focus();
       });
 
       li.appendChild(btn);
       list.appendChild(li);
     });
 
-    open();
+    // keep focus on input; highlight via aria-selected only
   };
 
-  // keyboard navigation
-  let active = -1;
+  // tiny HTML escape for name
+  function escapeHtml(str){
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
 
-  const updateActive = (next) => {
-    const items = Array.from(list.querySelectorAll(".token-suggestion-btn"));
-    if (!items.length) return;
-    active = Math.max(0, Math.min(next, items.length - 1));
-    const el = items[active];
-    input.setAttribute("aria-activedescendant", el.id);
-    items.forEach((x, i) => {
-      x.style.outline = i === active ? "2px solid rgba(99,102,241,0.45)" : "none";
-      x.style.outlineOffset = "-2px";
-    });
-    try { el.scrollIntoView({ block: "nearest" }); } catch (_e) {}
+  const normalizeRemote = (payload) => {
+    const out = [];
+    const seen = new Set();
+    const arr = payload && Array.isArray(payload.tokens) ? payload.tokens : (Array.isArray(payload) ? payload : []);
+    for (const it of arr) {
+      const currency = (it && it.currency ? String(it.currency) : "").trim();
+      const issuerV = (it && it.issuer ? String(it.issuer) : "").trim();
+      if (!currency || !issuerV) continue;
+      const key = (currency + ":" + issuerV).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const name = it.meta && it.meta.token && it.meta.token.name ? String(it.meta.token.name) : (it.name ? String(it.name) : "");
+      const label = it.label ? String(it.label) : currency;
+      const trustlines = (it.meta && it.meta.metrics && typeof it.meta.metrics.trustlines === "number")
+        ? it.meta.metrics.trustlines
+        : (typeof it.trustlines === "number" ? it.trustlines : null);
+
+      out.push({ currency, issuer: issuerV, name, label, trustlines });
+    }
+    return out;
   };
 
-  const run = () => {
-    const q = norm(input.value);
-    if (q.length < 1) { close(); return; }
-    const matches = buildMatches(q);
-    active = matches.length ? 0 : -1;
-    render(matches);
-    if (active >= 0) updateActive(active);
+  const fetchTokens = async (q) => {
+    // Use same-origin proxy to avoid CORS.
+    const url = `/api/xrplmeta-tokens?q=${encodeURIComponent(q)}`;
+    const res = await fetch(url, { method: "GET" });
+    if (!res.ok) throw new Error("xrplmeta_proxy_failed");
+    return res.json();
   };
 
-  input.addEventListener("input", run);
-  input.addEventListener("focus", run);
+  const run = async (q, mySeq) => {
+    try {
+      const payload = await fetchTokens(q);
+      console.log('xrplmeta payload=', payload && (payload.count ?? payload.length ?? null));
+      if (mySeq !== seq) return;
+      if ((input.value || "").trim() !== q.trim()) return;
+
+      // normalize payload shape
+      let norm = [];
+      if (payload && payload.tokens) norm = normalizeRemote(payload);
+      else if (Array.isArray(payload)) norm = normalizeRemote({ tokens: payload });
+      else norm = [];
+
+      items = norm;
+      activeIndex = items.length ? 0 : -1;
+      render();
+    } catch (_e) {
+      console.warn('XRPL Meta suggest failed:', _e);
+      items = [];
+      activeIndex = -1;
+      render();
+    }
+  };
+
+  const schedule = () => {
+    console.log('suggest q=', (input.value || '').trim());
+    const q = (input.value || "").trim();
+    if (q.length < 2) {
+      close();
+      return;
+    }
+    seq += 1;
+    const mySeq = seq;
+    if (debounce) clearTimeout(debounce);
+    debounce = window.setTimeout(() => run(q, mySeq), 220);
+  };
+
+  input.addEventListener("input", schedule);
+  input.addEventListener("focus", schedule);
 
   input.addEventListener("keydown", (e) => {
-    const isOpen = list.getAttribute("data-open") === "1";
-    const items = list.querySelectorAll(".token-suggestion-btn");
-    if (!isOpen || !items.length) return;
+    if (!items.length) return;
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      updateActive(active + 1);
-    } else if (e.key === "ArrowUp") {
+      activeIndex = Math.min(items.length - 1, activeIndex + 1);
+      render();
+      return;
+    }
+    if (e.key === "ArrowUp") {
       e.preventDefault();
-      updateActive(active - 1);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const btn = list.querySelector(`#token-suggestion-${active}`);
-      if (btn) btn.click();
-    } else if (e.key === "Escape") {
+      activeIndex = Math.max(0, activeIndex - 1);
+      render();
+      return;
+    }
+    if (e.key === "Enter") {
+      if (activeIndex >= 0 && items[activeIndex]) {
+        e.preventDefault();
+        const t = items[activeIndex];
+        input.value = t.currency;
+        issuer.value = t.issuer;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        issuer.dispatchEvent(new Event("input", { bubbles: true }));
+        close();
+      }
+      return;
+    }
+    if (e.key === "Escape") {
       e.preventDefault();
       close();
+      return;
     }
   });
 
-  // outside click closes
-  document.addEventListener("mousedown", (e) => {
-    if (e.target === input) return;
-    if (list.contains(e.target)) return;
+  // close when clicking outside
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!(t instanceof Node)) return;
+    if (t === input || list.contains(t)) return;
     close();
   });
-
-  close();
 };
 
 void initTokenSuggestions();
