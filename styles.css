@@ -1473,3 +1473,22 @@ html, body { background: #ffffff !important; }
 }
 .ts-issuer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
 
+/* brand link: look like plain header brand (no underline) */
+a.brand-link, a.brand-link:hover, a.brand-link:visited{
+  text-decoration: none !important;
+  color: inherit !important;
+}
+a.brand-link *{
+  text-decoration: none !important;
+  color: inherit !important;
+}
+
+/* XSIC: footer brand link should look like plain text (no underline) */
+.site-footer__title,
+.site-footer__title:link,
+.site-footer__title:visited,
+.site-footer__title:hover,
+.site-footer__title:active {
+  text-decoration: none;
+  color: inherit;
+}
