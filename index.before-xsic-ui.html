@@ -89,8 +89,8 @@
           <a class="mobile-jump__btn" href="#inputs-section" data-i18n="mobile.jump_inputs"></a>
           <a class="mobile-jump__btn" href="#results-section" data-i18n="mobile.jump_results"></a>
         </div>
-<section class="card" id="inputs-section" aria-labelledby="inputs-heading">
-<div class="card__header">
+<section class="card" id="results-section" aria-labelledby="inputs-heading">
+          <div class="card__header">
             <h2 id="inputs-heading" data-i18n="sections.inputs"></h2>
             <div class="pill-group">
               <span class="pill pill--active" data-i18n="modes.simple"></span>
@@ -204,38 +204,25 @@
           </details>
 
           <div class="actions">
-  <div class="action-row" aria-label="Actions">
-    <div class="action-row__left">      <button class="secondary-button" type="button" id="reset-inputs" data-i18n="actions.reset">Reset</button>
-      <button class="secondary-button" type="button" id="copy-link" data-i18n="actions.copy_link">Copy link</button>
-    </div>
-    <div class="action-row__right">
-      <button class="primary-button" type="button" data-i18n="actions.estimate">Estimate</button>
-    </div>
-  </div>            <p class="status status--notice" id="example-status" hidden></p>
-            
-            
+            <button class="secondary-button" type="button" id="try-example" data-i18n="actions.try_example">Try example</button>
+            <p class="field__help" data-i18n="actions.try_example_note"></p>
+            <p class="status status--notice" id="example-status" hidden></p>
+            <button class="secondary-button" type="button" id="reset-inputs" data-i18n="actions.reset">Reset</button>
+            <button class="secondary-button" type="button" id="copy-link" data-i18n="actions.copy_link">Copy link</button>
             <p class="status status--notice" id="share-load-note" data-i18n="status.loaded_from_link" hidden></p>
             <p class="status status--success" id="share-toast" aria-live="polite" hidden></p>
-            
+            <button class="primary-button" type="button" data-i18n="actions.estimate">Estimate</button>
             <div class="progress-bar" id="estimate-progress" role="progressbar" aria-label="Estimating" hidden>
               <span class="progress-bar__fill"></span>
             </div>
             <p class="error-banner" hidden></p>
             <p class="status" data-i18n="status.waiting"></p>
             <p class="status-endpoint" hidden></p>
-</div>
+          </div>
         </section>
 
-<section id="results-section" class="results" aria-label="Results">
-  <nav class="results-tabs" aria-label="Results tabs">
-    <a class="tab" data-tab="summary" href="#summary-block">Summary</a>
-    <a class="tab" data-tab="details" href="#details-block">Details</a>
-<a class="tab" data-tab="debug" href="#debug-panel"  >Debug</a>
-  </nav>
-
-
         <section class="grid two-column">
-          <article id="summary-block" class="card" aria-labelledby="result-summary" data-pane="summary">
+          <article class="card" aria-labelledby="result-summary">
             <div class="card__header">
               <h2 id="result-summary" data-i18n="sections.results_summary"></h2>
             </div>
@@ -276,7 +263,7 @@
             <p class="warning-banner" data-result="warning" hidden></p>
           </article>
 
-          <article id="details-block" class="card" aria-labelledby="result-details" data-pane="details">
+          <article class="card" aria-labelledby="result-details">
             <div class="card__header">
               <h2 id="result-details" data-i18n="sections.execution_details"></h2>
             </div>
@@ -314,51 +301,10 @@
                 <span data-result="endpoint-details" data-i18n="common.placeholder"></span>
               </li>
             </ul>
-          
-
-<section id="charts-block" class="grid two-column">
-          <article class="card" aria-labelledby="graph-depth">
-            <div class="card__header">
-              <h2 id="graph-depth" data-i18n="sections.depth_curve"></h2>
-            </div>
-            <p class="chart__help" data-i18n="graphs.depth.helper"></p>
-            <div class="chart" data-chart="depth">
-              <svg
-                id="depth-chart"
-                class="chart__svg"
-                viewBox="0 0 320 200"
-                preserveAspectRatio="none"
-                data-i18n-aria-label="graphs.depth.aria_label"
-                role="img"
-              ></svg>
-            </div>
-            <p class="chart__note" data-result="depth-note" hidden></p>
-            <p class="chart__summary" data-result="depth-summary"></p>
-          </article>
-
-          <article class="card" aria-labelledby="graph-impact">
-            <div class="card__header">
-              <h2 id="graph-impact" data-i18n="sections.impact_curve"></h2>
-            </div>
-            <p class="chart__help" data-i18n="graphs.impact.helper"></p>
-            <div class="chart" data-chart="impact">
-              <svg
-                id="impact-chart"
-                class="chart__svg"
-                viewBox="0 0 320 200"
-                preserveAspectRatio="none"
-                data-i18n-aria-label="graphs.impact.aria_label"
-                role="img"
-              ></svg>
-            </div>
-            <p class="chart__note" data-result="impact-note" hidden></p>
-            <p class="chart__summary" data-result="impact-summary"></p>
           </article>
         </section>
-</article>
-        </section>
 
-        <details class="card debug-panel" id="debug-panel" hidden data-pane="debug">
+        <details class="card debug-panel" id="debug-panel" hidden>
           <summary class="debug-panel__summary">Debug panel</summary>
           <div class="debug-panel__body">
             <div class="debug-panel__actions">
@@ -441,13 +387,48 @@
           </div>
         </details>
 
-        
+        <section class="grid two-column">
+          <article class="card" aria-labelledby="graph-depth">
+            <div class="card__header">
+              <h2 id="graph-depth" data-i18n="sections.depth_curve"></h2>
+            </div>
+            <p class="chart__help" data-i18n="graphs.depth.helper"></p>
+            <div class="chart" data-chart="depth">
+              <svg
+                id="depth-chart"
+                class="chart__svg"
+                viewBox="0 0 320 200"
+                preserveAspectRatio="none"
+                data-i18n-aria-label="graphs.depth.aria_label"
+                role="img"
+              ></svg>
+            </div>
+            <p class="chart__note" data-result="depth-note" hidden></p>
+            <p class="chart__summary" data-result="depth-summary"></p>
+          </article>
+
+          <article class="card" aria-labelledby="graph-impact">
+            <div class="card__header">
+              <h2 id="graph-impact" data-i18n="sections.impact_curve"></h2>
+            </div>
+            <p class="chart__help" data-i18n="graphs.impact.helper"></p>
+            <div class="chart" data-chart="impact">
+              <svg
+                id="impact-chart"
+                class="chart__svg"
+                viewBox="0 0 320 200"
+                preserveAspectRatio="none"
+                data-i18n-aria-label="graphs.impact.aria_label"
+                role="img"
+              ></svg>
+            </div>
+            <p class="chart__note" data-result="impact-note" hidden></p>
+            <p class="chart__summary" data-result="impact-summary"></p>
+          </article>
+        </section>
 </details>
 
 </details>
-  </section>
-
-
 
 
         <section class="card" aria-labelledby="faq-heading">
