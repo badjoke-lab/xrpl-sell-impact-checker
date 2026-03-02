@@ -50,14 +50,19 @@
             </div>
           </section>
 
-          <aside class="card status-card" aria-labelledby="updates-heading">
+          <aside class="card status-card" aria-labelledby="updates-heading" data-status-strip="health">
             <h3 id="updates-heading">Updates</h3>
-            <p><strong>API:</strong> OK / stale / down</p>
-            <p><strong>Last refresh:</strong> 12 sec ago</p>
+            <p><strong>API:</strong> <span data-health="status">OK / stale / down</span></p>
+            <p><strong>Last refresh:</strong> <span data-health="last-refresh">—</span></p>
+            <details>
+              <summary>Details</summary>
+              <pre data-health="details">{}</pre>
+            </details>
           </aside>
         </section>
       </main>
     </div>
     <script src="/shared/global-nav.js"></script>
+    <script src="/shared/status.js"></script>
   </body>
 </html>

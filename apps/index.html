@@ -20,6 +20,14 @@
       </header>
       <main class="page__content">
         <section class="card"><h2 class="page__title">XSIC Apps</h2></section>
+        <aside class="card status-card" data-status-strip="health" aria-label="Service status">
+          <p><strong>API:</strong> <span data-health="status">OK / stale / down</span></p>
+          <p><strong>Last refresh:</strong> <span data-health="last-refresh">—</span></p>
+          <details>
+            <summary>Details</summary>
+            <pre data-health="details">{}</pre>
+          </details>
+        </aside>
         <section class="card"><div class="apps-grid">
           <article class="app-card"><h4>Sell Impact</h4><p>Estimate DEX/AMM impact before execution.</p><a class="secondary-button" href="/apps/sell-impact/">Open</a></article>
           <article class="app-card"><h4>Liquidity Pulse</h4><p>AMM/DEX liquidity pulse at a glance.</p><a class="secondary-button" href="/apps/liquidity-pulse/">Open</a></article>
@@ -29,5 +37,6 @@
       </main>
     </div>
     <script src="/shared/global-nav.js"></script>
+    <script src="/shared/status.js"></script>
   </body>
 </html>
