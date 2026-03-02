@@ -2070,3 +2070,45 @@ svg polygon[fill="black"]{
   .global-nav { display:none; width:100%; flex-direction:column; border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; }
   .global-nav.is-open { display:flex; }
 }
+
+/* Shared UI kit states + lite mode */
+.lite-mode .ui-state,
+.lite-mode .card,
+.lite-mode .app-card {
+  transition: none !important;
+  animation: none !important;
+}
+
+.lite-mode-toggle {
+  white-space: nowrap;
+}
+
+.ui-mount {
+  min-height: 84px;
+}
+
+.ui-state {
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ui-state--error {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.ui-state__title,
+.ui-state__body {
+  margin: 0;
+}
+
+.ui-state__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

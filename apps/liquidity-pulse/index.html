@@ -13,19 +13,33 @@
         <div class="app__header-top">
           <a href="/" class="brand-link"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><h1 class="app__title">XSIC</h1></div></a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          <nav class="site-nav global-nav" id="global-nav" aria-label="Primary">
-            <a href="/" data-nav-item="console">Console</a><a href="/apps/" data-nav-item="apps">Apps</a><a href="/methods/" data-nav-item="docs">Docs</a><a href="/donate/" data-nav-item="donate">Donate</a><a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-nav-item="contact">Contact</a>
-          </nav>
+          <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
+          <div data-global-nav></div>
         </div>
       </header>
       <main class="page__content">
         <section class="card">
           <h2 class="page__title">Liquidity Pulse</h2>
-          <p class="page__lede">Coming soon. This app will provide liquidity pulse insights for XRPL operations.</p>
-          <p><a href="/">Back to Console</a> · <a href="/apps/">Back to Apps</a></p>
+          <p class="page__lede">Dummy rendering is now active. API integration comes next.</p>
         </section>
+        <section class="card" aria-label="Shared UI state mount"><div class="ui-mount" data-ui-mount="liquidity-pulse"></div></section>
       </main>
+      <div data-global-footer></div>
     </div>
-    <script src="/shared/global-nav.js"></script>
+    <script src="/shared/ui-kit.js"></script>
+    <script src="/shared/nav.js"></script>
+    <script>
+      const mount = document.querySelector('[data-ui-mount="liquidity-pulse"]');
+      window.XSICUiKit?.renderLoadingState(mount, { label: 'Rendering Liquidity Pulse demo…' });
+      window.setTimeout(() => {
+        window.XSICUiKit?.renderEmptyState(mount, {
+          title: 'Liquidity Pulse demo view',
+          body: window.XSICUiKit?.getLiteMode()
+            ? 'Lite mode is ON: low-intensity placeholders are enabled.'
+            : 'Lite mode is OFF: standard placeholders are enabled.',
+          actions: [{ label: 'Back to Apps', href: '/apps/' }],
+        });
+      }, 600);
+    </script>
   </body>
 </html>
