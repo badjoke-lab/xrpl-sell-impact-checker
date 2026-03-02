@@ -33,6 +33,19 @@
       status: state?.status || 'down',
       details: state?.details || {},
     };
+    const checkedAtLabel = Number.isFinite(lastCheckedAt)
+      ? `${Math.max(0, Math.floor((Date.now() - lastCheckedAt) / 1000))} sec ago`
+      : '—';
+
+    if (window.XSICUiKit?.renderStatusStrip) {
+      window.XSICUiKit.renderStatusStrip({
+        status: currentState.status,
+        checkedAt: checkedAtLabel,
+        details: currentState.details,
+      });
+      return;
+    }
+
     roots.forEach((root) => {
       const nodes = getNodes(root);
       const label = statusLabels[currentState.status] || "down";
@@ -46,12 +59,7 @@
         }
       }
 
-      if (Number.isFinite(lastCheckedAt)) {
-        const ageSec = Math.max(0, Math.floor((Date.now() - lastCheckedAt) / 1000));
-        safeText(nodes.lastRefresh, `${ageSec} sec ago`);
-      } else {
-        safeText(nodes.lastRefresh, "—");
-      }
+      safeText(nodes.lastRefresh, checkedAtLabel);
     });
   }
 
