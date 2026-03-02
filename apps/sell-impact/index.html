@@ -75,13 +75,8 @@
         </div>
         <p class="app__catchcopy" data-i18n="header.tagline"></p>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-        <nav class="site-nav global-nav" id="global-nav" aria-label="Primary">
-          <a href="/" data-nav-item="console">Console</a>
-          <a href="/apps/" data-nav-item="apps">Apps</a>
-          <a href="/methods/" data-nav-item="docs">Docs</a>
-          <a href="/donate/" data-nav-item="donate">Donate</a>
-          <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-nav-item="contact">Contact</a>
-        </nav>
+        <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
+        <div data-global-nav></div>
       </header>
 
       <main class="app__main">
@@ -89,6 +84,9 @@
           <a class="mobile-jump__btn" href="#inputs-section" data-i18n="mobile.jump_inputs"></a>
           <a class="mobile-jump__btn" href="#results-section" data-i18n="mobile.jump_results"></a>
         </div>
+        <section class="card" aria-label="Shared UI state mount">
+          <div class="ui-mount" data-ui-mount="sell-impact"></div>
+        </section>
 <section class="card" id="inputs-section" aria-labelledby="inputs-heading">
 <div class="card__header">
             <h2 id="inputs-heading" data-i18n="sections.inputs"></h2>
@@ -485,22 +483,22 @@
         </section>
       </main>
 
-      <footer class="site-footer">
-        <div class="site-footer__brand">
-          <a class="site-footer__title" href="https://badjoke-lab.com/" target="_blank" rel="noopener" data-i18n="footer.brand"></a>
-          <p class="site-footer__note" data-i18n="footer.note"></p>
-        </div>
-        <nav class="site-footer__links" aria-label="Footer">
-          <a href="/methods/">Methods</a>
-          <a href="/faq/">FAQ</a>
-          <a href="/disclaimer/">Disclaimer</a>
-          <a href="/credits/">Credits</a>
-          <a href="/donate/">Donate</a>
-        </nav>
-      </footer>
+      <div data-global-footer></div>
     </div>
 
+    <script src="/shared/ui-kit.js"></script>
+    <script src="/shared/nav.js"></script>
+    <script>
+      window.XSICUiKit?.renderErrorState('[data-ui-mount="sell-impact"]', {
+        title: "Sell Impact shared state",
+        body: "Errors can now render in a reusable container without breaking layout.",
+        retryLabel: "Dismiss",
+        onRetry: () => window.XSICUiKit?.renderEmptyState('[data-ui-mount="sell-impact"]', {
+          title: "Ready",
+          body: "Continue with the form below.",
+        }),
+      });
+    </script>
     <script type="module" src="/app.js"></script>
-    <script src="/shared/global-nav.js"></script>
   </body>
 </html>
