@@ -3,503 +3,61 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title data-i18n="app.title"></title>
+    <title>XSIC — XRPL Signal & Insight Console</title>
     <meta
       name="description"
-      data-i18n-content="app.description"
-      content="Estimate sell impact and receive amounts before you trade."
+      content="XSIC Console entrance for XRPL Sell Impact, Liquidity Pulse, Flow Alert, and Exposure Graph apps."
     />
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/">
-  <meta property="og:site_name" content="XSIC">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta property="og:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta name="twitter:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <link rel="icon" href="/favicon.png">
-  <link rel="apple-touch-icon" href="/favicon.png">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0D84H0D66W"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-0D84H0D66W');
-  </script>
-</head>
-  <body>
-    <noscript><p class="error-banner">JavaScript is required to use this tool.</p></noscript>
-    <div class="app">
-      <p class="error-banner" id="i18n-error-banner" hidden></p>
-      <header class="app__header">
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+  </head>
+  <body data-nav-key="console">
+    <div class="app page console-page">
+      <header class="app__header global-header">
         <div class="app__header-top">
-          <a href="/" class="brand-link" aria-label="Home"><div class="app__brand" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <img class="app__logo" src="/xsic_logo.png" alt="XRPL Sell Impact Checker logo" width="36" height="36" />
-            <h1 class="app__title" style="word-break: keep-all;">XRPL SELL IMPACT CHECKER</h1>
-          </div></a>
-          <button
-            class="ghost-button"
-            type="button"
-            data-i18n="header.wallet_not_required"
-            hidden
-          ></button>
-          <div
-            class="lang-switch"
-            role="group"
-            aria-label="Language"
-            data-i18n-aria-label="language.label"
-          >
-            <span class="lang-switch__label" data-i18n="language.label"></span>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="en"
-              aria-pressed="false"
-            >
-              EN
-            </button>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="ja"
-              aria-pressed="false"
-            >
-              JA
-            </button>
-          </div>
+          <a href="/" class="brand-link" aria-label="XSIC Console Home">
+            <div class="app__brand">
+              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+              <h1 class="app__title">XSIC</h1>
+            </div>
+          </a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+          <nav class="site-nav global-nav" id="global-nav" aria-label="Primary">
+            <a href="/" data-nav-item="console">Console</a>
+            <a href="/apps/" data-nav-item="apps">Apps</a>
+            <a href="/methods/" data-nav-item="docs">Docs</a>
+            <a href="/donate/" data-nav-item="donate">Donate</a>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-nav-item="contact">Contact</a>
+          </nav>
         </div>
-        <p class="app__catchcopy" data-i18n="header.tagline"></p>
-        <nav class="site-nav" aria-label="Primary">
-          <a href="/methods/">Methods</a>
-          <a href="/faq/">FAQ</a>
-          <a href="/disclaimer/">Disclaimer</a>
-          <a href="/credits/">Credits</a>
-          <a href="/donate/">Donate</a>
-          <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-i18n="nav.contact"></a>
-        </nav>
       </header>
 
-      <main class="app__main">
-        <div id="mobile-jump" class="mobile-jump" aria-label="Jump">
-          <a class="mobile-jump__btn" href="#inputs-section" data-i18n="mobile.jump_inputs"></a>
-          <a class="mobile-jump__btn" href="#results-section" data-i18n="mobile.jump_results"></a>
-        </div>
-<section class="card" id="inputs-section" aria-labelledby="inputs-heading">
-<div class="card__header">
-            <h2 id="inputs-heading" data-i18n="sections.inputs"></h2>
-            <div class="pill-group">
-              <span class="pill pill--active" data-i18n="modes.simple"></span>
-              <span class="pill" data-i18n="modes.advanced"></span>
-            </div>
-          </div>
-
-          <div class="grid two-column">
-            <label class="field field--suggestions">
-              <span class="field__label" data-i18n="fields.currency.label"></span>
-              <input
-                id="currency-input"
-                type="text"
-                data-i18n-placeholder="fields.currency.placeholder"
-                aria-describedby="currency-error"
-                autocomplete="off"
-              />
-              <ul id="token-suggestions" class="suggestions" role="listbox" hidden></ul>
-
-              <p class="field__error" id="currency-error" data-error-for="currency" hidden></p>
-            </label>
-            <label class="field">
-              <span class="field__label" data-i18n="fields.issuer.label"></span>
-              <input
-                id="issuer-input"
-                type="text"
-                data-i18n-placeholder="fields.issuer.placeholder"
-                aria-describedby="issuer-help issuer-error"
-              />
-              <p class="field__help" id="issuer-help" data-i18n="fields.issuer.helper"></p>
-              <p class="field__error" id="issuer-error" data-error-for="issuer" hidden></p>
-            </label>
-            <label class="field">
-              <span class="field__label" data-i18n="fields.amount.label"></span>
-              <input
-                id="sell-amount-input"
-                type="number"
-                min="0"
-                step="any"
-                data-i18n-placeholder="fields.amount.placeholder"
-                aria-describedby="amount-error"
-              />
-              <p class="field__error" id="amount-error" data-error-for="amount" hidden></p>
-            </label>
-            
-            <label class="field">
-              <span class="field__label" data-i18n="fields.orderbook_limit.label"></span>
-              <input
-                id="limit-input"
-                type="number"
-                min="1"
-                step="1"
-                value="50"
-                data-i18n-placeholder="fields.orderbook_limit.placeholder"
-                aria-describedby="limit-error limit-note"
-              />
-              <p class="field__error" id="limit-error" data-error-for="limit" hidden></p>
-              <p class="field__note" id="limit-note" hidden></p>
-            </label>
-          </div>
-
-          <details class="advanced">
-            <summary data-i18n="sections.advanced_controls"></summary>
-            <div class="grid two-column">
-              <label class="field">
-                <span class="field__label" data-i18n="fields.impact_threshold.label"></span>
-                <select id="impact-threshold-select" aria-describedby="impact-threshold-help">
-                  <option value="1" data-i18n="fields.impact_threshold.option_1"></option>
-                  <option value="2" data-i18n="fields.impact_threshold.option_2"></option>
-                  <option value="5" data-i18n="fields.impact_threshold.option_5" selected></option>
-                  <option value="10" data-i18n="fields.impact_threshold.option_10"></option>
-                  <option value="20" data-i18n="fields.impact_threshold.option_20"></option>
-                </select>
-                <p
-                  class="field__help"
-                  id="impact-threshold-help"
-                  data-i18n="fields.impact_threshold.helper"
-                ></p>
-              </label>
-              <label class="field">
-                <span class="field__label" data-i18n="fields.thin_cutoff.label"></span>
-                <input
-                  id="thin-cutoff-input"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value="20"
-                  data-i18n-placeholder="fields.thin_cutoff.placeholder"
-                  aria-describedby="thin-cutoff-help"
-                />
-                <p
-                  class="field__help"
-                  id="thin-cutoff-help"
-                  data-i18n="fields.thin_cutoff.helper"
-                ></p>
-              </label>
-              <label class="field">
-                <span class="field__label" data-i18n="fields.fiat_currency.label"></span>
-                <select id="fiat-currency-select" aria-describedby="fiat-currency-help">
-                  <option value="USD" data-i18n="fields.fiat_currency.option_usd" selected></option>
-                  <option value="JPY" data-i18n="fields.fiat_currency.option_jpy"></option>
-                </select>
-                <p
-                  class="field__help"
-                  id="fiat-currency-help"
-                  data-i18n="fields.fiat_currency.helper"
-                ></p>
-              </label>
-            </div>
-          </details>
-
-          <div class="actions">
-  <div class="action-row" aria-label="Actions">
-    <div class="action-row__left">      <button class="secondary-button" type="button" id="reset-inputs" data-i18n="actions.reset">Reset</button>
-      <button class="secondary-button" type="button" id="copy-link" data-i18n="actions.copy_link">Copy link</button>
-    </div>
-    <div class="action-row__right">
-      <button class="primary-button" type="button" data-i18n="actions.estimate">Estimate</button>
-    </div>
-  </div>            <p class="status status--notice" id="example-status" hidden></p>
-            
-            
-            <p class="status status--notice" id="share-load-note" data-i18n="status.loaded_from_link" hidden></p>
-            <p class="status status--success" id="share-toast" aria-live="polite" hidden></p>
-            
-            <div class="progress-bar" id="estimate-progress" role="progressbar" aria-label="Estimating" hidden>
-              <span class="progress-bar__fill"></span>
-            </div>
-            <p class="error-banner" hidden></p>
-            <p class="status" data-i18n="status.waiting"></p>
-            <p class="status-endpoint" hidden></p>
-</div>
+      <main class="page__content">
+        <section class="card console-hero">
+          <h2 class="page__title">XRPL Signal &amp; Insight Console</h2>
+          <p class="page__lede">A lightweight entrance to 4 XRPL apps for signal checks, flow tracking, and exposure context.</p>
         </section>
 
-<section id="results-section" class="results" aria-label="Results">
-  <nav class="results-tabs" aria-label="Results tabs">
-    <a class="tab" data-tab="summary" href="#summary-block">Summary</a>
-    <a class="tab" data-tab="details" href="#details-block">Details</a>
-<a class="tab" data-tab="debug" href="#debug-panel"  >Debug</a>
-  </nav>
-
-
-        <section class="grid two-column">
-          <article id="summary-block" class="card" aria-labelledby="result-summary" data-pane="summary">
-            <div class="card__header">
-              <h2 id="result-summary" data-i18n="sections.results_summary"></h2>
+        <section class="console-layout">
+          <section class="card" aria-labelledby="apps-heading">
+            <h3 id="apps-heading">Apps</h3>
+            <div class="apps-grid">
+              <article class="app-card"><h4>Sell Impact</h4><p>Estimate DEX/AMM impact before execution.</p><a class="secondary-button" href="/apps/sell-impact/">Open</a></article>
+              <article class="app-card"><h4>Liquidity Pulse</h4><p>AMM/DEX liquidity pulse at a glance.</p><a class="secondary-button" href="/apps/liquidity-pulse/">Open</a></article>
+              <article class="app-card"><h4>Flow Alert</h4><p>Monitor exchange and whale flows.</p><a class="secondary-button" href="/apps/flow-alert/">Open</a></article>
+              <article class="app-card"><h4>Exposure Graph</h4><p>View issuer and trustline exposure.</p><a class="secondary-button" href="/apps/exposure-graph/">Open</a></article>
             </div>
-            <div class="result-stack">
-              <div class="result-row">
-                <p class="label" data-i18n="results.sellability.label"></p>
-                <p class="value" data-result="sellability" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="filled-line" data-i18n="common.placeholder"></p>
-              </div>
-              <div class="result-row">
-                <p class="label" data-i18n="results.freshness.label"></p>
-                <p class="subvalue" data-result="data-fetched" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="endpoint" data-i18n="common.placeholder"></p>
-              </div>
-              <div class="result-row">
-                <p class="label" data-i18n="results.used_venue.label"></p>
-                <p class="value" data-result="used-venue-summary" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="used-venue-note"></p>
-              </div>
-              <div class="result-row">
-                <p class="label" data-i18n="results.receive.label"></p>
-                <p class="value" data-result="receive" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="fiat-rate" data-i18n="results.receive.fiat_pending"></p>
-              </div>
-              <p class="warning-banner" data-result="fiat-warning" hidden></p>
-              <div class="result-row">
-                <p class="label" data-i18n="results.slippage.label"></p>
-                <p class="value" data-result="slippage" data-i18n="common.placeholder"></p>
-                <p class="help" data-result="slippage-help" data-i18n="results.slippage.help"></p>
-              </div>
-              <div class="result-row">
-                <p class="label" data-result="max-sell-label"></p>
-                <p class="value" data-result="max-sell-value" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="max-sell-note"></p>
-              </div>
-            </div>
-            <p class="why-line" data-result="why"></p>
-            <p class="warning-banner" data-result="warning" hidden></p>
-          </article>
+          </section>
 
-          <article id="details-block" class="card" aria-labelledby="result-details" data-pane="details">
-            <div class="card__header">
-              <h2 id="result-details" data-i18n="sections.execution_details"></h2>
-            </div>
-            <ul class="list">
-              <li>
-                <span data-i18n="details.order_count"></span>:
-                <span data-result="order-count" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.best_price"></span>:
-                <span data-result="best-price" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.worst_price"></span>:
-                <span data-result="worst-price" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-result="liquidity-split-label" data-i18n="common.placeholder"></span>:
-                <span data-result="liquidity-split" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.amm_reserves"></span>:
-                <span data-result="amm-reserves" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.amm_fee"></span>:
-                <span data-result="amm-fee" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.used_venue"></span>:
-                <span data-result="used-venue-details" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.endpoint_tried"></span>:
-                <span data-result="endpoint-details" data-i18n="common.placeholder"></span>
-              </li>
-            </ul>
-          
-
-<section id="charts-block" class="grid two-column">
-          <article class="card" aria-labelledby="graph-depth">
-            <div class="card__header">
-              <h2 id="graph-depth" data-i18n="sections.depth_curve"></h2>
-            </div>
-            <p class="chart__help" data-i18n="graphs.depth.helper"></p>
-            <div class="chart" data-chart="depth">
-              <svg
-                id="depth-chart"
-                class="chart__svg"
-                viewBox="0 0 320 200"
-                preserveAspectRatio="none"
-                data-i18n-aria-label="graphs.depth.aria_label"
-                role="img"
-              ></svg>
-            </div>
-            <p class="chart__note" data-result="depth-note" hidden></p>
-            <p class="chart__summary" data-result="depth-summary"></p>
-          </article>
-
-          <article class="card" aria-labelledby="graph-impact">
-            <div class="card__header">
-              <h2 id="graph-impact" data-i18n="sections.impact_curve"></h2>
-            </div>
-            <p class="chart__help" data-i18n="graphs.impact.helper"></p>
-            <div class="chart" data-chart="impact">
-              <svg
-                id="impact-chart"
-                class="chart__svg"
-                viewBox="0 0 320 200"
-                preserveAspectRatio="none"
-                data-i18n-aria-label="graphs.impact.aria_label"
-                role="img"
-              ></svg>
-            </div>
-            <p class="chart__note" data-result="impact-note" hidden></p>
-            <p class="chart__summary" data-result="impact-summary"></p>
-          </article>
-        </section>
-</article>
-        </section>
-
-        <details class="card debug-panel" id="debug-panel" hidden data-pane="debug">
-          <summary class="debug-panel__summary">Debug panel</summary>
-          <div class="debug-panel__body">
-            <div class="debug-panel__actions">
-              <button class="secondary-button" type="button" id="debug-copy">Copy debug</button>
-              <p class="status status--success" data-debug="copy-status" hidden></p>
-            </div>
-            <div class="debug-panel__table">
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Last request</span>
-                <span class="debug-panel__value" data-debug="last-request">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Requested input</span>
-                <pre class="debug-panel__value debug-panel__pre" data-debug="request-payload">—</pre>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Endpoint used</span>
-                <span class="debug-panel__value" data-debug="endpoint-used">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Upstream status</span>
-                <span class="debug-panel__value" data-debug="upstream-status">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Response status</span>
-                <span class="debug-panel__value" data-debug="status">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Elapsed</span>
-                <span class="debug-panel__value" data-debug="elapsed-ms">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Offers count</span>
-                <span class="debug-panel__value" data-debug="offers-count">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">CLOB max</span>
-                <span class="debug-panel__value" data-debug="clob-max">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">AMM max</span>
-                <span class="debug-panel__value" data-debug="amm-max">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">CLOB share</span>
-                <span class="debug-panel__value" data-debug="clob-share">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Chosen venue</span>
-                <span class="debug-panel__value" data-debug="venue">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Venue reason</span>
-                <span class="debug-panel__value" data-debug="venue-reason">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Error</span>
-                <span class="debug-panel__value" data-debug="error">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Raw response</span>
-                <details class="debug-panel__value debug-panel__details">
-                  <summary>View response</summary>
-                  <pre class="debug-panel__pre" data-debug="raw-response">—</pre>
-                </details>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Response keys</span>
-                <pre class="debug-panel__value debug-panel__pre" data-debug="response-keys">—</pre>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Timings</span>
-                <div class="debug-panel__timings">
-                  <span>validate <strong data-debug="validate-ms">—</strong></span>
-                  <span>network <strong data-debug="network-ms">—</strong></span>
-                  <span>parse <strong data-debug="parse-ms">—</strong></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </details>
-
-        
-</details>
-
-</details>
-  </section>
-
-
-
-
-        <section class="card" aria-labelledby="faq-heading">
-          <div class="card__header">
-            <h2 id="faq-heading" data-i18n="sections.faq"></h2>
-          </div>
-          <div class="stack">
-            <p>
-              <strong data-i18n="faq.q1"></strong>
-              <span data-i18n="faq.a1"></span>
-            </p>
-            <p>
-              <strong data-i18n="faq.q2"></strong>
-              <span data-i18n="faq.a2"></span>
-            </p>
-          </div>
-        </section>
-
-        <section class="card" aria-labelledby="disclaimer-heading">
-          <div class="card__header">
-            <h2 id="disclaimer-heading" data-i18n="sections.disclaimer"></h2>
-          </div>
-          <p data-i18n="disclaimer.text"></p>
-        </section>
-
-        <section class="card" aria-labelledby="sources-heading">
-          <div class="card__header">
-            <h2 id="sources-heading" data-i18n="sections.sources"></h2>
-          </div>
-          <ul class="list">
-            <li data-i18n="sources.xrpl"></li>
-            <li data-i18n="sources.trades"></li>
-            <li data-i18n="sources.feeds"></li>
-          </ul>
+          <aside class="card status-card" aria-labelledby="updates-heading">
+            <h3 id="updates-heading">Updates</h3>
+            <p><strong>API:</strong> OK / stale / down</p>
+            <p><strong>Last refresh:</strong> 12 sec ago</p>
+          </aside>
         </section>
       </main>
-
-      <footer class="site-footer">
-        <div class="site-footer__brand">
-          <a class="site-footer__title" href="https://badjoke-lab.com/" target="_blank" rel="noopener" data-i18n="footer.brand"></a>
-          <p class="site-footer__note" data-i18n="footer.note"></p>
-        </div>
-        <nav class="site-footer__links" aria-label="Footer">
-          <a href="/methods/">Methods</a>
-          <a href="/faq/">FAQ</a>
-          <a href="/disclaimer/">Disclaimer</a>
-          <a href="/credits/">Credits</a>
-          <a href="/donate/">Donate</a>
-        </nav>
-      </footer>
     </div>
-
-    <script type="module" src="app.js"></script>
+    <script src="/shared/global-nav.js"></script>
   </body>
 </html>

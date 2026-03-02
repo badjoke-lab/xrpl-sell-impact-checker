@@ -17,7 +17,7 @@
     <link rel="canonical" href="https://xsic.badjoke-lab.com/faq/">
   <meta property="og:url" content="https://xsic.badjoke-lab.com/faq/">
 </head>
-  <body>
+  <body data-nav-key="docs">
     <div class="app page">
       <header class="app__header">
         <div class="app__header-top">
@@ -50,14 +50,13 @@
             </button>
           </div>
         </div>
-        <nav class="site-nav" aria-label="Primary">
-          <a href="/" data-i18n="nav.home"></a>
-          <a href="/methods" data-i18n="nav.methods"></a>
-          <a href="/faq" data-i18n="nav.faq"></a>
-          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
-          <a href="/credits" data-i18n="nav.credits"></a>
-          <a href="/donate" data-i18n="nav.donate"></a>
-          <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-i18n="nav.contact"></a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+        <nav class="site-nav global-nav" id="global-nav" aria-label="Primary">
+          <a href="/" data-nav-item="console">Console</a>
+          <a href="/apps/" data-nav-item="apps">Apps</a>
+          <a href="/methods/" data-nav-item="docs">Docs</a>
+          <a href="/donate/" data-nav-item="donate">Donate</a>
+          <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-nav-item="contact">Contact</a>
         </nav>
       </header>
 
@@ -108,5 +107,6 @@
       </footer>
     </div>
     <script type="module" src="/src/i18n/page-init.js"></script>
+      <script src="/shared/global-nav.js"></script>
   </body>
 </html>
