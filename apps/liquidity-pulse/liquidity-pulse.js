@@ -2,6 +2,9 @@
   const STORAGE_KEY = 'xsic.liquidityPulse.liteMode';
   const DEMO_KEY = 'xsic.liquidityPulse.demoMode';
   const API_POOL = 'xrp-rlusd';
+  const LIQUIDITY_WINDOW = 12;
+  const LIQUIDITY_EMA_ALPHA = 0.3;
+  const MAX_FETCH_TIMEOUT_MS = 5000;
 
   const refs = {
     canvas: document.getElementById('pulse-canvas'),
@@ -20,6 +23,7 @@
       swaps5m: document.querySelector('[data-snapshot="swaps5m"]'),
       deviationBps: document.querySelector('[data-snapshot="deviationBps"]'),
       source: document.querySelector('[data-snapshot="source"]'),
+      staleNote: document.querySelector('[data-snapshot="staleNote"]'),
     },
     trendBars: {
       h1: document.querySelector('[data-trend="1h"]'),
@@ -38,9 +42,17 @@
     particles: [],
     rafId: null,
     loopStarted: 0,
-    targetFrameMs: 1000 / 30,
+    targetFrameMs: 1000 / 24,
     snapshotTimer: null,
     activeRequestId: 0,
+    latestSnapshot: null,
+    liquiditySamples: [],
+    liquidityRateEma: 0,
+    visual: {
+      amplitudeNorm: 0.18,
+      particleNorm: 0.24,
+      jitterNorm: 0.03,
+    },
   };
 
   if (refs.liteToggle) refs.liteToggle.checked = state.liteMode;
@@ -88,7 +100,7 @@
   }
 
   function snapshotIntervalMs() {
-    return state.liteMode ? 20000 : 12000;
+    return state.liteMode ? 30000 : 12000;
   }
 
   function loadBool(key) {
@@ -131,19 +143,23 @@
       }
 
       renderSnapshot(snapshot);
+      updateVisualState(snapshot);
       setMode('demo');
     } catch {
       if (requestId !== state.activeRequestId) return;
-      if (!preferDemo) {
+
+      if (preferDemo) {
         try {
           const demoSnapshot = await loadDummySnapshot();
           renderSnapshot(demoSnapshot);
+          updateVisualState(demoSnapshot);
           setMode('demo');
           return;
         } catch {
           // fall through
         }
       }
+
       resetSnapshotUI();
       setMode('error');
     }
@@ -151,7 +167,7 @@
 
   async function fetchSnapshot() {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 5000);
+    const timer = window.setTimeout(() => controller.abort(), MAX_FETCH_TIMEOUT_MS);
 
     try {
       const res = await fetch(`/api/xrpl/amm-snapshot?pool=${encodeURIComponent(API_POOL)}`, {
@@ -167,7 +183,8 @@
       }
 
       if (!res.ok || payload?.error) {
-        throw new Error(payload?.error || `http_${res.status}`);
+        const structuredError = payload && typeof payload === 'object';
+        throw new Error(structuredError ? 'structured_error' : payload?.error || `http_${res.status}`);
       }
 
       return normalizeSnapshot(payload);
@@ -188,7 +205,7 @@
       liquidityUsd: Number.isFinite(liquidityUsd) ? liquidityUsd : null,
       swaps5m: Number.isFinite(swaps5m) ? Math.round(swaps5m) : null,
       deviationBps: Number.isFinite(deviationBps) ? Math.round(deviationBps) : null,
-      source: snapshot?.source || 'demo',
+      source: snapshot?.source || 'api',
       stale: Boolean(snapshot?.stale),
       trend1h: 24,
       trend6h: 42,
@@ -236,7 +253,9 @@
     safeText(refs.snapshot.liquidityUsd, snapshot.liquidityUsd === null ? '—' : `$${Math.round(snapshot.liquidityUsd).toLocaleString()}`);
     safeText(refs.snapshot.swaps5m, snapshot.swaps5m === null ? '—' : String(snapshot.swaps5m));
     safeText(refs.snapshot.deviationBps, snapshot.deviationBps === null ? '—' : `${snapshot.deviationBps} bps`);
-    safeText(refs.snapshot.source, snapshot.source || '—');
+    const sourceLabel = snapshot.source === 'demo' ? 'Demo' : `API${snapshot.stale ? ': stale' : ': live'}`;
+    safeText(refs.snapshot.source, sourceLabel);
+    if (refs.snapshot.staleNote) refs.snapshot.staleNote.hidden = !snapshot.stale;
 
     if (refs.trendBars.h1) refs.trendBars.h1.style.height = `${snapshot.trend1h}%`;
     if (refs.trendBars.h6) refs.trendBars.h6.style.height = `${snapshot.trend6h}%`;
@@ -244,7 +263,13 @@
   }
 
   function resetSnapshotUI() {
-    Object.values(refs.snapshot).forEach((node) => safeText(node, '—'));
+    Object.entries(refs.snapshot).forEach(([key, node]) => {
+      if (key === 'staleNote') {
+        if (node) node.hidden = true;
+        return;
+      }
+      safeText(node, '—');
+    });
     Object.values(refs.trendBars).forEach((node) => {
       if (node) node.style.height = '12%';
     });
@@ -255,7 +280,7 @@
   }
 
   function applyLiteMode() {
-    state.targetFrameMs = state.liteMode ? 1000 / 14 : 1000 / 30;
+    state.targetFrameMs = state.liteMode ? 1000 / 12 : 1000 / 24;
     seedParticles();
   }
 
@@ -268,13 +293,16 @@
   }
 
   function seedParticles() {
-    const count = state.liteMode ? 16 : 44;
+    const intensity = state.visual?.particleNorm ?? 0.25;
+    const minCount = state.liteMode ? 8 : 18;
+    const maxCount = state.liteMode ? 20 : 54;
+    const count = Math.round(minCount + (maxCount - minCount) * intensity);
     const particles = [];
     for (let i = 0; i < count; i += 1) {
       particles.push({
         x: Math.random(),
         y: Math.random(),
-        radius: 1 + Math.random() * (state.liteMode ? 2.2 : 3.6),
+        radius: 1 + Math.random() * (state.liteMode ? 1.8 : 3.2),
         speed: 0.0008 + Math.random() * 0.0018,
         drift: (Math.random() - 0.5) * 0.0012,
         phase: Math.random() * Math.PI * 2,
@@ -320,10 +348,13 @@
     ctx.strokeStyle = 'rgba(37, 99, 235, 0.18)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    const amp = h * (state.liteMode ? 0.04 : 0.09);
+    const staleSoftener = state.latestSnapshot?.stale ? 0.68 : 1;
+    const amp = h * (0.03 + state.visual.amplitudeNorm * (state.liteMode ? 0.08 : 0.13)) * staleSoftener;
     const baseY = h * 0.5;
+    const jitterPx = state.visual.jitterNorm * 18;
     for (let x = 0; x <= w; x += 14) {
-      const y = baseY + Math.sin((x + elapsedMs * 0.06) * 0.018) * amp;
+      const jitter = Math.sin((x * 0.06) + elapsedMs * 0.01) * jitterPx;
+      const y = baseY + Math.sin((x + elapsedMs * 0.06) * 0.018) * amp + jitter;
       if (x === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
@@ -336,12 +367,52 @@
       if (particle.y < -0.05) particle.y = 1.05;
       if (particle.y > 1.05) particle.y = -0.05;
       const px = particle.x * w;
-      const py = particle.y * h + Math.sin(particle.phase) * 12;
+      const py = particle.y * h + Math.sin(particle.phase) * (7 + state.visual.jitterNorm * 16);
 
       ctx.beginPath();
       ctx.arc(px, py, particle.radius, 0, Math.PI * 2);
       ctx.fill();
     });
+  }
+
+  function updateVisualState(snapshot) {
+    state.latestSnapshot = snapshot;
+    const liquidity = Number(snapshot?.liquidityUsd);
+    if (Number.isFinite(liquidity) && liquidity > 0) {
+      const samples = state.liquiditySamples;
+      samples.push(liquidity);
+      if (samples.length > LIQUIDITY_WINDOW) samples.shift();
+      if (samples.length >= 2) {
+        const previous = samples[samples.length - 2];
+        const relativeRate = Math.abs((liquidity - previous) / Math.max(previous, 1));
+        const clampedRate = clamp(relativeRate, 0, 0.25);
+        state.liquidityRateEma = (LIQUIDITY_EMA_ALPHA * clampedRate) + ((1 - LIQUIDITY_EMA_ALPHA) * state.liquidityRateEma);
+      }
+    }
+
+    const swaps5m = clamp(Number(snapshot?.swaps5m) || 0, 0, 4000);
+    const deviationBps = clamp(Number(snapshot?.deviationBps) || 0, 0, 2000);
+
+    const amplitudeNorm = clamp(logScale(state.liquidityRateEma, 0.12), 0.02, 1);
+    const particleNorm = clamp(0.12 + logScale(swaps5m, 240), 0.12, 1);
+    const jitterNorm = clamp(0.02 + logScale(deviationBps, 120), 0.02, 1);
+
+    state.visual = {
+      amplitudeNorm,
+      particleNorm,
+      jitterNorm,
+    };
+
+    seedParticles();
+  }
+
+  function logScale(value, scaleMax) {
+    const clamped = clamp(value, 0, scaleMax);
+    return Math.log10(1 + clamped * 9 / Math.max(scaleMax, 0.0001));
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
   }
 
   function wait(ms) {
