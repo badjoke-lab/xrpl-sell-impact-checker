@@ -22,7 +22,6 @@
             </div>
           </a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
           <div data-global-nav></div>
         </div>
       </header>
@@ -30,26 +29,44 @@
       <main class="page__content liquidity-pulse" aria-live="polite">
         <section class="card">
           <h2 class="page__title">Liquidity Pulse</h2>
-          <p class="page__lede">Dummy rendering is now active. API integration comes next.</p>
+          <p class="page__lede">Real AMM snapshots when Functions are available; automatic demo fallback for static hosting.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <label><input id="lite-mode-toggle" type="checkbox" /> Lite mode</label>
+            <label><input id="demo-mode-toggle" type="checkbox" /> Demo only</label>
+            <button id="retry-button" class="secondary-button" type="button">Retry</button>
+          </div>
         </section>
-        <section class="card" aria-label="Shared UI state mount"><div class="ui-mount" data-ui-mount="liquidity-pulse"></div></section>
+
+        <section class="card" style="position:relative;overflow:hidden;">
+          <canvas id="pulse-canvas" style="width:100%;height:230px;border-radius:12px;"></canvas>
+          <div data-state-overlay="loading">Loading snapshot…</div>
+          <div data-state-overlay="error" hidden>Could not load live snapshot. Toggle Demo only or Retry.</div>
+          <div data-state-overlay="empty" hidden>No liquidity data available for this pool.</div>
+        </section>
+
+        <section class="card">
+          <dl style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;">
+            <dt>Pool</dt><dd data-snapshot="pool">—</dd>
+            <dt>Price</dt><dd data-snapshot="price">—</dd>
+            <dt>Liquidity (USD)</dt><dd data-snapshot="liquidityUsd">—</dd>
+            <dt>Swaps (5m)</dt><dd data-snapshot="swaps5m">—</dd>
+            <dt>Deviation</dt><dd data-snapshot="deviationBps">—</dd>
+            <dt>Source</dt><dd data-snapshot="source">—</dd>
+          </dl>
+        </section>
+
+        <section class="card">
+          <h3>Pulse trend</h3>
+          <div style="display:flex;gap:12px;height:120px;align-items:flex-end;">
+            <div style="flex:1;background:#dbeafe;border-radius:8px 8px 0 0;height:12%;" data-trend="1h"></div>
+            <div style="flex:1;background:#93c5fd;border-radius:8px 8px 0 0;height:12%;" data-trend="6h"></div>
+            <div style="flex:1;background:#60a5fa;border-radius:8px 8px 0 0;height:12%;" data-trend="24h"></div>
+          </div>
+        </section>
       </main>
       <div data-global-footer></div>
     </div>
-    <script src="/shared/ui-kit.js"></script>
     <script src="/shared/nav.js"></script>
-    <script>
-      const mount = document.querySelector('[data-ui-mount="liquidity-pulse"]');
-      window.XSICUiKit?.renderLoadingState(mount, { label: 'Rendering Liquidity Pulse demo…' });
-      window.setTimeout(() => {
-        window.XSICUiKit?.renderEmptyState(mount, {
-          title: 'Liquidity Pulse demo view',
-          body: window.XSICUiKit?.getLiteMode()
-            ? 'Lite mode is ON: low-intensity placeholders are enabled.'
-            : 'Lite mode is OFF: standard placeholders are enabled.',
-          actions: [{ label: 'Back to Apps', href: '/apps/' }],
-        });
-      }, 600);
-    </script>
+    <script src="/apps/liquidity-pulse/liquidity-pulse.js"></script>
   </body>
 </html>

@@ -1,12 +1,13 @@
 (() => {
-  const STORAGE_KEY = 'xsic.liteMode';
-  const SNAPSHOT_MS = 12000;
+  const STORAGE_KEY = 'xsic.liquidityPulse.liteMode';
+  const DEMO_KEY = 'xsic.liquidityPulse.demoMode';
+  const API_POOL = 'xrp-rlusd';
 
   const refs = {
     canvas: document.getElementById('pulse-canvas'),
     liteToggle: document.getElementById('lite-mode-toggle'),
+    demoToggle: document.getElementById('demo-mode-toggle'),
     retryButton: document.getElementById('retry-button'),
-    choosePresetButton: document.getElementById('choose-preset-button'),
     overlays: {
       loading: document.querySelector('[data-state-overlay="loading"]'),
       error: document.querySelector('[data-state-overlay="error"]'),
@@ -18,6 +19,7 @@
       liquidityUsd: document.querySelector('[data-snapshot="liquidityUsd"]'),
       swaps5m: document.querySelector('[data-snapshot="swaps5m"]'),
       deviationBps: document.querySelector('[data-snapshot="deviationBps"]'),
+      source: document.querySelector('[data-snapshot="source"]'),
     },
     trendBars: {
       h1: document.querySelector('[data-trend="1h"]'),
@@ -26,41 +28,44 @@
     },
   };
 
-  if (!refs.canvas || !refs.liteToggle) {
-    return;
-  }
+  if (!refs.canvas) return;
 
   const ctx = refs.canvas.getContext('2d');
   const state = {
     mode: 'loading',
-    liteMode: loadLiteMode(),
-    snapshot: null,
+    liteMode: loadBool(STORAGE_KEY),
+    demoMode: loadBool(DEMO_KEY),
     particles: [],
     rafId: null,
     loopStarted: 0,
     targetFrameMs: 1000 / 30,
     snapshotTimer: null,
-    forceFailure: new URLSearchParams(window.location.search).get('fail') === '1',
+    activeRequestId: 0,
   };
 
-  refs.liteToggle.checked = state.liteMode;
+  if (refs.liteToggle) refs.liteToggle.checked = state.liteMode;
+  if (refs.demoToggle) refs.demoToggle.checked = state.demoMode;
+
   applyLiteMode();
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
-  refs.liteToggle.addEventListener('change', () => {
-    state.liteMode = refs.liteToggle.checked;
-    saveLiteMode(state.liteMode);
+  refs.liteToggle?.addEventListener('change', () => {
+    state.liteMode = Boolean(refs.liteToggle.checked);
+    saveBool(STORAGE_KEY, state.liteMode);
     applyLiteMode();
+    restartSnapshotLoop();
+  });
+
+  refs.demoToggle?.addEventListener('change', () => {
+    state.demoMode = Boolean(refs.demoToggle.checked);
+    saveBool(DEMO_KEY, state.demoMode);
+    void reloadSnapshot({ preferDemo: state.demoMode });
   });
 
   refs.retryButton?.addEventListener('click', () => {
-    void reloadSnapshot();
-  });
-
-  refs.choosePresetButton?.addEventListener('click', () => {
-    state.forceFailure = false;
-    void reloadSnapshot();
+    restartSnapshotLoop();
+    void reloadSnapshot({ forceApi: true });
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -69,10 +74,9 @@
       stopSnapshotLoop();
       return;
     }
-    startSnapshotLoop();
-    if (state.mode === 'demo') {
-      startAnimation();
-    }
+    restartSnapshotLoop();
+    if (state.mode === 'demo') startAnimation();
+    void reloadSnapshot({ silent: true });
   });
 
   void init();
@@ -83,17 +87,21 @@
     startSnapshotLoop();
   }
 
-  function loadLiteMode() {
+  function snapshotIntervalMs() {
+    return state.liteMode ? 20000 : 12000;
+  }
+
+  function loadBool(key) {
     try {
-      return window.localStorage.getItem(STORAGE_KEY) === '1';
+      return window.localStorage.getItem(key) === '1';
     } catch {
       return false;
     }
   }
 
-  function saveLiteMode(enabled) {
+  function saveBool(key, enabled) {
     try {
-      window.localStorage.setItem(STORAGE_KEY, enabled ? '1' : '0');
+      window.localStorage.setItem(key, enabled ? '1' : '0');
     } catch {
       // ignore storage failures
     }
@@ -102,67 +110,120 @@
   function setMode(mode) {
     state.mode = mode;
     Object.entries(refs.overlays).forEach(([name, node]) => {
-      if (!node) return;
-      node.hidden = name !== mode;
+      if (node) node.hidden = name !== mode;
     });
-
-    if (mode === 'demo') {
-      startAnimation();
-      return;
-    }
-    stopAnimation();
+    if (mode === 'demo') startAnimation();
+    else stopAnimation();
   }
 
-  async function reloadSnapshot() {
-    setMode('loading');
+  async function reloadSnapshot({ preferDemo = false, forceApi = false, silent = false } = {}) {
+    const requestId = ++state.activeRequestId;
+    if (!silent) setMode('loading');
 
     try {
-      const snapshot = await loadDummySnapshot();
+      const snapshot = (!preferDemo || forceApi) ? await fetchSnapshot() : await loadDummySnapshot();
+      if (requestId !== state.activeRequestId) return;
+
       if (!snapshot) {
         resetSnapshotUI();
         setMode('empty');
         return;
       }
-      state.snapshot = snapshot;
+
       renderSnapshot(snapshot);
       setMode('demo');
     } catch {
+      if (requestId !== state.activeRequestId) return;
+      if (!preferDemo) {
+        try {
+          const demoSnapshot = await loadDummySnapshot();
+          renderSnapshot(demoSnapshot);
+          setMode('demo');
+          return;
+        } catch {
+          // fall through
+        }
+      }
       resetSnapshotUI();
       setMode('error');
     }
   }
 
+  async function fetchSnapshot() {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const res = await fetch(`/api/xrpl/amm-snapshot?pool=${encodeURIComponent(API_POOL)}`, {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+        signal: controller.signal,
+      });
+      let payload = null;
+      try {
+        payload = await res.json();
+      } catch {
+        throw new Error('invalid_json');
+      }
+
+      if (!res.ok || payload?.error) {
+        throw new Error(payload?.error || `http_${res.status}`);
+      }
+
+      return normalizeSnapshot(payload);
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  function normalizeSnapshot(snapshot) {
+    const price = Number(snapshot?.price);
+    const liquidityUsd = Number(snapshot?.liquidityUsd);
+    const swaps5m = Number(snapshot?.swaps5m);
+    const deviationBps = Number(snapshot?.deviationBps);
+
+    return {
+      pool: snapshot?.poolLabel || 'XRPL AMM',
+      price: Number.isFinite(price) ? price : null,
+      liquidityUsd: Number.isFinite(liquidityUsd) ? liquidityUsd : null,
+      swaps5m: Number.isFinite(swaps5m) ? Math.round(swaps5m) : null,
+      deviationBps: Number.isFinite(deviationBps) ? Math.round(deviationBps) : null,
+      source: snapshot?.source || 'demo',
+      stale: Boolean(snapshot?.stale),
+      trend1h: 24,
+      trend6h: 42,
+      trend24h: 62,
+    };
+  }
+
   function startSnapshotLoop() {
     if (state.snapshotTimer) return;
     state.snapshotTimer = window.setInterval(() => {
-      void reloadSnapshot();
-    }, SNAPSHOT_MS);
+      void reloadSnapshot({ preferDemo: state.demoMode, silent: true });
+    }, snapshotIntervalMs());
   }
 
   function stopSnapshotLoop() {
     if (!state.snapshotTimer) return;
-    clearInterval(state.snapshotTimer);
+    window.clearInterval(state.snapshotTimer);
     state.snapshotTimer = null;
   }
 
+  function restartSnapshotLoop() {
+    stopSnapshotLoop();
+    startSnapshotLoop();
+  }
+
   async function loadDummySnapshot() {
-    await wait(650);
-
-    if (state.forceFailure) {
-      throw new Error('forced_failure');
-    }
-
-    const chance = Math.random();
-    if (chance < 0.14) {
-      return null;
-    }
-
+    await wait(250);
     return {
-      pool: 'XRP/USDC Demo',
-      price: 0.51 + Math.random() * 0.03,
-      liquidityUsd: 900000 + Math.random() * 120000,
-      swaps5m: Math.round(12 + Math.random() * 31),
-      deviationBps: Math.round(3 + Math.random() * 24),
+      pool: 'XRP / RLUSD Demo',
+      price: 0.5 + Math.random() * 0.05,
+      liquidityUsd: 850000 + Math.random() * 190000,
+      swaps5m: Math.round(6 + Math.random() * 24),
+      deviationBps: Math.round(2 + Math.random() * 26),
+      source: 'demo',
+      stale: false,
       trend1h: Math.max(8, Math.round(25 + Math.random() * 65)),
       trend6h: Math.max(8, Math.round(20 + Math.random() * 75)),
       trend24h: Math.max(8, Math.round(15 + Math.random() * 82)),
@@ -170,11 +231,12 @@
   }
 
   function renderSnapshot(snapshot) {
-    safeText(refs.snapshot.pool, snapshot.pool);
-    safeText(refs.snapshot.price, `${snapshot.price.toFixed(4)} XRP`);
-    safeText(refs.snapshot.liquidityUsd, `$${Math.round(snapshot.liquidityUsd).toLocaleString()}`);
-    safeText(refs.snapshot.swaps5m, String(snapshot.swaps5m));
-    safeText(refs.snapshot.deviationBps, `${snapshot.deviationBps} bps`);
+    safeText(refs.snapshot.pool, snapshot.pool + (snapshot.stale ? ' (stale)' : ''));
+    safeText(refs.snapshot.price, snapshot.price === null ? '—' : `${snapshot.price.toFixed(6)}`);
+    safeText(refs.snapshot.liquidityUsd, snapshot.liquidityUsd === null ? '—' : `$${Math.round(snapshot.liquidityUsd).toLocaleString()}`);
+    safeText(refs.snapshot.swaps5m, snapshot.swaps5m === null ? '—' : String(snapshot.swaps5m));
+    safeText(refs.snapshot.deviationBps, snapshot.deviationBps === null ? '—' : `${snapshot.deviationBps} bps`);
+    safeText(refs.snapshot.source, snapshot.source || '—');
 
     if (refs.trendBars.h1) refs.trendBars.h1.style.height = `${snapshot.trend1h}%`;
     if (refs.trendBars.h6) refs.trendBars.h6.style.height = `${snapshot.trend6h}%`;
@@ -193,7 +255,7 @@
   }
 
   function applyLiteMode() {
-    state.targetFrameMs = state.liteMode ? 1000 / 16 : 1000 / 30;
+    state.targetFrameMs = state.liteMode ? 1000 / 14 : 1000 / 30;
     seedParticles();
   }
 
@@ -206,14 +268,14 @@
   }
 
   function seedParticles() {
-    const count = state.liteMode ? 18 : 48;
+    const count = state.liteMode ? 16 : 44;
     const particles = [];
     for (let i = 0; i < count; i += 1) {
       particles.push({
         x: Math.random(),
         y: Math.random(),
-        radius: 1 + Math.random() * (state.liteMode ? 2.4 : 3.8),
-        speed: 0.0008 + Math.random() * 0.002,
+        radius: 1 + Math.random() * (state.liteMode ? 2.2 : 3.6),
+        speed: 0.0008 + Math.random() * 0.0018,
         drift: (Math.random() - 0.5) * 0.0012,
         phase: Math.random() * Math.PI * 2,
       });
@@ -258,7 +320,7 @@
     ctx.strokeStyle = 'rgba(37, 99, 235, 0.18)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    const amp = h * (state.liteMode ? 0.05 : 0.09);
+    const amp = h * (state.liteMode ? 0.04 : 0.09);
     const baseY = h * 0.5;
     for (let x = 0; x <= w; x += 14) {
       const y = baseY + Math.sin((x + elapsedMs * 0.06) * 0.018) * amp;
