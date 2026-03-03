@@ -2112,3 +2112,106 @@ svg polygon[fill="black"]{
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* Flow Alert */
+.flow-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.flow-select {
+  min-height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: #ffffff;
+}
+
+.flow-layout {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+.flow-canvas-wrap {
+  position: relative;
+  min-height: 240px;
+  overflow: hidden;
+}
+
+#flowCanvas {
+  width: 100%;
+  height: 240px;
+  border-radius: 12px;
+}
+
+.flow-overlay {
+  position: absolute;
+  inset: 10px;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px dashed #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 12px;
+}
+
+.flow-snapshot-list {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+}
+
+.flow-snapshot-list dt,
+.flow-snapshot-list dd {
+  margin: 0;
+}
+
+.flow-snapshot-list dd {
+  font-weight: 600;
+  text-align: right;
+}
+
+.flow-trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 110px;
+}
+
+.flow-trend-bars div {
+  flex: 1;
+  min-height: 14%;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, #60a5fa, #3b82f6);
+}
+
+.flow-status {
+  font-size: 0.92rem;
+  color: #334155;
+}
+
+.flow-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 768px) {
+  .flow-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(250px, 1fr);
+    align-items: stretch;
+  }
+
+  #flowCanvas,
+  .flow-canvas-wrap {
+    min-height: 280px;
+    height: 280px;
+  }
+}
