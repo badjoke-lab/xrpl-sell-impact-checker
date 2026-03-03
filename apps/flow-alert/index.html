@@ -4,35 +4,93 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Flow Alert — XSIC</title>
+    <meta name="description" content="Visualize exchange/whale in/out flows as actionable signals." />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="icon" href="/favicon.png" />
   </head>
   <body data-nav-key="apps">
-    <div class="app page console-page">
+    <div class="app page console-page flow-alert-page">
       <header class="app__header global-header">
         <div class="app__header-top">
-          <a href="/" class="brand-link"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><h1 class="app__title">XSIC</h1></div></a>
+          <a href="/" class="brand-link" aria-label="Home">
+            <div class="app__brand">
+              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+              <h1 class="app__title">Flow Alert — XSIC</h1>
+            </div>
+          </a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
           <div data-global-nav></div>
         </div>
       </header>
-      <main class="page__content">
+
+      <main class="page__content flow-alert" aria-live="polite">
         <section class="card">
-          <h2 class="page__title">Flow Alert</h2>
-          <p class="page__lede">Coming soon. Shared states are ready for this app.</p>
+          <h2 class="page__title">Flow Alert Visualizer</h2>
+          <p class="page__lede">Visualize exchange/whale in/out flows as actionable signals.</p>
+          <div id="flowToolbar" class="flow-toolbar">
+            <label><input id="flow-lite-toggle" type="checkbox" /> Lite mode</label>
+            <label><input id="flow-demo-toggle" type="checkbox" /> Demo only</label>
+            <label for="flow-target-preset">Target preset</label>
+            <select id="flow-target-preset" class="flow-select">
+              <option value="exchanges">Exchanges (default)</option>
+              <option value="whales">Whales (default)</option>
+              <option value="custom">Custom (coming soon)</option>
+              <option value="">Unset (empty state demo)</option>
+            </select>
+          </div>
         </section>
-        <section class="card" aria-label="Shared UI state mount"><div class="ui-mount" data-ui-mount="flow-alert"></div></section>
+
+        <section class="flow-layout">
+          <section id="flowCanvasWrap" class="card flow-canvas-wrap">
+            <canvas id="flowCanvas" aria-label="Flow visualization"></canvas>
+            <div data-flow-state="loading" class="flow-overlay">Loading flow visualizer…</div>
+            <div data-flow-state="error" class="flow-overlay" hidden>
+              <p>Could not load flow source.</p>
+              <button id="flow-retry-button" class="secondary-button" type="button">Retry</button>
+            </div>
+            <div data-flow-state="empty" class="flow-overlay" hidden>
+              <p>No target preset selected.</p>
+              <button id="flow-empty-button" class="secondary-button" type="button">Use Exchanges preset</button>
+            </div>
+          </section>
+
+          <aside id="flowSnapshot" class="card">
+            <h3>Snapshot</h3>
+            <dl class="flow-snapshot-list">
+              <dt>Target:</dt><dd data-flow-snapshot="target">—</dd>
+              <dt>Window:</dt><dd data-flow-snapshot="window">5m</dd>
+              <dt>Inflow:</dt><dd data-flow-snapshot="inflow">—</dd>
+              <dt>Outflow:</dt><dd data-flow-snapshot="outflow">—</dd>
+              <dt>Net:</dt><dd data-flow-snapshot="net">—</dd>
+              <dt>Source:</dt><dd data-flow-snapshot="source">—</dd>
+            </dl>
+          </aside>
+        </section>
+
+        <section id="flowTrend" class="card">
+          <h3>Trend</h3>
+          <div class="flow-trend-bars">
+            <div data-flow-trend="1"></div>
+            <div data-flow-trend="2"></div>
+            <div data-flow-trend="3"></div>
+            <div data-flow-trend="4"></div>
+            <div data-flow-trend="5"></div>
+            <div data-flow-trend="6"></div>
+          </div>
+        </section>
+
+        <section id="flowStatus" class="card flow-status">
+          Status: waiting for initialization…
+        </section>
+
+        <section class="card flow-actions">
+          <a class="secondary-button" href="/apps/">← Back to apps</a>
+          <a class="secondary-button" href="/">Back home</a>
+        </section>
       </main>
       <div data-global-footer></div>
     </div>
-    <script src="/shared/ui-kit.js"></script>
-    <script src="/shared/nav.js"></script>
-    <script>
-      window.XSICUiKit?.renderEmptyState('[data-ui-mount="flow-alert"]', {
-        title: 'Flow Alert placeholder',
-        body: 'This screen now shares the same empty/error/loading UI kit.',
-      });
-    </script>
+    <script defer src="/shared/nav.js"></script>
+    <script defer src="/apps/flow-alert/flow-alert.js"></script>
   </body>
 </html>
