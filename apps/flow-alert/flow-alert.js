@@ -173,8 +173,9 @@
         window: state.window,
         priceXrpUsd: null,
         summary: { inflowXrp: 0, outflowXrp: 0, netXrp: 0, inflowUsd: null, outflowUsd: null, netUsd: null },
-        heatmap: { labels: ['Binance', 'Coinbase', 'Bitstamp', 'Kraken', 'Bybit', 'Unknown'], buckets: [], matrix: [], unit: 'xrp' },
+        heatmap: { labels: ['Unknown'], buckets: [], matrix: [], unit: 'xrp' },
         events: [],
+        summaryReason: 'Unable to fetch live data.',
         debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`] },
       };
     }
@@ -229,7 +230,11 @@
         amountXrp,
         amountUsd: amountXrp * 0.58,
         score: amountXrp > 900000 ? 'HIGH' : 'MED',
-        reason: 'demo rule set',
+        scoreBasis: i % 3 === 0 ? 'both' : i % 2 ? 'amount' : 'rank',
+        reason: i % 2 ? `to exchange address (${labels[i % labels.length]}) → potential sell pressure` : `from exchange address (${labels[i % labels.length]}) → potential withdrawal`,
+        labelSource: `matched preset: ${labels[i % labels.length]}`,
+        txHash: `DEMOHASH${i}`,
+        timeBucket: `b${i + 1}`,
       });
     }
 
@@ -255,7 +260,8 @@
         unit: 'usd',
       },
       events,
-      debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: events.length, cacheHit: false, warnings: [] },
+      summaryReason: events[0]?.reason || 'No notable events above threshold.',
+      debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: events.length, cacheHit: false, scoreBasis: events[0]?.scoreBasis || 'amount', warnings: [] },
     };
   }
 
@@ -302,7 +308,7 @@
     const net = useUsd ? payload.summary.netUsd : payload.summary.netXrp;
     const pressure = Math.abs(net) > (useUsd ? 700000 : 1000000) ? 'HIGH' : 'MEDIUM';
     safeText(refs.summary.headline, `NET: ${useUsd ? formatSignedUsd(net) : formatSignedXrp(net)} | Pressure: ${pressure} | Window: ${payload.window} | Target: ${state.preset}`);
-    safeText(refs.summary.reason, payload.events?.[0]?.reason ? `Why: ${payload.events[0].reason}` : 'Why: no notable events yet.');
+    safeText(refs.summary.reason, payload.summaryReason ? `Why: ${payload.summaryReason}` : 'Why: no notable events yet.');
   }
 
   function renderHeatmap(refs, state) {
@@ -385,7 +391,7 @@
 
     refs.eventsTableBody.innerHTML = rows.map((row) => `
       <tr>
-        <td><details><summary>${formatTime(row.time)}</summary><div>reason: ${row.reason}<br>from: ${row.from}<br>to: ${row.to}</div></details></td>
+        <td><details><summary>${formatTime(row.time)}</summary><div>reason: ${row.reason || 'n/a'}<br>label source: ${row.labelSource || 'unknown'}<br>tx: ${row.txHash || 'n/a'}<br>bucket: ${row.timeBucket || 'n/a'}<br>from: ${row.from}<br>to: ${row.to}</div></details></td>
         <td>${shortAddress(row.from)} → ${shortAddress(row.to)}</td>
         <td>${row.label}</td>
         <td>${row.dir}</td>
@@ -398,7 +404,9 @@
       <details class="flow-event-card">
         <summary>${formatTime(row.time)} • ${row.dir} • ${formatXrp(row.amountXrp)} • ${row.score}</summary>
         <p>${shortAddress(row.from)} → ${shortAddress(row.to)} (${row.label})</p>
-        <p>reason: ${row.reason}</p>
+        <p>reason: ${row.reason || 'n/a'}</p>
+        <p>label source: ${row.labelSource || 'unknown'}</p>
+        <p>tx: ${row.txHash || 'n/a'} / bucket: ${row.timeBucket || 'n/a'}</p>
       </details>
     `).join('');
   }

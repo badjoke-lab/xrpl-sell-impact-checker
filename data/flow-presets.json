@@ -1,13 +1,78 @@
 {
-  "exchanges": {
-    "id": "exchanges",
-    "labels": ["Binance", "Coinbase", "Bitstamp", "Kraken", "Bybit", "Unknown"],
-    "addresses": [
-      { "address": "rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh", "label": "Binance" },
-      { "address": "r3ADD8kXSUKHd6zTCKfnKT3zV9EZHjzp1S", "label": "Coinbase" },
-      { "address": "rDsbeomae4FXwgQTJp9Rs64Qg9vDiTCdBv", "label": "Bitstamp" },
-      { "address": "rU6K7V3Po4snVhBBaU29sesqs2qTQJWDw1", "label": "Kraken" },
-      { "address": "rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh", "label": "Bybit" }
-    ]
+  "presets": {
+    "exchanges": {
+      "id": "exchanges",
+      "description": "Known exchange wallets used for directional flow detection.",
+      "entities": [
+        {
+          "id": "binance",
+          "label": "Binance",
+          "type": "exchange",
+          "tag": "hotwallet",
+          "addrs": ["rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh"]
+        },
+        {
+          "id": "coinbase",
+          "label": "Coinbase",
+          "type": "exchange",
+          "tag": "hotwallet",
+          "addrs": ["r3ADD8kXSUKHd6zTCKfnKT3zV9EZHjzp1S"]
+        },
+        {
+          "id": "bitstamp",
+          "label": "Bitstamp",
+          "type": "exchange",
+          "tag": "hotwallet",
+          "addrs": ["rDsbeomae4FXwgQTJp9Rs64Qg9vDiTCdBv"]
+        },
+        {
+          "id": "kraken",
+          "label": "Kraken",
+          "type": "exchange",
+          "tag": "hotwallet",
+          "addrs": ["rU6K7V3Po4snVhBBaU29sesqs2qTQJWDw1"]
+        },
+        {
+          "id": "bybit",
+          "label": "Bybit",
+          "type": "exchange",
+          "tag": "hotwallet",
+          "addrs": ["rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh"]
+        }
+      ]
+    },
+    "whales": {
+      "id": "whales",
+      "description": "Rule-based large transfer watch with exchange context when available.",
+      "rules": {
+        "minAmountXrp": {
+          "default": 500000,
+          "5m": 250000,
+          "1h": 500000,
+          "24h": 1000000
+        }
+      },
+      "entities": []
+    },
+    "ripple": {
+      "id": "ripple",
+      "description": "Ripple and escrow-related addresses for unlock watch extensions.",
+      "entities": [
+        {
+          "id": "ripple-treasury",
+          "label": "Ripple",
+          "type": "ripple",
+          "tag": "treasury",
+          "addrs": ["rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"]
+        },
+        {
+          "id": "ripple-escrow",
+          "label": "Ripple Escrow",
+          "type": "ripple",
+          "tag": "escrow",
+          "addrs": ["rP1coskQzayaQ9geMdJgAV5f3tNZcHghzH"]
+        }
+      ]
+    }
   }
 }
