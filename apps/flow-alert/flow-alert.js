@@ -188,6 +188,7 @@
   }
 
   async function fetchFlowPayload(url, state) {
+    const startedAt = Date.now();
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`http_${response.status}`);
@@ -196,7 +197,7 @@
       return {
         ok: false,
         ts: Date.now(),
-        source: 'demo',
+        source: 'xrpl:rpc',
         stale: true,
         window: state.window,
         priceXrpUsd: null,
@@ -204,8 +205,8 @@
         heatmap: { labels: ['Unknown'], buckets: [], matrix: [], unit: 'xrp' },
         events: [],
         summaryReason: 'Unable to fetch live data.',
-        staleReason: 'cached',
-        debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'D', strategy: 'fetch_failed' },
+        staleReason: 'fetch_error',
+        debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`], durationMs: Math.max(1, Date.now() - startedAt), rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'D', strategy: 'fetch_failed', lastError: error instanceof Error ? error.message : 'unknown' },
       };
     }
   }
@@ -421,8 +422,9 @@
   function renderPanels(refs, state) {
     toggleOverlay(refs, state.mode);
     const payload = state.payload;
+    const liveError = getLiveError(payload, state.demoOnly);
     safeText(refs.statusMeta, state.mode.toUpperCase());
-    safeText(refs.status, `Status: ${state.mode.toUpperCase()}`);
+    safeText(refs.status, liveError ? `Status: ${state.mode.toUpperCase()} | Live error: ${liveError}` : `Status: ${state.mode.toUpperCase()}`);
     safeText(refs.debugLine, buildDebugLine(state));
     refs.staleNote.hidden = state.mode !== 'stale';
 
@@ -449,7 +451,8 @@
     safeText(refs.summary.headline, `NET: ${useUsd ? formatSignedUsd(net) : formatSignedXrp(net)} | Pressure: ${pressure} | Window: ${payload.window} | Target: ${state.preset}`);
     const escrowNote = buildEscrowSummaryNote(state.escrowPayload);
     const reason = payload.summaryReason ? `Why: ${payload.summaryReason}` : 'Why: no notable events yet.';
-    safeText(refs.summary.reason, escrowNote ? `${reason} | ${escrowNote}` : reason);
+    const reasonWithError = liveError ? `${reason} | Live error: ${liveError}` : reason;
+    safeText(refs.summary.reason, escrowNote ? `${reasonWithError} | ${escrowNote}` : reasonWithError);
   }
 
   function renderHeatmap(refs, state) {
@@ -556,7 +559,14 @@
   function buildDebugLine(state) {
     const payload = state.payload || {};
     const dbg = payload.debug || {};
-    return `FLOW_DEBUG preset=${state.preset || 'none'} window=${payload.window || state.window} ok=${Boolean(payload.ok)} stale=${Boolean(payload.stale)} dur=${Math.round(dbg.durationMs || 0)}ms rpc=${dbg.rpcCalls || 0} strat=${dbg.strategy || 'n/a'} degrade=${dbg.degradeLevel || 'none'}`;
+    const firstWarning = Array.isArray(dbg.warnings) && dbg.warnings.length ? dbg.warnings[0] : 'none';
+    return `FLOW_DEBUG preset=${state.preset || 'none'} window=${payload.window || state.window} ok=${Boolean(payload.ok)} stale=${Boolean(payload.stale)} dur=${Math.round(dbg.durationMs || 0)}ms rpc=${dbg.rpcCalls || 0} strat=${dbg.strategy || 'n/a'} degrade=${dbg.degradeLevel || 'none'} lastError=${dbg.lastError || 'none'} warn=${firstWarning}`;
+  }
+
+  function getLiveError(payload, demoOnly) {
+    if (demoOnly || !payload || payload.ok) return '';
+    const warnings = Array.isArray(payload.debug?.warnings) ? payload.debug.warnings : [];
+    return warnings[0] || payload.debug?.lastError || payload.staleReason || 'unknown_live_error';
   }
 
   function bindCanvasInteraction(refs, state) {
