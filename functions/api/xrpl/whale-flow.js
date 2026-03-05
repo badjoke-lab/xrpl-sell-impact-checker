@@ -7,6 +7,7 @@ const XRPL_ENDPOINTS = [
 
 const FLOW_CACHE_TTL_MS = 45_000;
 const PRICE_CACHE_TTL_MS = 5 * 60_000;
+const MIN_RPC_GRACE_MS = 1_200;
 
 const WINDOW_STRATEGIES = {
   '5m': { name: '5m_small', maxLedgers: 26, bucketCount: 10, eventLimit: 24, timeoutBudget: 4_000, sampled: false, sampleStride: 1 },
@@ -108,7 +109,7 @@ function buildEntityMap(preset) {
 
 function buildSummaryReason(netXrp, events) {
   const leader = events[0];
-  if (!leader) return 'No notable events above noise threshold.';
+  if (!leader) return 'No qualifying payments in window.';
   const direction = netXrp >= 0 ? 'net inflow bias' : 'net outflow bias';
   return `${direction}; top flow: ${leader.reason}`;
 }
@@ -255,14 +256,41 @@ async function buildFreshFlowAttempt({ preset, window, strategy, whaleThreshold,
   const startedAt = Date.now();
   const debug = { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, scoreBasis: 'amount', warnings: [], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel, strategy: strategy.name, lastError: null };
 
-  const deadline = startedAt + strategy.timeoutBudget;
+  const requestedBudget = Number(strategy?.timeoutBudget);
+  const safeBudget = Number.isFinite(requestedBudget) && requestedBudget > 0 ? requestedBudget : 4_000;
+  const effectiveBudget = Math.max(MIN_RPC_GRACE_MS, safeBudget);
+  const deadline = startedAt + effectiveBudget;
+  const remainingBudget = () => deadline - Date.now();
   const timeoutFor = (floorMs = 1_000) => {
-    const remaining = deadline - Date.now();
+    const remaining = remainingBudget();
     const dynamicFloor = Math.max(300, floorMs);
     return Math.max(dynamicFloor, Math.min(4_500, remaining));
   };
 
+  const probeRpcOnceBeforeFatal = async () => {
+    if (debug.rpcCalls > 0) return false;
+    let attempted = false;
+    for (const endpoint of XRPL_ENDPOINTS) {
+      attempted = true;
+      debug.endpointsTried.push(`${endpoint}#ledger_current`);
+      try {
+        await rpcFetch(endpoint, { method: 'ledger_current', params: [{}] }, timeoutFor(300), debug);
+        return true;
+      } catch (error) {
+        debug.warnings.push(`probe_failed:${endpoint}:${error instanceof Error ? error.message : 'unknown'}`);
+      }
+    }
+    if (!attempted) debug.warnings.push('probe_failed:no_endpoints');
+    return false;
+  };
+
   try {
+    if (remainingBudget() <= 0) {
+      await probeRpcOnceBeforeFatal();
+      if (debug.rpcCalls <= 0) throw new Error('timeout_budget_exceeded');
+      debug.warnings.push('budget_exceeded_after_initial_probe');
+    }
+
     const info = await fetchValidatedLedgerIndex(debug, timeoutFor(800));
     debug.lastValidatedLedger = info.ledgerIndex;
 
@@ -279,7 +307,7 @@ async function buildFreshFlowAttempt({ preset, window, strategy, whaleThreshold,
     let attemptedLedgerRpc = false;
 
     for (let ledgerIndex = startLedger; ledgerIndex <= info.ledgerIndex; ledgerIndex += strategy.sampleStride) {
-      const remaining = deadline - Date.now();
+      const remaining = remainingBudget();
       if (remaining <= 0 && attemptedLedgerRpc) throw new Error('timeout_budget_exceeded');
       const ledgerBucket = new Map();
       debug.endpointsTried.push(`${info.endpoint}#ledger:${ledgerIndex}`);
@@ -352,8 +380,11 @@ async function buildFreshFlowAttempt({ preset, window, strategy, whaleThreshold,
       debug,
     };
   } catch (error) {
-    debug.lastError = error instanceof Error ? error.message : 'unknown';
-    throw error;
+    const err = error instanceof Error ? error : new Error('unknown');
+    debug.lastError = err.message;
+    debug.warnings.push(`fatal:${err.message}`);
+    err.debugSnapshot = { ...debug, endpointsTried: [...debug.endpointsTried], warnings: [...debug.warnings] };
+    throw err;
   } finally {
     debug.durationMs = Math.max(1, Date.now() - startedAt);
   }
@@ -370,6 +401,7 @@ async function buildFreshFlow({ preset, window }) {
   ];
 
   let lastError = null;
+  let lastDebug = null;
   for (const attempt of attempts) {
     try {
       const payload = await buildFreshFlowAttempt({ preset, window, strategy: { ...attempt, name: `${base.name}_${attempt.degradeLevel}` }, whaleThreshold, degradeLevel: attempt.degradeLevel });
@@ -377,10 +409,13 @@ async function buildFreshFlow({ preset, window }) {
       return payload;
     } catch (error) {
       lastError = error;
+      lastDebug = error?.debugSnapshot || lastDebug;
     }
   }
 
-  throw new Error(lastError?.message || 'build_failed');
+  const fatal = new Error(lastError?.message || 'build_failed');
+  fatal.debugSnapshot = lastDebug;
+  throw fatal;
 }
 
 export async function onRequestGet({ request }) {
@@ -419,9 +454,18 @@ export async function onRequestGet({ request }) {
     }
 
     const fallback = emptyPayload(window, preset, 'xrpl:rpc');
+    if (error?.debugSnapshot) {
+      fallback.debug = {
+        ...fallback.debug,
+        ...error.debugSnapshot,
+        warnings: [...(error.debugSnapshot.warnings || []), `fatal:${error instanceof Error ? error.message : 'unknown'}`],
+      };
+    }
     fallback.debug.durationMs = Math.max(1, Date.now() - requestStartedAt);
     fallback.debug.lastError = error instanceof Error ? error.message : 'unknown';
-    fallback.debug.warnings.push(`fatal:${error instanceof Error ? error.message : 'unknown'}`);
+    if (!fallback.debug.warnings.includes(`fatal:${fallback.debug.lastError}`)) {
+      fallback.debug.warnings.push(`fatal:${fallback.debug.lastError}`);
+    }
     return json(fallback, 200);
   }
 }
