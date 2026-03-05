@@ -3,8 +3,6 @@
   const DEMO_KEY = 'xsic.flowAlert.demoOnly';
   const PRESET_KEY = 'xsic.flowAlert.targetPreset';
   const WINDOW_KEY = 'xsic.flowAlert.window';
-
-  const LABELS = ['Binance', 'Coinbase', 'Bitstamp', 'Kraken', 'Bybit', 'Unknown'];
   const FORCE_MODES = new Set(['loading', 'ok', 'empty', 'error', 'stale']);
 
   function boot() {
@@ -46,24 +44,24 @@
     };
 
     if (!refs.canvas || !refs.canvasWrap) return;
-
     init(refs);
   }
 
   function init(refs) {
     const state = {
       mode: 'loading',
-      forcedMode: 'ok',
+      forcedMode: null,
       liteMode: loadBool(LITE_KEY),
-      demoOnly: true,
+      demoOnly: loadBool(DEMO_KEY, true),
       preset: loadValue(PRESET_KEY, 'exchanges') || 'exchanges',
       window: loadValue(WINDOW_KEY, '5m'),
-      snapshot: null,
-      heatmap: null,
+      payload: null,
+      heatmapCells: [],
       hoveredCell: null,
       pinnedCell: null,
       lastRefreshMs: 0,
       timer: null,
+      isFetching: false,
     };
 
     refs.liteToggle.checked = state.liteMode;
@@ -74,173 +72,237 @@
     refs.liteToggle.addEventListener('change', () => {
       state.liteMode = refs.liteToggle.checked;
       saveBool(LITE_KEY, state.liteMode);
-      renderNow();
+      renderCycle();
     });
 
     refs.demoToggle.addEventListener('change', () => {
       state.demoOnly = refs.demoToggle.checked;
       saveBool(DEMO_KEY, state.demoOnly);
-      renderNow();
+      renderCycle(true);
     });
 
     refs.presetSelect.addEventListener('change', () => {
       state.preset = refs.presetSelect.value;
       saveValue(PRESET_KEY, state.preset);
-      renderNow();
+      renderCycle(true);
     });
 
     refs.windowSelect.addEventListener('change', () => {
       state.window = refs.windowSelect.value;
       saveValue(WINDOW_KEY, state.window);
-      renderNow();
+      renderCycle(true);
     });
 
     refs.retryButton?.addEventListener('click', () => {
-      state.forcedMode = 'ok';
-      renderNow();
+      state.forcedMode = null;
+      renderCycle(true);
     });
 
     refs.emptyButton?.addEventListener('click', () => {
       state.preset = 'exchanges';
       refs.presetSelect.value = 'exchanges';
       saveValue(PRESET_KEY, state.preset);
-      state.forcedMode = 'ok';
-      renderNow();
+      state.forcedMode = null;
+      renderCycle(true);
     });
 
     refs.debugButtons.forEach((button) => {
       button.addEventListener('click', () => {
         const mode = button.dataset.flowForce;
         if (!FORCE_MODES.has(mode)) return;
-        state.forcedMode = mode;
-        renderNow();
+        state.forcedMode = mode === 'ok' ? null : mode;
+        applyMode(state);
+        renderPanels(refs, state);
+        renderHeatmap(refs, state);
       });
     });
 
     window.addEventListener('resize', () => renderHeatmap(refs, state));
     bindCanvasInteraction(refs, state);
+    renderCycle(true);
 
-    renderEvents(refs);
-    renderTrend(refs, []);
-    renderNow();
-
-    state.timer = window.setInterval(() => {
-      if (state.mode === 'loading') return;
-      if (state.mode === 'error') return;
-      generateData(state);
-      renderPanels(refs, state);
-      renderHeatmap(refs, state);
-      renderTrend(refs, state.heatmap.netSeries);
-    }, state.liteMode ? 5500 : 3000);
-
-    function renderNow() {
-      applyMode(state);
+    function renderCycle(immediate = false) {
       clearInterval(state.timer);
-      const delay = state.mode === 'loading' ? 700 : 0;
-      window.setTimeout(() => {
-        if (state.mode === 'error' || state.mode === 'empty') {
-          renderPanels(refs, state);
-          renderHeatmap(refs, state);
-          return;
-        }
-        generateData(state);
-        renderPanels(refs, state);
-        renderHeatmap(refs, state);
-        renderTrend(refs, state.heatmap.netSeries);
-      }, delay);
-
-      state.timer = window.setInterval(() => {
-        if (state.mode !== 'ok' && state.mode !== 'stale') return;
-        generateData(state);
-        renderPanels(refs, state);
-        renderHeatmap(refs, state);
-        renderTrend(refs, state.heatmap.netSeries);
-      }, state.liteMode ? 5500 : 3000);
-    }
-
-    function applyMode(current) {
-      if (current.forcedMode === 'loading') {
-        current.mode = 'loading';
-      } else if (current.forcedMode === 'error' || !current.demoOnly) {
-        current.mode = 'error';
-      } else if (current.forcedMode === 'empty' || !current.preset) {
-        current.mode = 'empty';
-      } else if (current.forcedMode === 'stale') {
-        current.mode = 'stale';
-      } else {
-        current.mode = 'ok';
-      }
+      state.timer = window.setInterval(() => syncData(refs, state), state.liteMode ? 12_000 : 8_000);
+      if (immediate) syncData(refs, state);
     }
   }
 
-  function generateData(state) {
-    const now = Date.now();
-    const bucketCount = state.liteMode ? 12 : 24;
-    const cells = [];
-    const totals = Array.from({ length: LABELS.length }, () => 0);
-    const netSeries = [];
+  async function syncData(refs, state) {
+    if (!state.preset) {
+      state.mode = 'empty';
+      state.payload = null;
+      renderPanels(refs, state);
+      renderHeatmap(refs, state);
+      return;
+    }
 
-    for (let y = 0; y < LABELS.length; y += 1) {
-      for (let x = 0; x < bucketCount; x += 1) {
-        const wave = Math.sin((now / 13000) + x * 0.45 + y * 0.65);
-        const noise = (Math.random() * 0.35) + 0.2;
-        const base = Math.max(0, wave + noise);
-        const value = Math.round(base * 980000);
-        totals[y] += value;
-        cells.push({ x, y, label: LABELS[y], value });
+    state.mode = 'loading';
+    renderPanels(refs, state);
+    renderHeatmap(refs, state);
+
+    let payload;
+    if (state.demoOnly) {
+      payload = makeDemoPayload(state);
+    } else {
+      payload = await fetchLivePayload(state);
+    }
+
+    state.payload = payload;
+    state.lastRefreshMs = payload?.ts || Date.now();
+    applyMode(state);
+    buildHeatmapCells(state);
+    renderPanels(refs, state);
+    renderHeatmap(refs, state);
+    renderTrend(refs, state);
+    renderEvents(refs, state);
+  }
+
+  async function fetchLivePayload(state) {
+    try {
+      const response = await fetch(`/api/xrpl/whale-flow?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}`);
+      if (!response.ok) throw new Error(`http_${response.status}`);
+      const payload = await response.json();
+      return payload;
+    } catch (error) {
+      return {
+        ok: false,
+        ts: Date.now(),
+        source: 'demo',
+        stale: true,
+        window: state.window,
+        priceXrpUsd: null,
+        summary: { inflowXrp: 0, outflowXrp: 0, netXrp: 0, inflowUsd: null, outflowUsd: null, netUsd: null },
+        heatmap: { labels: ['Binance', 'Coinbase', 'Bitstamp', 'Kraken', 'Bybit', 'Unknown'], buckets: [], matrix: [], unit: 'xrp' },
+        events: [],
+        debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`] },
+      };
+    }
+  }
+
+  function applyMode(state) {
+    if (state.forcedMode) {
+      state.mode = state.forcedMode;
+      return;
+    }
+    if (!state.payload) {
+      state.mode = 'loading';
+      return;
+    }
+    if (!state.payload.ok && !state.payload.stale) {
+      state.mode = 'error';
+      return;
+    }
+    if (state.payload.stale) {
+      state.mode = 'stale';
+      return;
+    }
+    state.mode = 'ok';
+  }
+
+  function makeDemoPayload(state) {
+    const labels = ['Binance', 'Coinbase', 'Bitstamp', 'Kraken', 'Bybit', 'Unknown'];
+    const cols = state.liteMode ? 12 : 20;
+    const matrix = labels.map(() => []);
+    const events = [];
+    let inflowXrp = 0;
+    let outflowXrp = 0;
+
+    for (let y = 0; y < labels.length; y += 1) {
+      for (let x = 0; x < cols; x += 1) {
+        const value = Math.round(Math.sin((Date.now() / 11000) + x * 0.4 + y * 0.7) * 400000 + 500000);
+        const signed = y % 2 === 0 ? Math.max(0, value) : -Math.max(0, Math.round(value * 0.7));
+        matrix[y].push(signed);
+        if (signed > 0) inflowXrp += signed;
+        if (signed < 0) outflowXrp += Math.abs(signed);
       }
     }
 
-    for (let i = 0; i < bucketCount; i += 1) {
-      const inflow = 90000 + Math.round(Math.random() * 210000);
-      const outflow = 90000 + Math.round(Math.random() * 230000);
-      netSeries.push(inflow - outflow);
+    for (let i = 0; i < 8; i += 1) {
+      const amountXrp = Math.round(200000 + Math.random() * 1200000);
+      events.push({
+        time: new Date(Date.now() - i * 21000).toISOString(),
+        from: `rDemoFrom${i}`,
+        to: `rDemoTo${i}`,
+        dir: i % 2 ? 'IN' : 'OUT',
+        label: labels[i % labels.length],
+        amountXrp,
+        amountUsd: amountXrp * 0.58,
+        score: amountXrp > 900000 ? 'HIGH' : 'MED',
+        reason: 'demo rule set',
+      });
     }
 
-    const inflow = netSeries.reduce((acc, value) => acc + (value > 0 ? value : Math.round(Math.abs(value) * 0.52)), 0);
-    const outflow = netSeries.reduce((acc, value) => acc + (value < 0 ? Math.abs(value) : Math.round(value * 0.48)), 0);
-    const net = inflow - outflow;
-
-    state.lastRefreshMs = now;
-    state.heatmap = { bucketCount, cells, totals, netSeries };
-    state.snapshot = {
-      inflow,
-      outflow,
-      net,
-      pressure: Math.abs(net) > 600000 ? 'HIGH' : 'MEDIUM',
+    return {
+      ok: true,
+      ts: Date.now(),
+      source: 'demo',
+      stale: false,
+      window: state.window,
+      priceXrpUsd: 0.58,
+      summary: {
+        inflowXrp,
+        outflowXrp,
+        netXrp: inflowXrp - outflowXrp,
+        inflowUsd: inflowXrp * 0.58,
+        outflowUsd: outflowXrp * 0.58,
+        netUsd: (inflowXrp - outflowXrp) * 0.58,
+      },
+      heatmap: {
+        labels,
+        buckets: Array.from({ length: cols }, (_, i) => `b${i + 1}`),
+        matrix,
+        unit: 'usd',
+      },
+      events,
+      debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: events.length, cacheHit: false, warnings: [] },
     };
   }
 
-  function renderPanels(refs, state) {
-    const isData = Boolean(state.snapshot);
-    toggleOverlay(refs, state.mode);
+  function buildHeatmapCells(state) {
+    const labels = state.payload?.heatmap?.labels || [];
+    const matrix = state.payload?.heatmap?.matrix || [];
+    const cols = Math.max(0, ...(matrix.map((row) => row.length)));
+    const cells = [];
 
-    const statusText = state.mode === 'ok' ? 'OK' : state.mode.toUpperCase();
-    safeText(refs.statusMeta, statusText);
-    safeText(refs.status, `Status: ${statusText}`);
+    for (let y = 0; y < labels.length; y += 1) {
+      for (let x = 0; x < cols; x += 1) {
+        const signed = Number(matrix[y]?.[x] || 0);
+        cells.push({ x, y, label: labels[y], value: Math.abs(signed), signed });
+      }
+    }
+
+    state.heatmapCells = cells;
+  }
+
+  function renderPanels(refs, state) {
+    toggleOverlay(refs, state.mode);
+    const payload = state.payload;
+    safeText(refs.statusMeta, state.mode.toUpperCase());
+    safeText(refs.status, `Status: ${state.mode.toUpperCase()}`);
     refs.staleNote.hidden = state.mode !== 'stale';
 
-    if (!isData) {
+    if (!payload || (state.mode !== 'ok' && state.mode !== 'stale')) {
       ['inflow', 'outflow', 'net', 'window', 'source', 'updated'].forEach((key) => safeText(refs.snapshot[key], '—'));
       safeText(refs.summary.headline, 'NET: — | Pressure: — | Window: — | Target: —');
-      safeText(refs.summary.reason, 'Why: no data generated for this state.');
+      safeText(refs.summary.reason, 'Why: waiting for data.');
       safeText(refs.refreshMeta, '—');
       return;
     }
 
-    safeText(refs.snapshot.inflow, formatUsd(state.snapshot.inflow));
-    safeText(refs.snapshot.outflow, formatUsd(state.snapshot.outflow));
-    safeText(refs.snapshot.net, formatSignedUsd(state.snapshot.net));
-    safeText(refs.snapshot.window, state.window);
-    safeText(refs.snapshot.source, state.mode === 'stale' ? 'demo (cached)' : 'demo');
+    const useUsd = Number.isFinite(payload?.summary?.inflowUsd) && payload.priceXrpUsd;
+    safeText(refs.snapshot.inflow, useUsd ? formatUsd(payload.summary.inflowUsd) : formatXrp(payload.summary.inflowXrp));
+    safeText(refs.snapshot.outflow, useUsd ? formatUsd(payload.summary.outflowUsd) : formatXrp(payload.summary.outflowXrp));
+    safeText(refs.snapshot.net, useUsd ? formatSignedUsd(payload.summary.netUsd) : formatSignedXrp(payload.summary.netXrp));
+    safeText(refs.snapshot.window, payload.window || state.window);
+    safeText(refs.snapshot.source, `${payload.source}${payload.stale ? ' (stale)' : ''}`);
     safeText(refs.snapshot.updated, relativeSeconds(state.lastRefreshMs));
     safeText(refs.refreshMeta, relativeSeconds(state.lastRefreshMs));
 
-    safeText(
-      refs.summary.headline,
-      `NET: ${formatSignedUsd(state.snapshot.net)} | Pressure: ${state.snapshot.pressure} | Window: ${state.window} | Target: ${state.preset || 'Unset'}`,
-    );
-    safeText(refs.summary.reason, 'Why: Exchange IN spike + whale→exchange burst (demo).');
+    const net = useUsd ? payload.summary.netUsd : payload.summary.netXrp;
+    const pressure = Math.abs(net) > (useUsd ? 700000 : 1000000) ? 'HIGH' : 'MEDIUM';
+    safeText(refs.summary.headline, `NET: ${useUsd ? formatSignedUsd(net) : formatSignedXrp(net)} | Pressure: ${pressure} | Window: ${payload.window} | Target: ${state.preset}`);
+    safeText(refs.summary.reason, payload.events?.[0]?.reason ? `Why: ${payload.events[0].reason}` : 'Why: no notable events yet.');
   }
 
   function renderHeatmap(refs, state) {
@@ -254,44 +316,35 @@
     refs.canvas.style.height = `${height}px`;
     refs.canvas.style.width = `${width}px`;
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-
     ctx.fillStyle = '#f8fafc';
     ctx.fillRect(0, 0, width, height);
 
-    if (!state.heatmap || (state.mode !== 'ok' && state.mode !== 'stale')) return;
+    if (!state.payload || (state.mode !== 'ok' && state.mode !== 'stale')) return;
 
+    const labels = state.payload.heatmap.labels || [];
+    const cols = Math.max(1, state.payload.heatmap.buckets?.length || 1);
     const leftPad = 92;
     const topPad = 18;
     const chartW = width - leftPad - 14;
     const chartH = height - topPad - 48;
-    const rows = LABELS.length;
-    const cols = state.heatmap.bucketCount;
     const cellW = chartW / cols;
-    const cellH = chartH / rows;
-    const max = Math.max(...state.heatmap.cells.map((cell) => cell.value), 1);
+    const cellH = chartH / Math.max(1, labels.length);
+    const max = Math.max(...state.heatmapCells.map((cell) => cell.value), 1);
 
-    state.heatmap.cells.forEach((cell) => {
+    state.heatmapCells.forEach((cell) => {
       const alpha = 0.15 + (cell.value / max) * 0.8;
       const x = leftPad + (cell.x * cellW);
       const y = topPad + (cell.y * cellH);
-      ctx.fillStyle = `rgba(37, 99, 235, ${alpha})`;
+      ctx.fillStyle = cell.signed >= 0 ? `rgba(37, 99, 235, ${alpha})` : `rgba(220, 38, 38, ${alpha})`;
       ctx.fillRect(x + 1, y + 1, Math.max(2, cellW - 2), Math.max(2, cellH - 2));
     });
 
     ctx.fillStyle = '#334155';
     ctx.font = '12px sans-serif';
-    LABELS.forEach((label, index) => {
+    labels.forEach((label, index) => {
       const y = topPad + index * cellH + cellH * 0.66;
       ctx.fillText(label, 8, y);
     });
-
-    ctx.fillStyle = '#64748b';
-    const xStep = Math.max(1, Math.floor(cols / (state.liteMode ? 4 : 6)));
-    for (let i = 0; i < cols; i += xStep) {
-      const x = leftPad + i * cellW;
-      const minute = String((i * 5) % 60).padStart(2, '0');
-      ctx.fillText(`${minute}m`, x, height - 14);
-    }
 
     if (state.hoveredCell || state.pinnedCell) {
       const cell = state.pinnedCell || state.hoveredCell;
@@ -303,53 +356,57 @@
     }
   }
 
-  function renderTrend(refs, values) {
+  function renderTrend(refs, state) {
+    const matrix = state.payload?.heatmap?.matrix || [];
+    const cols = Math.max(0, ...(matrix.map((row) => row.length)));
+    const values = [];
+    for (let c = 0; c < cols; c += 1) {
+      let sum = 0;
+      for (let r = 0; r < matrix.length; r += 1) {
+        sum += Number(matrix[r]?.[c] || 0);
+      }
+      values.push(sum);
+    }
+
     refs.trendWrap.innerHTML = '';
     values.forEach((value) => {
       const bar = document.createElement('div');
-      const pct = Math.min(100, Math.max(12, Math.round((Math.abs(value) / 260000) * 100)));
+      const pct = Math.min(100, Math.max(8, Math.round((Math.abs(value) / 500000) * 100)));
       bar.style.height = `${pct}%`;
       bar.className = value < 0 ? 'flow-trend-bar flow-trend-bar--neg' : 'flow-trend-bar flow-trend-bar--pos';
-      bar.title = `Net ${formatSignedUsd(value)}`;
+      bar.title = `Net ${formatSignedXrp(value)}`;
       refs.trendWrap.appendChild(bar);
     });
   }
 
-  function renderEvents(refs) {
-    const rows = Array.from({ length: 8 }, (_, i) => ({
-      id: i + 1,
-      time: `19:${String(24 + i).padStart(2, '0')}:10`,
-      route: `r${i}x.. → ${LABELS[i % LABELS.length]}`,
-      label: i % 2 === 0 ? 'Exchange' : 'Whale',
-      dir: i % 3 === 0 ? 'OUT' : 'IN',
-      amount: `${(1.2 + i * 0.3).toFixed(1)}M XRP`,
-      score: i % 2 === 0 ? 'HIGH' : 'MED',
-    }));
+  function renderEvents(refs, state) {
+    const useUsd = Number.isFinite(state.payload?.priceXrpUsd);
+    const rows = (state.payload?.events || []).slice(0, state.liteMode ? 8 : 16);
 
     refs.eventsTableBody.innerHTML = rows.map((row) => `
       <tr>
-        <td><details><summary>${row.time}</summary><div>tx link: coming soon<br>classification reason: demo rule set</div></details></td>
-        <td>${row.route}</td>
+        <td><details><summary>${formatTime(row.time)}</summary><div>reason: ${row.reason}<br>from: ${row.from}<br>to: ${row.to}</div></details></td>
+        <td>${shortAddress(row.from)} → ${shortAddress(row.to)}</td>
         <td>${row.label}</td>
         <td>${row.dir}</td>
-        <td>${row.amount}</td>
+        <td>${useUsd && row.amountUsd ? `${formatUsd(row.amountUsd)} (${formatXrp(row.amountXrp)})` : formatXrp(row.amountXrp)}</td>
         <td>${row.score}</td>
       </tr>
     `).join('');
 
     refs.eventCards.innerHTML = rows.map((row) => `
       <details class="flow-event-card">
-        <summary>${row.time} • ${row.dir} • ${row.amount} • ${row.score}</summary>
-        <p>${row.route} (${row.label})</p>
-        <p>tx link: coming soon</p>
-        <p>classification reason: demo rule set</p>
+        <summary>${formatTime(row.time)} • ${row.dir} • ${formatXrp(row.amountXrp)} • ${row.score}</summary>
+        <p>${shortAddress(row.from)} → ${shortAddress(row.to)} (${row.label})</p>
+        <p>reason: ${row.reason}</p>
       </details>
     `).join('');
   }
 
   function bindCanvasInteraction(refs, state) {
     const findCell = (clientX, clientY) => {
-      if (!state.heatmap) return null;
+      const cells = state.heatmapCells || [];
+      if (!cells.length || !state.payload) return null;
       const rect = refs.canvas.getBoundingClientRect();
       const x = clientX - rect.left;
       const y = clientY - rect.top;
@@ -357,13 +414,13 @@
       const topPad = 18;
       const chartW = rect.width - leftPad - 14;
       const chartH = rect.height - topPad - 48;
-      const cols = state.heatmap.bucketCount;
-      const rows = LABELS.length;
+      const cols = Math.max(1, state.payload.heatmap.buckets?.length || 1);
+      const rows = Math.max(1, state.payload.heatmap.labels?.length || 1);
       if (x < leftPad || x > leftPad + chartW || y < topPad || y > topPad + chartH) return null;
       const cx = Math.max(0, Math.min(cols - 1, Math.floor(((x - leftPad) / chartW) * cols)));
       const cy = Math.max(0, Math.min(rows - 1, Math.floor(((y - topPad) / chartH) * rows)));
       const idx = (cy * cols) + cx;
-      return state.heatmap.cells[idx] || null;
+      return cells[idx] || null;
     };
 
     const showTooltip = (cell, clientX, clientY, fixed = false) => {
@@ -372,7 +429,7 @@
         return;
       }
       refs.tooltip.hidden = false;
-      refs.tooltip.textContent = `${cell.label} | t-${cell.x + 1} | ${formatUsd(cell.value)}`;
+      refs.tooltip.textContent = `${cell.label} | ${cell.signed >= 0 ? '+' : ''}${formatXrp(cell.signed)}`;
       const rect = refs.canvasWrap.getBoundingClientRect();
       refs.tooltip.style.left = `${Math.min(rect.width - 160, Math.max(12, clientX - rect.left + 10))}px`;
       refs.tooltip.style.top = `${Math.min(rect.height - 40, Math.max(16, clientY - rect.top - 8))}px`;
@@ -381,7 +438,7 @@
 
     const moveHandler = (event) => {
       if (state.pinnedCell) return;
-      const cell = findCell(event.clientX, event.clientY) || state.heatmap?.cells?.[0] || null;
+      const cell = findCell(event.clientX, event.clientY);
       state.hoveredCell = cell;
       showTooltip(cell, event.clientX, event.clientY);
       renderHeatmap(refs, state);
@@ -395,7 +452,7 @@
     };
 
     const clickHandler = (event) => {
-      const cell = findCell(event.clientX, event.clientY) || state.heatmap?.cells?.[0] || null;
+      const cell = findCell(event.clientX, event.clientY);
       state.pinnedCell = cell;
       showTooltip(cell, event.clientX, event.clientY, true);
       renderHeatmap(refs, state);
@@ -425,19 +482,15 @@
   }
 
   function saveBool(key, value) {
-    try { localStorage.setItem(key, value ? '1' : '0'); } catch { /* ignore */ }
+    try { localStorage.setItem(key, value ? '1' : '0'); } catch { }
   }
 
   function loadValue(key, fallback) {
-    try {
-      return localStorage.getItem(key) || fallback;
-    } catch {
-      return fallback;
-    }
+    try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
   }
 
   function saveValue(key, value) {
-    try { localStorage.setItem(key, value); } catch { /* ignore */ }
+    try { localStorage.setItem(key, value); } catch { }
   }
 
   function safeText(node, value) {
@@ -451,6 +504,28 @@
   function formatSignedUsd(value) {
     const sign = value > 0 ? '+' : '';
     return `${sign}${formatUsd(value)}`;
+  }
+
+  function formatXrp(value) {
+    return `${Math.round(value).toLocaleString()} XRP`;
+  }
+
+  function formatSignedXrp(value) {
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${formatXrp(value)}`;
+  }
+
+  function shortAddress(address) {
+    if (!address) return '—';
+    if (address.length <= 12) return address;
+    return `${address.slice(0, 5)}...${address.slice(-5)}`;
+  }
+
+  function formatTime(value) {
+    if (typeof value === 'number') return String(value);
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value || '—');
+    return date.toLocaleTimeString();
   }
 
   function relativeSeconds(timestamp) {
