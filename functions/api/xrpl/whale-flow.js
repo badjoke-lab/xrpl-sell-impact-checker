@@ -5,16 +5,21 @@ const XRPL_ENDPOINTS = [
   'https://s2.ripple.com:51234/',
 ];
 
-const REQUEST_TIMEOUT_MS = 4_500;
 const FLOW_CACHE_TTL_MS = 45_000;
 const PRICE_CACHE_TTL_MS = 5 * 60_000;
-const DEFAULT_MAX_LEDGERS = 30;
-const HARD_MAX_LEDGERS = 60;
+
+const WINDOW_STRATEGIES = {
+  '5m': { name: '5m_small', maxLedgers: 26, bucketCount: 10, eventLimit: 24, timeoutBudget: 4_000, sampled: false, sampleStride: 1 },
+  '1h': { name: '1h_medium', maxLedgers: 60, bucketCount: 14, eventLimit: 32, timeoutBudget: 6_000, sampled: false, sampleStride: 1 },
+  '24h': { name: '24h_sampled', maxLedgers: 120, bucketCount: 16, eventLimit: 24, timeoutBudget: 7_500, sampled: true, sampleStride: 3 },
+  '7d': { name: '7d_sampled', maxLedgers: 220, bucketCount: 18, eventLimit: 20, timeoutBudget: 9_000, sampled: true, sampleStride: 8 },
+};
 
 const EVENT_MIN_XRP_BY_WINDOW = {
   '5m': 60_000,
   '1h': 150_000,
   '24h': 350_000,
+  '7d': 500_000,
 };
 
 const flowCache = globalThis.__xsicWhaleFlowCache || new Map();
@@ -43,17 +48,12 @@ function getPreset(presetKey = 'exchanges') {
 }
 
 function normalizeWindow(rawWindow) {
-  if (rawWindow === '1h' || rawWindow === '24h') return rawWindow;
+  if (rawWindow === '1h' || rawWindow === '24h' || rawWindow === '7d') return rawWindow;
   return '5m';
 }
 
-function resolveLedgersCount(window, rawMax) {
-  const parsed = Number(rawMax);
-  const perWindowDefault = window === '24h' ? 60 : window === '1h' ? 40 : DEFAULT_MAX_LEDGERS;
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return perWindowDefault;
-  }
-  return Math.max(10, Math.min(HARD_MAX_LEDGERS, Math.floor(parsed)));
+function resolveStrategy(window) {
+  return WINDOW_STRATEGIES[window] || WINDOW_STRATEGIES['5m'];
 }
 
 function toXrpAmount(amount) {
@@ -111,49 +111,17 @@ function classifyTx({ tx, amountXrp, preset, entityMap, whaleThreshold }) {
   const meetsWhale = amountXrp >= whaleThreshold;
 
   if (toExchange && fromExchange) {
-    return {
-      dir: 'XFER',
-      label: toEntity.label,
-      reason: `exchange-to-exchange transfer (${fromEntity.label} → ${toEntity.label}) → internal movement candidate`,
-      labelSource: `matched preset: ${fromEntity.label}, ${toEntity.label}`,
-      scoreCap: 'MED',
-      include: true,
-    };
+    return { dir: 'XFER', label: toEntity.label, reason: `exchange-to-exchange transfer (${fromEntity.label} → ${toEntity.label}) → internal movement candidate`, labelSource: `matched preset: ${fromEntity.label}, ${toEntity.label}`, scoreCap: 'MED', include: true };
   }
-
   if (toExchange) {
-    return {
-      dir: 'IN',
-      label: toEntity.label,
-      reason: `to exchange address (${toEntity.label}) → potential sell pressure`,
-      labelSource: `matched preset: ${toEntity.label}`,
-      scoreCap: 'HIGH',
-      include: true,
-    };
+    return { dir: 'IN', label: toEntity.label, reason: `to exchange address (${toEntity.label}) → potential sell pressure`, labelSource: `matched preset: ${toEntity.label}`, scoreCap: 'HIGH', include: true };
   }
-
   if (fromExchange) {
-    return {
-      dir: 'OUT',
-      label: fromEntity.label,
-      reason: `from exchange address (${fromEntity.label}) → potential withdrawal`,
-      labelSource: `matched preset: ${fromEntity.label}`,
-      scoreCap: 'HIGH',
-      include: true,
-    };
+    return { dir: 'OUT', label: fromEntity.label, reason: `from exchange address (${fromEntity.label}) → potential withdrawal`, labelSource: `matched preset: ${fromEntity.label}`, scoreCap: 'HIGH', include: true };
   }
-
   if (isWhalePreset && meetsWhale) {
-    return {
-      dir: 'XFER',
-      label: 'Whale',
-      reason: `large transfer (${Math.round(amountXrp).toLocaleString()} XRP) above whale threshold`,
-      labelSource: 'matched preset rule: whale threshold',
-      scoreCap: 'HIGH',
-      include: true,
-    };
+    return { dir: 'XFER', label: 'Whale', reason: `large transfer (${Math.round(amountXrp).toLocaleString()} XRP) above whale threshold`, labelSource: 'matched preset rule: whale threshold', scoreCap: 'HIGH', include: true };
   }
-
   return { include: false };
 }
 
@@ -174,8 +142,7 @@ function scoreByRank(rankIndex, total) {
 function mergeScore(amountScore, rankScore, cap = 'HIGH') {
   const order = { LOW: 1, MED: 2, HIGH: 3 };
   let raw = Math.max(order[amountScore] || 1, order[rankScore] || 1);
-  const capValue = order[cap] || 3;
-  raw = Math.min(raw, capValue);
+  raw = Math.min(raw, order[cap] || 3);
   const score = Object.keys(order).find((key) => order[key] === raw) || 'LOW';
   const scoreBasis = amountScore === rankScore ? 'both' : raw === (order[amountScore] || 1) ? 'amount' : 'rank';
   return { score, scoreBasis };
@@ -188,101 +155,60 @@ function emptyPayload(window = '5m', preset = getPreset('exchanges')) {
     ts: Date.now(),
     source: 'demo',
     stale: true,
+    staleReason: 'cached',
     window,
     priceXrpUsd: null,
     summaryReason: 'No data available.',
-    summary: {
-      inflowXrp: 0,
-      outflowXrp: 0,
-      netXrp: 0,
-      inflowUsd: null,
-      outflowUsd: null,
-      netUsd: null,
-    },
-    heatmap: {
-      labels,
-      buckets: [],
-      matrix: [],
-      unit: 'xrp',
-    },
+    summary: { inflowXrp: 0, outflowXrp: 0, netXrp: 0, inflowUsd: null, outflowUsd: null, netUsd: null },
+    heatmap: { labels, buckets: [], matrix: [], unit: 'xrp' },
     events: [],
-    debug: {
-      endpointsTried: [],
-      ledgersScanned: 0,
-      paymentsCount: 0,
-      cacheHit: false,
-      scoreBasis: 'amount',
-      warnings: [],
-    },
+    debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, scoreBasis: 'amount', warnings: [], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'D', strategy: resolveStrategy(window).name },
   };
 }
 
-async function rpcFetch(endpoint, payload) { /* unchanged */
+async function rpcFetch(endpoint, payload, timeoutMs, debug) {
+  debug.rpcCalls += 1;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`http_${response.status}`);
-    }
-
+    const response = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal });
+    if (!response.ok) throw new Error(`http_${response.status}`);
     return await response.json();
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function fetchValidatedLedgerIndex(debug) {
+async function fetchValidatedLedgerIndex(debug, timeoutMs) {
   let timeoutSeen = false;
   let lastError = null;
-
   for (const endpoint of XRPL_ENDPOINTS) {
     debug.endpointsTried.push(`${endpoint}#server_info`);
     try {
-      const response = await rpcFetch(endpoint, {
-        method: 'server_info',
-        params: [{}],
-      });
-      const seq = response?.result?.info?.validated_ledger?.seq;
-      const idx = Number(seq);
-      if (Number.isFinite(idx) && idx > 0) {
-        return { endpoint, ledgerIndex: idx };
-      }
+      const response = await rpcFetch(endpoint, { method: 'server_info', params: [{}] }, timeoutMs, debug);
+      const idx = Number(response?.result?.info?.validated_ledger?.seq);
+      if (Number.isFinite(idx) && idx > 0) return { endpoint, ledgerIndex: idx };
       throw new Error('invalid_server_info');
     } catch (error) {
       if (error?.name === 'AbortError') timeoutSeen = true;
       lastError = error;
     }
   }
-
-  if (timeoutSeen) {
-    const err = new Error('upstream_timeout');
-    err.isTimeout = true;
-    throw err;
-  }
-
+  if (timeoutSeen) throw new Error('upstream_timeout');
   throw new Error(lastError?.message || 'upstream_unreachable');
 }
 
-async function fetchXrpUsd(debug) {
-  const now = Date.now();
-  if (priceCache.fetchedAt && now - priceCache.fetchedAt <= PRICE_CACHE_TTL_MS) {
-    return priceCache.value;
+async function fetchXrpUsd(debug, skipPrice = false) {
+  if (skipPrice) {
+    debug.warnings.push('degrade:C:price_skipped');
+    return null;
   }
-
+  const now = Date.now();
+  if (priceCache.fetchedAt && now - priceCache.fetchedAt <= PRICE_CACHE_TTL_MS) return priceCache.value;
   try {
-    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd', {
-      headers: { accept: 'application/json' },
-    });
+    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd', { headers: { accept: 'application/json' } });
     if (!response.ok) throw new Error(`coingecko_http_${response.status}`);
-    const payload = await response.json();
-    const price = Number(payload?.ripple?.usd);
+    const price = Number((await response.json())?.ripple?.usd);
     if (!Number.isFinite(price) || price <= 0) throw new Error('coingecko_invalid_price');
     priceCache.value = price;
     priceCache.fetchedAt = now;
@@ -293,54 +219,62 @@ async function fetchXrpUsd(debug) {
   }
 }
 
-async function buildFreshFlow({ preset, window, ledgersToScan }) {
-  const debug = {
-    endpointsTried: [],
-    ledgersScanned: 0,
-    paymentsCount: 0,
-    cacheHit: false,
-    scoreBasis: 'amount',
-    warnings: [],
-  };
+function aggregateBuckets(rawBuckets, startLedger, endLedger, bucketCount) {
+  if (!rawBuckets.length) return { buckets: [], totals: [] };
+  const count = Math.max(1, Math.min(bucketCount, rawBuckets.length));
+  const span = endLedger - startLedger + 1;
+  const chunk = Math.max(1, Math.ceil(span / count));
+  const grouped = [];
+  for (let i = 0; i < count; i += 1) grouped.push({ label: '', bucket: new Map() });
+  for (let ledger = startLedger; ledger <= endLedger; ledger += 1) {
+    const idx = Math.min(count - 1, Math.floor((ledger - startLedger) / chunk));
+    const slot = grouped[idx];
+    if (!slot.label) {
+      const end = Math.min(endLedger, startLedger + ((idx + 1) * chunk) - 1);
+      slot.label = `${startLedger + (idx * chunk)}-${end}`;
+    }
+    const row = rawBuckets[ledger - startLedger] || new Map();
+    row.forEach((value, label) => slot.bucket.set(label, (slot.bucket.get(label) || 0) + value));
+  }
+  return { buckets: grouped.map((row) => row.label || '?'), totals: grouped.map((row) => row.bucket) };
+}
 
-  const info = await fetchValidatedLedgerIndex(debug);
+async function buildFreshFlowAttempt({ preset, window, strategy, whaleThreshold, degradeLevel }) {
+  const startedAt = Date.now();
+  const debug = { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, scoreBasis: 'amount', warnings: [], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel, strategy: strategy.name };
+
+  const deadline = startedAt + strategy.timeoutBudget;
+  const timeoutFor = () => Math.max(1_000, Math.min(4_500, deadline - Date.now()));
+
+  const info = await fetchValidatedLedgerIndex(debug, timeoutFor());
+  debug.lastValidatedLedger = info.ledgerIndex;
+
   const entityMap = buildEntityMap(preset);
   const labelsSet = new Set((preset.entities || []).map((entity) => entity.label));
   if (preset.id === 'whales') labelsSet.add('Whale');
   if (!labelsSet.size) labelsSet.add('Unknown');
-  const startLedger = Math.max(1, info.ledgerIndex - ledgersToScan + 1);
 
-  const buckets = [];
+  const startLedger = Math.max(1, info.ledgerIndex - strategy.maxLedgers + 1);
+  const rawBucketTotals = [];
   let inflowXrp = 0;
   let outflowXrp = 0;
   const allEvents = [];
-  const bucketLabelTotals = [];
-  const whaleThreshold = resolveWhaleThreshold(preset, window);
 
-  for (let ledgerIndex = startLedger; ledgerIndex <= info.ledgerIndex; ledgerIndex += 1) {
-    buckets.push(String(ledgerIndex));
+  for (let ledgerIndex = startLedger; ledgerIndex <= info.ledgerIndex; ledgerIndex += strategy.sampleStride) {
+    if (Date.now() > deadline) throw new Error('timeout_budget_exceeded');
     const ledgerBucket = new Map();
     debug.endpointsTried.push(`${info.endpoint}#ledger:${ledgerIndex}`);
     let ledgerResponse;
     try {
-      ledgerResponse = await rpcFetch(info.endpoint, {
-        method: 'ledger',
-        params: [{
-          ledger_index: ledgerIndex,
-          transactions: true,
-          expand: true,
-          owner_funds: false,
-        }],
-      });
+      ledgerResponse = await rpcFetch(info.endpoint, { method: 'ledger', params: [{ ledger_index: ledgerIndex, transactions: true, expand: true, owner_funds: false }] }, timeoutFor(), debug);
     } catch (error) {
       debug.warnings.push(`ledger_fetch_failed:${ledgerIndex}:${error instanceof Error ? error.message : 'unknown'}`);
-      bucketLabelTotals.push(ledgerBucket);
+      rawBucketTotals[ledgerIndex - startLedger] = ledgerBucket;
       continue;
     }
 
-    const txs = ledgerResponse?.result?.ledger?.transactions || [];
     debug.ledgersScanned += 1;
-
+    const txs = ledgerResponse?.result?.ledger?.transactions || [];
     for (const entry of txs) {
       const tx = entry?.tx || entry;
       if (!tx || tx.TransactionType !== 'Payment') continue;
@@ -351,79 +285,77 @@ async function buildFreshFlow({ preset, window, ledgersToScan }) {
 
       const classified = classifyTx({ tx, amountXrp, preset, entityMap, whaleThreshold });
       if (!classified.include) continue;
-
       labelsSet.add(classified.label || 'Unknown');
       const signed = classified.dir === 'IN' ? amountXrp : classified.dir === 'OUT' ? -amountXrp : 0;
       ledgerBucket.set(classified.label, (ledgerBucket.get(classified.label) || 0) + signed);
-
       if (signed > 0) inflowXrp += signed;
       if (signed < 0) outflowXrp += Math.abs(signed);
 
       if (amountXrp >= getMinEventAmount(window)) {
-        allEvents.push({
-          time: tx.date || tx.hash || String(Date.now()),
-          from: tx.Account || '',
-          to: tx.Destination || '',
-          dir: classified.dir,
-          label: classified.label || 'Unknown',
-          amountXrp,
-          txHash: tx.hash || null,
-          timeBucket: String(ledgerIndex),
-          reason: classified.reason,
-          labelSource: classified.labelSource,
-          scoreCap: classified.scoreCap,
-        });
+        allEvents.push({ time: tx.date || tx.hash || String(Date.now()), from: tx.Account || '', to: tx.Destination || '', dir: classified.dir, label: classified.label || 'Unknown', amountXrp, txHash: tx.hash || null, timeBucket: String(ledgerIndex), reason: classified.reason, labelSource: classified.labelSource, scoreCap: classified.scoreCap });
       }
     }
-
-    bucketLabelTotals.push(ledgerBucket);
+    rawBucketTotals[ledgerIndex - startLedger] = ledgerBucket;
   }
 
-  const labels = sortLabelsWithUnknownLast(Array.from(labelsSet));
-  const matrix = labels.map((label) => bucketLabelTotals.map((bucket) => Number(bucket.get(label) || 0)));
-  const priceXrpUsd = await fetchXrpUsd(debug);
+  const aggregated = aggregateBuckets(rawBucketTotals, startLedger, info.ledgerIndex, strategy.bucketCount);
+  let labels = sortLabelsWithUnknownLast(Array.from(labelsSet));
+  if (strategy.maxLabels && labels.length > strategy.maxLabels) {
+    labels = labels.slice(0, strategy.maxLabels).concat(labels.includes('Unknown') ? [] : ['Unknown']);
+    debug.warnings.push('degrade:B:labels_reduced');
+  }
+  const matrix = labels.map((label) => aggregated.totals.map((bucket) => Number(bucket?.get(label) || 0)));
 
+  const priceXrpUsd = await fetchXrpUsd(debug, strategy.disablePrice);
   const sortedEvents = allEvents.sort((a, b) => b.amountXrp - a.amountXrp);
-  const scoredEvents = sortedEvents.slice(0, 60).map((event, index) => {
-    const amountScore = scoreByAmount(event.amountXrp);
-    const rankScore = scoreByRank(index, sortedEvents.length);
-    const merged = mergeScore(amountScore, rankScore, event.scoreCap);
-    return {
-      ...event,
-      score: merged.score,
-      scoreBasis: merged.scoreBasis,
-      amountUsd: priceXrpUsd ? event.amountXrp * priceXrpUsd : null,
-    };
+  const scoredEvents = sortedEvents.slice(0, strategy.eventLimit).map((event, index) => {
+    const merged = mergeScore(scoreByAmount(event.amountXrp), scoreByRank(index, sortedEvents.length), event.scoreCap);
+    return { ...event, score: merged.score, scoreBasis: merged.scoreBasis, amountUsd: priceXrpUsd ? event.amountXrp * priceXrpUsd : null };
   });
 
   debug.scoreBasis = scoredEvents[0]?.scoreBasis || 'amount';
+  debug.durationMs = Date.now() - startedAt;
   const netXrp = inflowXrp - outflowXrp;
+  const sampled = Boolean(strategy.sampled || strategy.sampleStride > 1);
 
   return {
     ok: true,
     ts: Date.now(),
     source: 'xrpl:rpc',
-    stale: false,
+    stale: sampled,
+    staleReason: sampled ? 'sampled' : null,
     window,
     priceXrpUsd,
     summaryReason: buildSummaryReason(netXrp, scoredEvents),
-    summary: {
-      inflowXrp,
-      outflowXrp,
-      netXrp,
-      inflowUsd: priceXrpUsd ? inflowXrp * priceXrpUsd : null,
-      outflowUsd: priceXrpUsd ? outflowXrp * priceXrpUsd : null,
-      netUsd: priceXrpUsd ? netXrp * priceXrpUsd : null,
-    },
-    heatmap: {
-      labels,
-      buckets,
-      matrix,
-      unit: priceXrpUsd ? 'usd' : 'xrp',
-    },
+    summary: { inflowXrp, outflowXrp, netXrp, inflowUsd: priceXrpUsd ? inflowXrp * priceXrpUsd : null, outflowUsd: priceXrpUsd ? outflowXrp * priceXrpUsd : null, netUsd: priceXrpUsd ? netXrp * priceXrpUsd : null },
+    heatmap: { labels, buckets: aggregated.buckets, matrix, unit: priceXrpUsd ? 'usd' : 'xrp' },
     events: scoredEvents,
     debug,
   };
+}
+
+async function buildFreshFlow({ preset, window }) {
+  const base = resolveStrategy(window);
+  const whaleThreshold = resolveWhaleThreshold(preset, window);
+  const attempts = [
+    { ...base, degradeLevel: 'none' },
+    { ...base, eventLimit: Math.max(8, Math.floor(base.eventLimit * 0.6)), maxLedgers: Math.max(20, Math.floor(base.maxLedgers * 0.75)), degradeLevel: 'A' },
+    { ...base, eventLimit: Math.max(6, Math.floor(base.eventLimit * 0.45)), bucketCount: Math.max(8, Math.floor(base.bucketCount * 0.6)), maxLabels: 8, maxLedgers: Math.max(16, Math.floor(base.maxLedgers * 0.55)), degradeLevel: 'B' },
+    { ...base, eventLimit: Math.max(4, Math.floor(base.eventLimit * 0.4)), bucketCount: Math.max(6, Math.floor(base.bucketCount * 0.45)), maxLabels: 6, maxLedgers: Math.max(12, Math.floor(base.maxLedgers * 0.4)), disablePrice: true, degradeLevel: 'C' },
+  ];
+
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      const payload = await buildFreshFlowAttempt({ preset, window, strategy: { ...attempt, name: `${base.name}_${attempt.degradeLevel}` }, whaleThreshold, degradeLevel: attempt.degradeLevel });
+      if (attempt.degradeLevel !== 'none') payload.debug.warnings.push(`degrade:${attempt.degradeLevel}`);
+      return payload;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw new Error(lastError?.message || 'build_failed');
 }
 
 export async function onRequestGet({ request }) {
@@ -431,42 +363,29 @@ export async function onRequestGet({ request }) {
   const presetKey = url.searchParams.get('preset') || 'exchanges';
   const window = normalizeWindow(url.searchParams.get('window') || '5m');
   const preset = getPreset(presetKey);
-  const ledgersToScan = resolveLedgersCount(window, url.searchParams.get('max_ledgers'));
-  const cacheKey = `${preset.id || presetKey}:${window}`;
+  const whaleThreshold = resolveWhaleThreshold(preset, window);
+  const cacheKey = `${preset.id || presetKey}:${window}:thr=${whaleThreshold}`;
 
   const now = Date.now();
   const cached = flowCache.get(cacheKey);
-  if (cached && now - cached.fetchedAt <= FLOW_CACHE_TTL_MS) {
-    return json({
-      ...cached.data,
-      source: 'cache',
-      stale: false,
-      ts: now,
-      debug: {
-        ...cached.data.debug,
-        cacheHit: true,
-      },
-    });
-  }
 
   try {
-    const fresh = await buildFreshFlow({ preset, window, ledgersToScan });
+    const fresh = await buildFreshFlow({ preset, window });
     flowCache.set(cacheKey, { data: fresh, fetchedAt: now });
     return json(fresh);
   } catch (error) {
-    if (cached) {
+    if (cached?.data) {
       return json({
         ...cached.data,
         source: 'cache',
         stale: true,
+        staleReason: 'cached',
         ts: now,
         debug: {
           ...cached.data.debug,
           cacheHit: true,
-          warnings: [
-            ...(cached.data.debug?.warnings || []),
-            `fallback:${error instanceof Error ? error.message : 'unknown'}`,
-          ],
+          degradeLevel: 'D',
+          warnings: [...(cached.data.debug?.warnings || []), `fallback:${error instanceof Error ? error.message : 'unknown'}`, 'degrade:D:cache_fallback'],
         },
       });
     }
