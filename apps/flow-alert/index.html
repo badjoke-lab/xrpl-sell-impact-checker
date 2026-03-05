@@ -24,28 +24,74 @@
       </header>
 
       <main class="page__content flow-alert" aria-live="polite">
-        <section class="card">
-          <h2 class="page__title">Flow Alert Visualizer</h2>
-          <p class="page__lede">Visualize exchange/whale in/out flows as actionable signals.</p>
-          <div id="flowToolbar" class="flow-toolbar">
-            <label><input id="flow-lite-toggle" type="checkbox" /> Lite mode</label>
-            <label><input id="flow-demo-toggle" type="checkbox" /> Demo only</label>
-            <label for="flow-target-preset">Target preset</label>
-            <select id="flow-target-preset" class="flow-select">
-              <option value="exchanges">Exchanges (default)</option>
-              <option value="whales">Whales (default)</option>
-              <option value="custom">Custom (coming soon)</option>
-              <option value="">Unset (empty state demo)</option>
-            </select>
+        <section class="card flow-section">
+          <h2 class="page__title">Signal Summary</h2>
+          <p class="page__lede">Conclusion first: current pressure, net impact, and the reason in one glance.</p>
+          <div id="flowSummary" class="flow-summary">
+            <p class="flow-summary__headline" data-flow-summary="headline">NET: — | Pressure: — | Window: — | Target: —</p>
+            <p class="flow-summary__reason" data-flow-summary="reason">Why: waiting for demo signal...</p>
           </div>
         </section>
 
-        <section class="flow-layout">
-          <section id="flowCanvasWrap" class="card flow-canvas-wrap">
-            <canvas id="flowCanvas" aria-label="Flow visualization"></canvas>
-            <div data-flow-state="loading" class="flow-overlay">Loading flow visualizer…</div>
+        <section class="card flow-section">
+          <h2>Controls</h2>
+          <p class="flow-section__desc">Preset, window, and runtime switches for future API + demo parity.</p>
+          <div class="flow-controls-grid">
+            <label class="flow-field">Target preset
+              <select id="flow-target-preset" class="flow-select">
+                <option value="exchanges">Exchanges (default)</option>
+                <option value="whales">Whales (default)</option>
+                <option value="">Unset (empty state demo)</option>
+              </select>
+            </label>
+            <label class="flow-field">Window
+              <select id="flow-window" class="flow-select">
+                <option value="5m">5m</option>
+                <option value="1h">1h</option>
+                <option value="24h">24h</option>
+                <option value="7d">7d</option>
+              </select>
+            </label>
+            <label class="flow-field">Threshold
+              <select class="flow-select" disabled>
+                <option>Medium (coming soon)</option>
+              </select>
+            </label>
+            <label class="flow-field">Source
+              <select class="flow-select" disabled>
+                <option>Demo only (coming soon)</option>
+              </select>
+            </label>
+            <label><input id="flow-lite-toggle" type="checkbox" /> Lite mode</label>
+            <label><input id="flow-demo-toggle" type="checkbox" checked /> Demo only</label>
+            <div class="flow-chip">Status: <span data-flow-meta="status">LOADING</span></div>
+            <div class="flow-chip">Last refresh: <span data-flow-meta="refresh">—</span></div>
+          </div>
+          <div id="flowStaleNote" class="flow-note" hidden>Stale warning: showing cached/demo data that may be old.</div>
+        </section>
+
+        <section class="flow-main-grid">
+          <aside id="flowSnapshot" class="card flow-section flow-snapshot-card">
+            <h3>Snapshot</h3>
+            <p class="flow-section__desc">Quick metrics for the currently selected target/window.</p>
+            <dl class="flow-snapshot-list">
+              <dt>Inflow</dt><dd data-flow-snapshot="inflow">—</dd>
+              <dt>Outflow</dt><dd data-flow-snapshot="outflow">—</dd>
+              <dt>Net</dt><dd data-flow-snapshot="net">—</dd>
+              <dt>Window</dt><dd data-flow-snapshot="window">—</dd>
+              <dt>Source</dt><dd data-flow-snapshot="source">—</dd>
+              <dt>Updated</dt><dd data-flow-snapshot="updated">—</dd>
+            </dl>
+          </aside>
+
+          <section id="flowCanvasWrap" class="card flow-section flow-canvas-wrap">
+            <h2>Main Viz: Heatmap</h2>
+            <p class="flow-section__desc">Heat intensity tracks flow concentration by entity (rows) and time bucket (columns).</p>
+            <canvas id="flowCanvas" aria-label="Flow heatmap"></canvas>
+            <div id="flowTooltip" class="flow-tooltip" hidden></div>
+            <div data-flow-state="loading" class="flow-overlay">Loading heatmap…</div>
             <div data-flow-state="error" class="flow-overlay" hidden>
-              <p>Could not load flow source.</p>
+              <p>Could not prepare the heatmap.</p>
               <button id="flow-retry-button" class="secondary-button" type="button">Retry</button>
             </div>
             <div data-flow-state="empty" class="flow-overlay" hidden>
@@ -53,39 +99,47 @@
               <button id="flow-empty-button" class="secondary-button" type="button">Use Exchanges preset</button>
             </div>
           </section>
-
-          <aside id="flowSnapshot" class="card">
-            <h3>Snapshot</h3>
-            <dl class="flow-snapshot-list">
-              <dt>Target:</dt><dd data-flow-snapshot="target">—</dd>
-              <dt>Window:</dt><dd data-flow-snapshot="window">5m</dd>
-              <dt>Inflow:</dt><dd data-flow-snapshot="inflow">—</dd>
-              <dt>Outflow:</dt><dd data-flow-snapshot="outflow">—</dd>
-              <dt>Net:</dt><dd data-flow-snapshot="net">—</dd>
-              <dt>Source:</dt><dd data-flow-snapshot="source">—</dd>
-            </dl>
-          </aside>
         </section>
 
-        <section id="flowTrend" class="card">
-          <h3>Trend</h3>
-          <div class="flow-trend-bars">
-            <div data-flow-trend="1"></div>
-            <div data-flow-trend="2"></div>
-            <div data-flow-trend="3"></div>
-            <div data-flow-trend="4"></div>
-            <div data-flow-trend="5"></div>
-            <div data-flow-trend="6"></div>
+        <section id="flowTrend" class="card flow-section">
+          <h2>Trend</h2>
+          <p class="flow-section__desc">Net flow trend (USD) over the active window.</p>
+          <div class="flow-trend-bars" id="flowTrendBars"></div>
+        </section>
+
+        <section class="card flow-section">
+          <h2>Events / Top flows</h2>
+          <p class="flow-section__desc">Dig deeper into notable flow events. Tap/click to expand details.</p>
+          <div class="flow-events-table-wrap">
+            <table class="flow-events-table">
+              <thead>
+                <tr><th>Time</th><th>From → To</th><th>Label</th><th>Dir</th><th>Amount</th><th>Score</th></tr>
+              </thead>
+              <tbody id="flowEventsTableBody"></tbody>
+            </table>
           </div>
+          <div id="flowEventCards" class="flow-event-cards"></div>
         </section>
 
-        <section id="flowStatus" class="card flow-status">
-          Status: waiting for initialization…
+        <section class="card flow-section">
+          <h2>Escrow / Unlock Watch (XRP)</h2>
+          <p class="flow-section__desc">XRP-specific unlock timeline and pattern notes will be added in PR-F2.</p>
+          <p class="flow-coming-soon">Coming soon: next unlock, last unlock, and pattern annotation blocks.</p>
         </section>
 
-        <section class="card flow-actions">
-          <a class="secondary-button" href="/apps/">← Back to apps</a>
-          <a class="secondary-button" href="/">Back home</a>
+        <section class="card flow-section">
+          <details>
+            <summary>Debug (collapsed)</summary>
+            <p class="flow-section__desc">Development-only controls to validate loading/empty/error/stale states.</p>
+            <div class="flow-debug-buttons">
+              <button type="button" class="secondary-button" data-flow-force="loading">Force Loading</button>
+              <button type="button" class="secondary-button" data-flow-force="ok">Force OK</button>
+              <button type="button" class="secondary-button" data-flow-force="empty">Force Empty</button>
+              <button type="button" class="secondary-button" data-flow-force="error">Force Error</button>
+              <button type="button" class="secondary-button" data-flow-force="stale">Force Stale</button>
+            </div>
+            <p id="flowStatus" class="flow-debug-status">Status: waiting for initialization…</p>
+          </details>
         </section>
       </main>
       <div data-global-footer></div>
