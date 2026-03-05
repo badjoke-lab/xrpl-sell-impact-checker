@@ -2,414 +2,446 @@
   const LITE_KEY = 'xsic.flowAlert.liteMode';
   const DEMO_KEY = 'xsic.flowAlert.demoOnly';
   const PRESET_KEY = 'xsic.flowAlert.targetPreset';
+  const WINDOW_KEY = 'xsic.flowAlert.window';
 
-  const PRESET_LABELS = {
-    exchanges: 'Exchanges (default)',
-    whales: 'Whales (default)',
-    custom: 'Custom (coming soon)',
-  };
+  const LABELS = ['Binance', 'Coinbase', 'Bitstamp', 'Kraken', 'Bybit', 'Unknown'];
+  const FORCE_MODES = new Set(['loading', 'ok', 'empty', 'error', 'stale']);
 
   function boot() {
     const refs = {
       canvasWrap: document.getElementById('flowCanvasWrap'),
       canvas: document.getElementById('flowCanvas'),
+      tooltip: document.getElementById('flowTooltip'),
       status: document.getElementById('flowStatus'),
+      statusMeta: document.querySelector('[data-flow-meta="status"]'),
+      refreshMeta: document.querySelector('[data-flow-meta="refresh"]'),
+      staleNote: document.getElementById('flowStaleNote'),
       liteToggle: document.getElementById('flow-lite-toggle'),
       demoToggle: document.getElementById('flow-demo-toggle'),
       presetSelect: document.getElementById('flow-target-preset'),
+      windowSelect: document.getElementById('flow-window'),
       retryButton: document.getElementById('flow-retry-button'),
       emptyButton: document.getElementById('flow-empty-button'),
+      debugButtons: Array.from(document.querySelectorAll('[data-flow-force]')),
       overlays: {
         loading: document.querySelector('[data-flow-state="loading"]'),
         error: document.querySelector('[data-flow-state="error"]'),
         empty: document.querySelector('[data-flow-state="empty"]'),
       },
+      summary: {
+        headline: document.querySelector('[data-flow-summary="headline"]'),
+        reason: document.querySelector('[data-flow-summary="reason"]'),
+      },
       snapshot: {
-        target: document.querySelector('[data-flow-snapshot="target"]'),
-        window: document.querySelector('[data-flow-snapshot="window"]'),
         inflow: document.querySelector('[data-flow-snapshot="inflow"]'),
         outflow: document.querySelector('[data-flow-snapshot="outflow"]'),
         net: document.querySelector('[data-flow-snapshot="net"]'),
+        window: document.querySelector('[data-flow-snapshot="window"]'),
         source: document.querySelector('[data-flow-snapshot="source"]'),
+        updated: document.querySelector('[data-flow-snapshot="updated"]'),
       },
-      trendBars: Array.from(document.querySelectorAll('[data-flow-trend]')),
+      trendWrap: document.getElementById('flowTrendBars'),
+      eventsTableBody: document.getElementById('flowEventsTableBody'),
+      eventCards: document.getElementById('flowEventCards'),
     };
 
-    const setStatus = (message) => {
-      if (refs.status) refs.status.textContent = `Status: ${message}`;
-    };
+    if (!refs.canvas || !refs.canvasWrap) return;
 
-    if (!refs.canvas) {
-      setStatus('Initialization failed: canvas element is missing.');
-      if (refs.overlays.loading) refs.overlays.loading.hidden = true;
-      if (refs.overlays.error) refs.overlays.error.hidden = false;
-      return;
-    }
-
-    try {
-      init(refs, setStatus);
-    } catch (error) {
-      setStatus('Initialization failed. Please refresh.');
-      if (refs.overlays.loading) refs.overlays.loading.hidden = true;
-      if (refs.overlays.error) refs.overlays.error.hidden = false;
-      console.error('Flow Alert init error:', error);
-    }
+    init(refs);
   }
 
-  function init(refs, setStatus) {
-    const ctx = refs.canvas.getContext('2d');
+  function init(refs) {
     const state = {
       mode: 'loading',
+      forcedMode: 'ok',
       liteMode: loadBool(LITE_KEY),
-      demoOnly: loadBool(DEMO_KEY, true),
-      preset: loadPreset(),
-      rafId: null,
-      loopStamp: 0,
-      targetFrameMs: 1000 / 30,
-      inParticles: [],
-      outParticles: [],
-      burstTimer: 0,
-      intensity: 0.42,
-      snapshotTimer: null,
+      demoOnly: true,
+      preset: loadValue(PRESET_KEY, 'exchanges') || 'exchanges',
+      window: loadValue(WINDOW_KEY, '5m'),
+      snapshot: null,
+      heatmap: null,
+      hoveredCell: null,
+      pinnedCell: null,
+      lastRefreshMs: 0,
+      timer: null,
     };
 
-    if (refs.liteToggle) refs.liteToggle.checked = state.liteMode;
-    if (refs.demoToggle) refs.demoToggle.checked = state.demoOnly;
-    if (refs.presetSelect) refs.presetSelect.value = state.preset;
+    refs.liteToggle.checked = state.liteMode;
+    refs.demoToggle.checked = state.demoOnly;
+    refs.presetSelect.value = state.preset;
+    refs.windowSelect.value = state.window;
 
-    applyLiteMode();
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    refs.liteToggle?.addEventListener('change', () => {
-      state.liteMode = Boolean(refs.liteToggle.checked);
+    refs.liteToggle.addEventListener('change', () => {
+      state.liteMode = refs.liteToggle.checked;
       saveBool(LITE_KEY, state.liteMode);
-      applyLiteMode();
-      setStatus(`Lite mode ${state.liteMode ? 'enabled' : 'disabled'}.`);
+      renderNow();
     });
 
-    refs.demoToggle?.addEventListener('change', () => {
-      state.demoOnly = Boolean(refs.demoToggle.checked);
+    refs.demoToggle.addEventListener('change', () => {
+      state.demoOnly = refs.demoToggle.checked;
       saveBool(DEMO_KEY, state.demoOnly);
-      void refreshState();
+      renderNow();
     });
 
-    refs.presetSelect?.addEventListener('change', () => {
-      state.preset = refs.presetSelect?.value || '';
-      savePreset(state.preset);
-      void refreshState();
+    refs.presetSelect.addEventListener('change', () => {
+      state.preset = refs.presetSelect.value;
+      saveValue(PRESET_KEY, state.preset);
+      renderNow();
+    });
+
+    refs.windowSelect.addEventListener('change', () => {
+      state.window = refs.windowSelect.value;
+      saveValue(WINDOW_KEY, state.window);
+      renderNow();
     });
 
     refs.retryButton?.addEventListener('click', () => {
-      setStatus('Retrying flow renderer…');
-      seedParticles();
-      void refreshState({ forceDemo: true });
+      state.forcedMode = 'ok';
+      renderNow();
     });
 
     refs.emptyButton?.addEventListener('click', () => {
       state.preset = 'exchanges';
-      if (refs.presetSelect) refs.presetSelect.value = 'exchanges';
-      savePreset(state.preset);
-      void refreshState();
+      refs.presetSelect.value = 'exchanges';
+      saveValue(PRESET_KEY, state.preset);
+      state.forcedMode = 'ok';
+      renderNow();
     });
 
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        stopAnimation();
-        stopSnapshotLoop();
+    refs.debugButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const mode = button.dataset.flowForce;
+        if (!FORCE_MODES.has(mode)) return;
+        state.forcedMode = mode;
+        renderNow();
+      });
+    });
+
+    window.addEventListener('resize', () => renderHeatmap(refs, state));
+    bindCanvasInteraction(refs, state);
+
+    renderEvents(refs);
+    renderTrend(refs, []);
+    renderNow();
+
+    state.timer = window.setInterval(() => {
+      if (state.mode === 'loading') return;
+      if (state.mode === 'error') return;
+      generateData(state);
+      renderPanels(refs, state);
+      renderHeatmap(refs, state);
+      renderTrend(refs, state.heatmap.netSeries);
+    }, state.liteMode ? 5500 : 3000);
+
+    function renderNow() {
+      applyMode(state);
+      clearInterval(state.timer);
+      const delay = state.mode === 'loading' ? 700 : 0;
+      window.setTimeout(() => {
+        if (state.mode === 'error' || state.mode === 'empty') {
+          renderPanels(refs, state);
+          renderHeatmap(refs, state);
+          return;
+        }
+        generateData(state);
+        renderPanels(refs, state);
+        renderHeatmap(refs, state);
+        renderTrend(refs, state.heatmap.netSeries);
+      }, delay);
+
+      state.timer = window.setInterval(() => {
+        if (state.mode !== 'ok' && state.mode !== 'stale') return;
+        generateData(state);
+        renderPanels(refs, state);
+        renderHeatmap(refs, state);
+        renderTrend(refs, state.heatmap.netSeries);
+      }, state.liteMode ? 5500 : 3000);
+    }
+
+    function applyMode(current) {
+      if (current.forcedMode === 'loading') {
+        current.mode = 'loading';
+      } else if (current.forcedMode === 'error' || !current.demoOnly) {
+        current.mode = 'error';
+      } else if (current.forcedMode === 'empty' || !current.preset) {
+        current.mode = 'empty';
+      } else if (current.forcedMode === 'stale') {
+        current.mode = 'stale';
       } else {
-        startSnapshotLoop();
-        if (state.mode === 'demo') startAnimation();
+        current.mode = 'ok';
       }
+    }
+  }
+
+  function generateData(state) {
+    const now = Date.now();
+    const bucketCount = state.liteMode ? 12 : 24;
+    const cells = [];
+    const totals = Array.from({ length: LABELS.length }, () => 0);
+    const netSeries = [];
+
+    for (let y = 0; y < LABELS.length; y += 1) {
+      for (let x = 0; x < bucketCount; x += 1) {
+        const wave = Math.sin((now / 13000) + x * 0.45 + y * 0.65);
+        const noise = (Math.random() * 0.35) + 0.2;
+        const base = Math.max(0, wave + noise);
+        const value = Math.round(base * 980000);
+        totals[y] += value;
+        cells.push({ x, y, label: LABELS[y], value });
+      }
+    }
+
+    for (let i = 0; i < bucketCount; i += 1) {
+      const inflow = 90000 + Math.round(Math.random() * 210000);
+      const outflow = 90000 + Math.round(Math.random() * 230000);
+      netSeries.push(inflow - outflow);
+    }
+
+    const inflow = netSeries.reduce((acc, value) => acc + (value > 0 ? value : Math.round(Math.abs(value) * 0.52)), 0);
+    const outflow = netSeries.reduce((acc, value) => acc + (value < 0 ? Math.abs(value) : Math.round(value * 0.48)), 0);
+    const net = inflow - outflow;
+
+    state.lastRefreshMs = now;
+    state.heatmap = { bucketCount, cells, totals, netSeries };
+    state.snapshot = {
+      inflow,
+      outflow,
+      net,
+      pressure: Math.abs(net) > 600000 ? 'HIGH' : 'MEDIUM',
+    };
+  }
+
+  function renderPanels(refs, state) {
+    const isData = Boolean(state.snapshot);
+    toggleOverlay(refs, state.mode);
+
+    const statusText = state.mode === 'ok' ? 'OK' : state.mode.toUpperCase();
+    safeText(refs.statusMeta, statusText);
+    safeText(refs.status, `Status: ${statusText}`);
+    refs.staleNote.hidden = state.mode !== 'stale';
+
+    if (!isData) {
+      ['inflow', 'outflow', 'net', 'window', 'source', 'updated'].forEach((key) => safeText(refs.snapshot[key], '—'));
+      safeText(refs.summary.headline, 'NET: — | Pressure: — | Window: — | Target: —');
+      safeText(refs.summary.reason, 'Why: no data generated for this state.');
+      safeText(refs.refreshMeta, '—');
+      return;
+    }
+
+    safeText(refs.snapshot.inflow, formatUsd(state.snapshot.inflow));
+    safeText(refs.snapshot.outflow, formatUsd(state.snapshot.outflow));
+    safeText(refs.snapshot.net, formatSignedUsd(state.snapshot.net));
+    safeText(refs.snapshot.window, state.window);
+    safeText(refs.snapshot.source, state.mode === 'stale' ? 'demo (cached)' : 'demo');
+    safeText(refs.snapshot.updated, relativeSeconds(state.lastRefreshMs));
+    safeText(refs.refreshMeta, relativeSeconds(state.lastRefreshMs));
+
+    safeText(
+      refs.summary.headline,
+      `NET: ${formatSignedUsd(state.snapshot.net)} | Pressure: ${state.snapshot.pressure} | Window: ${state.window} | Target: ${state.preset || 'Unset'}`,
+    );
+    safeText(refs.summary.reason, 'Why: Exchange IN spike + whale→exchange burst (demo).');
+  }
+
+  function renderHeatmap(refs, state) {
+    const ctx = refs.canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = Math.floor(refs.canvasWrap.clientWidth - 24);
+    const height = 320;
+    refs.canvas.width = width * devicePixelRatio;
+    refs.canvas.height = height * devicePixelRatio;
+    refs.canvas.style.height = `${height}px`;
+    refs.canvas.style.width = `${width}px`;
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, width, height);
+
+    if (!state.heatmap || (state.mode !== 'ok' && state.mode !== 'stale')) return;
+
+    const leftPad = 92;
+    const topPad = 18;
+    const chartW = width - leftPad - 14;
+    const chartH = height - topPad - 48;
+    const rows = LABELS.length;
+    const cols = state.heatmap.bucketCount;
+    const cellW = chartW / cols;
+    const cellH = chartH / rows;
+    const max = Math.max(...state.heatmap.cells.map((cell) => cell.value), 1);
+
+    state.heatmap.cells.forEach((cell) => {
+      const alpha = 0.15 + (cell.value / max) * 0.8;
+      const x = leftPad + (cell.x * cellW);
+      const y = topPad + (cell.y * cellH);
+      ctx.fillStyle = `rgba(37, 99, 235, ${alpha})`;
+      ctx.fillRect(x + 1, y + 1, Math.max(2, cellW - 2), Math.max(2, cellH - 2));
     });
 
-    void refreshState();
-    startSnapshotLoop();
+    ctx.fillStyle = '#334155';
+    ctx.font = '12px sans-serif';
+    LABELS.forEach((label, index) => {
+      const y = topPad + index * cellH + cellH * 0.66;
+      ctx.fillText(label, 8, y);
+    });
 
-    function loadBool(key, fallback = false) {
-      try {
-        const value = window.localStorage.getItem(key);
-        if (value === null) return fallback;
-        return value === '1';
-      } catch {
-        return fallback;
-      }
+    ctx.fillStyle = '#64748b';
+    const xStep = Math.max(1, Math.floor(cols / (state.liteMode ? 4 : 6)));
+    for (let i = 0; i < cols; i += xStep) {
+      const x = leftPad + i * cellW;
+      const minute = String((i * 5) % 60).padStart(2, '0');
+      ctx.fillText(`${minute}m`, x, height - 14);
     }
 
-    function saveBool(key, value) {
-      try {
-        window.localStorage.setItem(key, value ? '1' : '0');
-      } catch {
-        // ignore
-      }
+    if (state.hoveredCell || state.pinnedCell) {
+      const cell = state.pinnedCell || state.hoveredCell;
+      const x = leftPad + cell.x * cellW;
+      const y = topPad + cell.y * cellH;
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 1, y + 1, Math.max(2, cellW - 2), Math.max(2, cellH - 2));
     }
+  }
 
-    function loadPreset() {
-      try {
-        const value = window.localStorage.getItem(PRESET_KEY);
-        if (!value) return 'exchanges';
-        return Object.prototype.hasOwnProperty.call(PRESET_LABELS, value) ? value : '';
-      } catch {
-        return 'exchanges';
-      }
-    }
+  function renderTrend(refs, values) {
+    refs.trendWrap.innerHTML = '';
+    values.forEach((value) => {
+      const bar = document.createElement('div');
+      const pct = Math.min(100, Math.max(12, Math.round((Math.abs(value) / 260000) * 100)));
+      bar.style.height = `${pct}%`;
+      bar.className = value < 0 ? 'flow-trend-bar flow-trend-bar--neg' : 'flow-trend-bar flow-trend-bar--pos';
+      bar.title = `Net ${formatSignedUsd(value)}`;
+      refs.trendWrap.appendChild(bar);
+    });
+  }
 
-    function savePreset(value) {
-      try {
-        window.localStorage.setItem(PRESET_KEY, value);
-      } catch {
-        // ignore
-      }
-    }
+  function renderEvents(refs) {
+    const rows = Array.from({ length: 8 }, (_, i) => ({
+      id: i + 1,
+      time: `19:${String(24 + i).padStart(2, '0')}:10`,
+      route: `r${i}x.. → ${LABELS[i % LABELS.length]}`,
+      label: i % 2 === 0 ? 'Exchange' : 'Whale',
+      dir: i % 3 === 0 ? 'OUT' : 'IN',
+      amount: `${(1.2 + i * 0.3).toFixed(1)}M XRP`,
+      score: i % 2 === 0 ? 'HIGH' : 'MED',
+    }));
 
-    function setMode(mode) {
-      state.mode = mode;
-      Object.entries(refs.overlays).forEach(([name, node]) => {
-        if (node) node.hidden = name !== mode;
-      });
+    refs.eventsTableBody.innerHTML = rows.map((row) => `
+      <tr>
+        <td><details><summary>${row.time}</summary><div>tx link: coming soon<br>classification reason: demo rule set</div></details></td>
+        <td>${row.route}</td>
+        <td>${row.label}</td>
+        <td>${row.dir}</td>
+        <td>${row.amount}</td>
+        <td>${row.score}</td>
+      </tr>
+    `).join('');
 
-      if (mode === 'demo') {
-        setStatus('Demo rendering active.');
-        startAnimation();
-      } else if (mode === 'loading') {
-        setStatus('Loading flow state…');
-        stopAnimation();
-      } else if (mode === 'error') {
-        setStatus('Error: could not start renderer.');
-        stopAnimation();
-      } else if (mode === 'empty') {
-        setStatus('Preset missing. Choose a target preset.');
-        stopAnimation();
-      }
-    }
+    refs.eventCards.innerHTML = rows.map((row) => `
+      <details class="flow-event-card">
+        <summary>${row.time} • ${row.dir} • ${row.amount} • ${row.score}</summary>
+        <p>${row.route} (${row.label})</p>
+        <p>tx link: coming soon</p>
+        <p>classification reason: demo rule set</p>
+      </details>
+    `).join('');
+  }
 
-    async function refreshState({ forceDemo = false } = {}) {
-      setMode('loading');
-      await wait(220);
+  function bindCanvasInteraction(refs, state) {
+    const findCell = (clientX, clientY) => {
+      if (!state.heatmap) return null;
+      const rect = refs.canvas.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const leftPad = 92;
+      const topPad = 18;
+      const chartW = rect.width - leftPad - 14;
+      const chartH = rect.height - topPad - 48;
+      const cols = state.heatmap.bucketCount;
+      const rows = LABELS.length;
+      if (x < leftPad || x > leftPad + chartW || y < topPad || y > topPad + chartH) return null;
+      const cx = Math.max(0, Math.min(cols - 1, Math.floor(((x - leftPad) / chartW) * cols)));
+      const cy = Math.max(0, Math.min(rows - 1, Math.floor(((y - topPad) / chartH) * rows)));
+      const idx = (cy * cols) + cx;
+      return state.heatmap.cells[idx] || null;
+    };
 
-      if (!state.preset) {
-        updateSnapshot({ inflow: null, outflow: null, net: null, source: 'demo' });
-        resetTrend();
-        setMode('empty');
+    const showTooltip = (cell, clientX, clientY, fixed = false) => {
+      if (!cell) {
+        refs.tooltip.hidden = true;
         return;
       }
+      refs.tooltip.hidden = false;
+      refs.tooltip.textContent = `${cell.label} | t-${cell.x + 1} | ${formatUsd(cell.value)}`;
+      const rect = refs.canvasWrap.getBoundingClientRect();
+      refs.tooltip.style.left = `${Math.min(rect.width - 160, Math.max(12, clientX - rect.left + 10))}px`;
+      refs.tooltip.style.top = `${Math.min(rect.height - 40, Math.max(16, clientY - rect.top - 8))}px`;
+      refs.tooltip.dataset.fixed = fixed ? '1' : '';
+    };
 
-      if (!state.demoOnly && !forceDemo) {
-        updateSnapshot({ inflow: null, outflow: null, net: null, source: 'API: unavailable' });
-        resetTrend();
-        setMode('error');
-        return;
-      }
+    const moveHandler = (event) => {
+      if (state.pinnedCell) return;
+      const cell = findCell(event.clientX, event.clientY) || state.heatmap?.cells?.[0] || null;
+      state.hoveredCell = cell;
+      showTooltip(cell, event.clientX, event.clientY);
+      renderHeatmap(refs, state);
+    };
 
-      const snapshot = createDemoSnapshot(state.preset);
-      updateSnapshot(snapshot);
-      updateTrend(snapshot);
-      setMode('demo');
+    const leaveHandler = () => {
+      if (state.pinnedCell) return;
+      state.hoveredCell = null;
+      refs.tooltip.hidden = true;
+      renderHeatmap(refs, state);
+    };
+
+    const clickHandler = (event) => {
+      const cell = findCell(event.clientX, event.clientY) || state.heatmap?.cells?.[0] || null;
+      state.pinnedCell = cell;
+      showTooltip(cell, event.clientX, event.clientY, true);
+      renderHeatmap(refs, state);
+    };
+
+    [refs.canvas, refs.canvasWrap].forEach((target) => {
+      target.addEventListener('mousemove', moveHandler);
+      target.addEventListener('mouseleave', leaveHandler);
+      target.addEventListener('click', clickHandler);
+    });
+  }
+
+  function toggleOverlay(refs, mode) {
+    Object.entries(refs.overlays).forEach(([name, node]) => {
+      node.hidden = name !== mode;
+    });
+  }
+
+  function loadBool(key, fallback = false) {
+    try {
+      const value = localStorage.getItem(key);
+      if (value == null) return fallback;
+      return value === '1';
+    } catch {
+      return fallback;
     }
+  }
 
-    function createDemoSnapshot(preset) {
-      const now = Date.now();
-      const wave = (Math.sin(now / 1700) + 1) / 2;
-      const skew = preset === 'whales' ? 1.24 : preset === 'custom' ? 0.82 : 1;
-      const inflow = Math.round((170000 + (wave * 130000) + (Math.random() * 45000)) * skew);
-      const outflow = Math.round((165000 + ((1 - wave) * 120000) + (Math.random() * 42000)) * skew);
-      const net = inflow - outflow;
-      state.intensity = clamp((Math.abs(net) / 320000) + (wave * 0.35), 0.18, 1);
+  function saveBool(key, value) {
+    try { localStorage.setItem(key, value ? '1' : '0'); } catch { /* ignore */ }
+  }
 
-      return {
-        inflow,
-        outflow,
-        net,
-        source: 'demo',
-      };
+  function loadValue(key, fallback) {
+    try {
+      return localStorage.getItem(key) || fallback;
+    } catch {
+      return fallback;
     }
+  }
 
-    function updateSnapshot(snapshot) {
-      safeText(refs.snapshot.target, PRESET_LABELS[state.preset] || '—');
-      safeText(refs.snapshot.window, '5m');
-      safeText(refs.snapshot.inflow, snapshot.inflow === null ? '—' : formatUsd(snapshot.inflow));
-      safeText(refs.snapshot.outflow, snapshot.outflow === null ? '—' : formatUsd(snapshot.outflow));
-      safeText(refs.snapshot.net, snapshot.net === null ? '—' : formatSignedUsd(snapshot.net));
-      safeText(refs.snapshot.source, snapshot.source === 'demo' ? 'demo' : snapshot.source);
-    }
-
-    function updateTrend(snapshot) {
-      const range = Math.max(1, Math.abs(snapshot.net));
-      refs.trendBars.forEach((bar, index) => {
-        const wobble = 0.45 + (Math.sin((Date.now() / 800) + index) * 0.25);
-        const pct = clamp(Math.round(22 + (range / 7000) * wobble), 12, 94);
-        if (bar) bar.style.height = `${pct}%`;
-      });
-    }
-
-    function resetTrend() {
-      refs.trendBars.forEach((bar) => {
-        if (bar) bar.style.height = '14%';
-      });
-    }
-
-    function snapshotIntervalMs() {
-      return state.liteMode ? 3200 : 1900;
-    }
-
-    function startSnapshotLoop() {
-      if (state.snapshotTimer) return;
-      state.snapshotTimer = window.setInterval(() => {
-        if (state.mode !== 'demo') return;
-        const snapshot = createDemoSnapshot(state.preset);
-        updateSnapshot(snapshot);
-        updateTrend(snapshot);
-      }, snapshotIntervalMs());
-    }
-
-    function stopSnapshotLoop() {
-      if (!state.snapshotTimer) return;
-      window.clearInterval(state.snapshotTimer);
-      state.snapshotTimer = null;
-    }
-
-    function applyLiteMode() {
-      state.targetFrameMs = state.liteMode ? 1000 / 12 : 1000 / 30;
-      seedParticles();
-      stopSnapshotLoop();
-      startSnapshotLoop();
-    }
-
-    function resizeCanvas() {
-      const rect = refs.canvasWrap?.getBoundingClientRect();
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
-      const width = Math.max(300, Math.floor((rect?.width || 300) * dpr));
-      const height = Math.max(200, Math.floor((rect?.height || 220) * dpr));
-      refs.canvas.width = width;
-      refs.canvas.height = height;
-      seedParticles();
-    }
-
-    function seedParticles() {
-      const base = state.liteMode ? 10 : 24;
-      const extra = state.liteMode ? 7 : 32;
-      const count = Math.max(8, Math.round(base + (extra * state.intensity)));
-      state.inParticles = Array.from({ length: count }, createParticle('in'));
-      state.outParticles = Array.from({ length: count }, createParticle('out'));
-    }
-
-    function createParticle(direction) {
-      const inbound = direction === 'in';
-      return () => ({
-        lane: Math.random() * 0.36 + (inbound ? 0.14 : 0.5),
-        progress: Math.random(),
-        speed: 0.0012 + Math.random() * (state.liteMode ? 0.0024 : 0.0036),
-        radius: 1.6 + Math.random() * (state.liteMode ? 1.8 : 3.2),
-        jitter: (Math.random() - 0.5) * 0.16,
-        alpha: 0.4 + Math.random() * 0.5,
-        inbound,
-      });
-    }
-
-    function startAnimation() {
-      if (state.rafId || document.hidden) return;
-      state.loopStamp = performance.now();
-      state.rafId = window.requestAnimationFrame(loop);
-    }
-
-    function stopAnimation() {
-      if (!state.rafId) return;
-      window.cancelAnimationFrame(state.rafId);
-      state.rafId = null;
-    }
-
-    function loop(now) {
-      const elapsed = now - state.loopStamp;
-      if (elapsed >= state.targetFrameMs) {
-        drawFrame(elapsed);
-        state.loopStamp = now;
-      }
-      state.rafId = window.requestAnimationFrame(loop);
-    }
-
-    function drawFrame(elapsed) {
-      if (!ctx) return;
-      const width = refs.canvas.width;
-      const height = refs.canvas.height;
-      const centerX = width * 0.5;
-      const centerY = height * 0.5;
-      state.burstTimer += elapsed;
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(0, 0, width, height);
-
-      const gradient = ctx.createLinearGradient(0, 0, width, 0);
-      gradient.addColorStop(0, 'rgba(37, 99, 235, 0.08)');
-      gradient.addColorStop(0.5, 'rgba(59, 130, 246, 0.18)');
-      gradient.addColorStop(1, 'rgba(30, 64, 175, 0.08)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, width, height);
-
-      ctx.strokeStyle = 'rgba(37, 99, 235, 0.25)';
-      ctx.lineWidth = state.liteMode ? 1 : 2;
-      ctx.beginPath();
-      ctx.moveTo(centerX, 0);
-      ctx.lineTo(centerX, height);
-      ctx.stroke();
-
-      drawLane(state.inParticles, elapsed, centerX, centerY, true);
-      drawLane(state.outParticles, elapsed, centerX, centerY, false);
-
-      if (state.burstTimer > (state.liteMode ? 4500 : 2900) && Math.random() > 0.74) {
-        state.burstTimer = 0;
-        drawBurst(centerX, centerY);
-      }
-    }
-
-    function drawLane(particles, elapsed, centerX, centerY, inbound) {
-      particles.forEach((particle) => {
-        particle.progress += particle.speed * elapsed;
-        if (particle.progress >= 1.06) particle.progress = 0;
-
-        const fromX = inbound ? 0 : refs.canvas.width;
-        const laneY = centerY + ((particle.lane - 0.5) * refs.canvas.height);
-        const toX = centerX;
-        const x = inbound
-          ? fromX + ((toX - fromX) * particle.progress)
-          : fromX - ((fromX - toX) * particle.progress);
-        const y = laneY + Math.sin((particle.progress * 10) + particle.jitter) * 8;
-
-        const alphaBoost = 0.25 + (state.intensity * 0.5);
-        const color = inbound ? `rgba(16, 185, 129, ${Math.min(0.95, particle.alpha + alphaBoost)})` : `rgba(239, 68, 68, ${Math.min(0.95, particle.alpha + alphaBoost)})`;
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(x, y, particle.radius, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
-    function drawBurst(centerX, centerY) {
-      const burstCount = state.liteMode ? 10 : 20;
-      for (let i = 0; i < burstCount; i += 1) {
-        const angle = (Math.PI * 2 * i) / burstCount;
-        const distance = (state.liteMode ? 14 : 26) + Math.random() * (state.liteMode ? 32 : 52);
-        const x = centerX + Math.cos(angle) * distance;
-        const y = centerY + Math.sin(angle) * distance;
-        ctx.fillStyle = i % 2 === 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)';
-        ctx.beginPath();
-        ctx.arc(x, y, state.liteMode ? 2 : 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+  function saveValue(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* ignore */ }
   }
 
   function safeText(node, value) {
     if (node) node.textContent = value;
-  }
-
-  function wait(ms) {
-    return new Promise((resolve) => {
-      window.setTimeout(resolve, ms);
-    });
-  }
-
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
   }
 
   function formatUsd(value) {
@@ -419,6 +451,11 @@
   function formatSignedUsd(value) {
     const sign = value > 0 ? '+' : '';
     return `${sign}${formatUsd(value)}`;
+  }
+
+  function relativeSeconds(timestamp) {
+    const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    return `${seconds}s ago`;
   }
 
   if (document.readyState === 'loading') {
