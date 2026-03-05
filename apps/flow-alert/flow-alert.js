@@ -41,6 +41,12 @@
       trendWrap: document.getElementById('flowTrendBars'),
       eventsTableBody: document.getElementById('flowEventsTableBody'),
       eventCards: document.getElementById('flowEventCards'),
+      escrow: {
+        next: document.getElementById('flowEscrowNext'),
+        recent: document.getElementById('flowEscrowRecent'),
+        pattern: document.getElementById('flowEscrowPattern'),
+        stats: document.getElementById('flowEscrowStats'),
+      },
     };
 
     if (!refs.canvas || !refs.canvasWrap) return;
@@ -56,6 +62,7 @@
       preset: loadValue(PRESET_KEY, 'exchanges') || 'exchanges',
       window: loadValue(WINDOW_KEY, '5m'),
       payload: null,
+      escrowPayload: null,
       heatmapCells: [],
       hoveredCell: null,
       pinnedCell: null,
@@ -134,36 +141,56 @@
       state.payload = null;
       renderPanels(refs, state);
       renderHeatmap(refs, state);
+      renderEscrow(refs, state);
       return;
     }
 
     state.mode = 'loading';
     renderPanels(refs, state);
     renderHeatmap(refs, state);
+    renderEscrow(refs, state);
 
-    let payload;
+    let result;
     if (state.demoOnly) {
-      payload = makeDemoPayload(state);
+      result = {
+        flow: makeDemoPayload(state),
+        escrow: makeDemoEscrowPayload(state),
+      };
     } else {
-      payload = await fetchLivePayload(state);
+      result = await fetchLivePayload(state);
     }
 
-    state.payload = payload;
-    state.lastRefreshMs = payload?.ts || Date.now();
+    state.payload = result.flow;
+    state.escrowPayload = result.escrow;
+    state.lastRefreshMs = Math.max(result.flow?.ts || 0, result.escrow?.ts || 0, Date.now());
     applyMode(state);
     buildHeatmapCells(state);
     renderPanels(refs, state);
     renderHeatmap(refs, state);
     renderTrend(refs, state);
     renderEvents(refs, state);
+    renderEscrow(refs, state);
   }
 
   async function fetchLivePayload(state) {
+    const flowUrl = `/api/xrpl/whale-flow?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}`;
+    const escrowWindow = state.window === '24h' ? '24h' : state.window === '1h' ? '24h' : '7d';
+    const escrowLimit = state.liteMode ? 5 : 10;
+    const escrowUrl = `/api/xrpl/escrow-watch?window=${encodeURIComponent(escrowWindow)}&limit=${escrowLimit}`;
+
+    const [flow, escrow] = await Promise.all([
+      fetchFlowPayload(flowUrl, state),
+      fetchEscrowPayload(escrowUrl, escrowWindow),
+    ]);
+
+    return { flow, escrow };
+  }
+
+  async function fetchFlowPayload(url, state) {
     try {
-      const response = await fetch(`/api/xrpl/whale-flow?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}`);
+      const response = await fetch(url);
       if (!response.ok) throw new Error(`http_${response.status}`);
-      const payload = await response.json();
-      return payload;
+      return await response.json();
     } catch (error) {
       return {
         ok: false,
@@ -177,6 +204,27 @@
         events: [],
         summaryReason: 'Unable to fetch live data.',
         debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`] },
+      };
+    }
+  }
+
+  async function fetchEscrowPayload(url, window) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`http_${response.status}`);
+      return await response.json();
+    } catch (error) {
+      return {
+        ok: false,
+        ts: Date.now(),
+        source: 'demo',
+        stale: true,
+        window,
+        next: null,
+        recent: [],
+        stats: { sumXrp: 0, count: 0, avgXrp: 0, maxXrp: 0 },
+        pattern: [{ label: 'unavailable', note: 'Escrow watcher unavailable. Showing fallback payload.' }],
+        debug: { endpointsTried: [], ledgersScanned: 0, txCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`] },
       };
     }
   }
@@ -265,6 +313,92 @@
     };
   }
 
+
+  function makeDemoEscrowPayload(state) {
+    const now = Date.now();
+    const recent = Array.from({ length: state.liteMode ? 4 : 8 }, (_, index) => ({
+      time: now - (index * 6 * 60 * 60 * 1000),
+      amountXrp: 12_000_000 + index * 2_000_000,
+      txHash: `DEMOESCROW${index}`,
+      type: index % 3 === 0 ? 'create' : index % 2 === 0 ? 'cancel' : 'finish',
+      account: 'rDemoEscrowAddr',
+      note: 'Demo escrow signal',
+    }));
+
+    return {
+      ok: true,
+      ts: now,
+      source: 'demo',
+      stale: false,
+      window: state.window === '24h' ? '24h' : '7d',
+      next: {
+        time: now + (18 * 60 * 60 * 1000),
+        amountXrp: 42_000_000,
+        txHash: 'DEMOESCROWNEXT',
+        account: 'rDemoEscrowAddr',
+        note: 'Upcoming unlock from demo schedule',
+      },
+      recent,
+      stats: {
+        sumXrp: recent.reduce((sum, row) => sum + row.amountXrp, 0),
+        count: recent.length,
+        avgXrp: recent.reduce((sum, row) => sum + row.amountXrp, 0) / recent.length,
+        maxXrp: Math.max(...recent.map((row) => row.amountXrp)),
+      },
+      pattern: [
+        { label: 'monthly-ish', note: 'Unlock cadence appears monthly-ish in demo sequence.' },
+      ],
+      debug: { endpointsTried: [], ledgersScanned: 0, txCount: recent.length, cacheHit: false, warnings: [] },
+    };
+  }
+
+  function renderEscrow(refs, state) {
+    const escrow = state.escrowPayload;
+    if (!escrow) {
+      safeText(refs.escrow.next, 'No upcoming unlock found');
+      safeText(refs.escrow.stats, 'sum: — / count: — / avg: — / max: —');
+      refs.escrow.recent.innerHTML = '<li>—</li>';
+      refs.escrow.pattern.innerHTML = '<li>No pattern note yet.</li>';
+      return;
+    }
+
+    if (escrow.next?.time) {
+      safeText(
+        refs.escrow.next,
+        `${formatDateTime(escrow.next.time)} • ${formatXrp(escrow.next.amountXrp || 0)}${escrow.stale ? ' (stale)' : ''}`,
+      );
+    } else {
+      safeText(refs.escrow.next, 'No upcoming unlock found');
+    }
+
+    safeText(
+      refs.escrow.stats,
+      `sum: ${formatXrp(escrow.stats?.sumXrp || 0)} / count: ${escrow.stats?.count || 0} / avg: ${formatXrp(escrow.stats?.avgXrp || 0)} / max: ${formatXrp(escrow.stats?.maxXrp || 0)}`,
+    );
+
+    const recentRows = (escrow.recent || []).slice(0, state.liteMode ? 5 : 10);
+    refs.escrow.recent.innerHTML = recentRows.length
+      ? recentRows.map((row) => `<li>${formatDateTime(row.time)} • ${row.type} • ${formatXrp(row.amountXrp || 0)} • ${row.txHash || 'n/a'}</li>`).join('')
+      : '<li>No recent unlocks in selected window.</li>';
+
+    const notes = escrow.pattern || [];
+    refs.escrow.pattern.innerHTML = notes.length
+      ? notes.map((row) => `<li><strong>${row.label}:</strong> ${row.note}</li>`).join('')
+      : '<li>No strong pattern detected.</li>';
+  }
+
+  function buildEscrowSummaryNote(escrowPayload) {
+    if (!escrowPayload) return '';
+    const latest = (escrowPayload.recent || [])[0];
+    if (latest?.amountXrp >= 20_000_000) {
+      return `Escrow unlock detected in last ${escrowPayload.window}: ${Math.round(latest.amountXrp).toLocaleString()} XRP`;
+    }
+    if (escrowPayload.next?.amountXrp >= 20_000_000) {
+      return `Upcoming escrow unlock: ${Math.round(escrowPayload.next.amountXrp).toLocaleString()} XRP`;
+    }
+    return '';
+  }
+
   function buildHeatmapCells(state) {
     const labels = state.payload?.heatmap?.labels || [];
     const matrix = state.payload?.heatmap?.matrix || [];
@@ -308,7 +442,9 @@
     const net = useUsd ? payload.summary.netUsd : payload.summary.netXrp;
     const pressure = Math.abs(net) > (useUsd ? 700000 : 1000000) ? 'HIGH' : 'MEDIUM';
     safeText(refs.summary.headline, `NET: ${useUsd ? formatSignedUsd(net) : formatSignedXrp(net)} | Pressure: ${pressure} | Window: ${payload.window} | Target: ${state.preset}`);
-    safeText(refs.summary.reason, payload.summaryReason ? `Why: ${payload.summaryReason}` : 'Why: no notable events yet.');
+    const escrowNote = buildEscrowSummaryNote(state.escrowPayload);
+    const reason = payload.summaryReason ? `Why: ${payload.summaryReason}` : 'Why: no notable events yet.';
+    safeText(refs.summary.reason, escrowNote ? `${reason} | ${escrowNote}` : reason);
   }
 
   function renderHeatmap(refs, state) {
@@ -527,6 +663,12 @@
     if (!address) return '—';
     if (address.length <= 12) return address;
     return `${address.slice(0, 5)}...${address.slice(-5)}`;
+  }
+
+  function formatDateTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value || '—');
+    return date.toLocaleString();
   }
 
   function formatTime(value) {
