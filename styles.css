@@ -2321,6 +2321,18 @@ svg polygon[fill="black"]{
   background: #f8fafc;
 }
 
+.flow-escrow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.flow-subtitle { margin: 10px 0 6px; font-size: 0.95rem; }
+.flow-escrow-next,
+.flow-escrow-stats { margin: 0; color: #334155; }
+.flow-escrow-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: #334155;
+}
+
 .flow-debug-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .flow-debug-status { margin: 0; color: #334155; font-size: 0.9rem; }
 
@@ -2348,6 +2360,7 @@ svg polygon[fill="black"]{
 
 @media (max-width: 599px) {
   .flow-controls-grid { grid-template-columns: 1fr; }
+  .flow-escrow-grid { grid-template-columns: 1fr; }
   #flowCanvas { height: 260px; }
   .flow-overlay { inset: 90px 10px 10px; }
   .flow-events-table-wrap { display: none; }

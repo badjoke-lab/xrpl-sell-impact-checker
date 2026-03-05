@@ -123,8 +123,21 @@
 
         <section class="card flow-section">
           <h2>Escrow / Unlock Watch (XRP)</h2>
-          <p class="flow-section__desc">XRP-specific unlock timeline and pattern notes will be added in PR-F2.</p>
-          <p class="flow-coming-soon">Coming soon: next unlock, last unlock, and pattern annotation blocks.</p>
+          <p class="flow-section__desc">Track upcoming and recent escrow unlock signals alongside exchange flow.</p>
+          <div class="flow-escrow-grid">
+            <div>
+              <h3 class="flow-subtitle">Next unlock</h3>
+              <p id="flowEscrowNext" class="flow-escrow-next">No upcoming unlock found</p>
+            </div>
+            <div>
+              <h3 class="flow-subtitle">Stats</h3>
+              <p id="flowEscrowStats" class="flow-escrow-stats">sum: — / count: — / avg: — / max: —</p>
+            </div>
+          </div>
+          <h3 class="flow-subtitle">Pattern notes</h3>
+          <ul id="flowEscrowPattern" class="flow-escrow-list"></ul>
+          <h3 class="flow-subtitle">Recent unlocks</h3>
+          <ul id="flowEscrowRecent" class="flow-escrow-list"></ul>
         </section>
 
         <section class="card flow-section">
