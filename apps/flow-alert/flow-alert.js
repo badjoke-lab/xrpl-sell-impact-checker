@@ -11,6 +11,7 @@
       canvas: document.getElementById('flowCanvas'),
       tooltip: document.getElementById('flowTooltip'),
       status: document.getElementById('flowStatus'),
+      debugLine: document.getElementById('flowDebugLine'),
       statusMeta: document.querySelector('[data-flow-meta="status"]'),
       refreshMeta: document.querySelector('[data-flow-meta="refresh"]'),
       staleNote: document.getElementById('flowStaleNote'),
@@ -174,8 +175,8 @@
 
   async function fetchLivePayload(state) {
     const flowUrl = `/api/xrpl/whale-flow?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}`;
-    const escrowWindow = state.window === '24h' ? '24h' : state.window === '1h' ? '24h' : '7d';
-    const escrowLimit = state.liteMode ? 5 : 10;
+    const escrowWindow = state.window;
+    const escrowLimit = state.liteMode || state.window === '24h' || state.window === '7d' ? 5 : 10;
     const escrowUrl = `/api/xrpl/escrow-watch?window=${encodeURIComponent(escrowWindow)}&limit=${escrowLimit}`;
 
     const [flow, escrow] = await Promise.all([
@@ -203,7 +204,8 @@
         heatmap: { labels: ['Unknown'], buckets: [], matrix: [], unit: 'xrp' },
         events: [],
         summaryReason: 'Unable to fetch live data.',
-        debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`] },
+        staleReason: 'cached',
+        debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'D', strategy: 'fetch_failed' },
       };
     }
   }
@@ -224,7 +226,8 @@
         recent: [],
         stats: { sumXrp: 0, count: 0, avgXrp: 0, maxXrp: 0 },
         pattern: [{ label: 'unavailable', note: 'Escrow watcher unavailable. Showing fallback payload.' }],
-        debug: { endpointsTried: [], ledgersScanned: 0, txCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`] },
+        staleReason: 'cached',
+        debug: { endpointsTried: [], ledgersScanned: 0, txCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'D', strategy: 'fetch_failed' },
       };
     }
   }
@@ -309,7 +312,7 @@
       },
       events,
       summaryReason: events[0]?.reason || 'No notable events above threshold.',
-      debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: events.length, cacheHit: false, scoreBasis: events[0]?.scoreBasis || 'amount', warnings: [] },
+      debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: events.length, cacheHit: false, scoreBasis: events[0]?.scoreBasis || 'amount', warnings: [], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'none', strategy: `demo_${state.window}` },
     };
   }
 
@@ -348,7 +351,7 @@
       pattern: [
         { label: 'monthly-ish', note: 'Unlock cadence appears monthly-ish in demo sequence.' },
       ],
-      debug: { endpointsTried: [], ledgersScanned: 0, txCount: recent.length, cacheHit: false, warnings: [] },
+      debug: { endpointsTried: [], ledgersScanned: 0, txCount: recent.length, cacheHit: false, warnings: [], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'none', strategy: `demo_${state.window}` },
     };
   }
 
@@ -420,6 +423,7 @@
     const payload = state.payload;
     safeText(refs.statusMeta, state.mode.toUpperCase());
     safeText(refs.status, `Status: ${state.mode.toUpperCase()}`);
+    safeText(refs.debugLine, buildDebugLine(state));
     refs.staleNote.hidden = state.mode !== 'stale';
 
     if (!payload || (state.mode !== 'ok' && state.mode !== 'stale')) {
@@ -435,7 +439,8 @@
     safeText(refs.snapshot.outflow, useUsd ? formatUsd(payload.summary.outflowUsd) : formatXrp(payload.summary.outflowXrp));
     safeText(refs.snapshot.net, useUsd ? formatSignedUsd(payload.summary.netUsd) : formatSignedXrp(payload.summary.netXrp));
     safeText(refs.snapshot.window, payload.window || state.window);
-    safeText(refs.snapshot.source, `${payload.source}${payload.stale ? ' (stale)' : ''}`);
+    const staleTag = payload.staleReason === 'sampled' ? 'sampled' : payload.stale ? 'cached' : '';
+    safeText(refs.snapshot.source, `${payload.source}${staleTag ? ` (${staleTag})` : ''}`);
     safeText(refs.snapshot.updated, relativeSeconds(state.lastRefreshMs));
     safeText(refs.refreshMeta, relativeSeconds(state.lastRefreshMs));
 
@@ -523,7 +528,8 @@
 
   function renderEvents(refs, state) {
     const useUsd = Number.isFinite(state.payload?.priceXrpUsd);
-    const rows = (state.payload?.events || []).slice(0, state.liteMode ? 8 : 16);
+    const highWindow = state.window === '24h' || state.window === '7d';
+    const rows = (state.payload?.events || []).slice(0, (state.liteMode || highWindow) ? 8 : 16);
 
     refs.eventsTableBody.innerHTML = rows.map((row) => `
       <tr>
@@ -545,6 +551,12 @@
         <p>tx: ${row.txHash || 'n/a'} / bucket: ${row.timeBucket || 'n/a'}</p>
       </details>
     `).join('');
+  }
+
+  function buildDebugLine(state) {
+    const payload = state.payload || {};
+    const dbg = payload.debug || {};
+    return `FLOW_DEBUG preset=${state.preset || 'none'} window=${payload.window || state.window} ok=${Boolean(payload.ok)} stale=${Boolean(payload.stale)} dur=${Math.round(dbg.durationMs || 0)}ms rpc=${dbg.rpcCalls || 0} strat=${dbg.strategy || 'n/a'} degrade=${dbg.degradeLevel || 'none'}`;
   }
 
   function bindCanvasInteraction(refs, state) {

@@ -50,7 +50,8 @@
                 <option value="5m">5m</option>
                 <option value="1h">1h</option>
                 <option value="24h">24h</option>
-                              </select>
+                <option value="7d">7d</option>
+              </select>
             </label>
             <label class="flow-field">Threshold
               <select class="flow-select" disabled>
@@ -67,7 +68,7 @@
             <div class="flow-chip">Status: <span data-flow-meta="status">LOADING</span></div>
             <div class="flow-chip">Last refresh: <span data-flow-meta="refresh">—</span></div>
           </div>
-          <div id="flowStaleNote" class="flow-note" hidden>Stale warning: showing cached/demo data that may be old.</div>
+          <div id="flowStaleNote" class="flow-note" hidden>Stale warning: showing cached or sampled data (lower precision).</div>
         </section>
 
         <section class="flow-main-grid">
@@ -152,6 +153,7 @@
               <button type="button" class="secondary-button" data-flow-force="stale">Force Stale</button>
             </div>
             <p id="flowStatus" class="flow-debug-status">Status: waiting for initialization…</p>
+            <p id="flowDebugLine" class="flow-debug-status">FLOW_DEBUG pending</p>
           </details>
         </section>
       </main>
