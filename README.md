@@ -9,8 +9,12 @@ order book depth (CLOB) and AMM pool data. It is maintained by BadJoke-Lab.
 
 ```bash
 pnpm install
-pnpm run start
+pnpm run dev
 ```
+
+> [!IMPORTANT]
+> Do **not** use `python -m http.server` for local verification. It only serves static files and will return HTML for `/api/*` instead of running Cloudflare Pages Functions.
+> Always run local development with `wrangler pages dev` (via `pnpm run dev`) so `/api/*` behaves like production.
 
 Production: https://xsic.badjoke-lab.com/
 

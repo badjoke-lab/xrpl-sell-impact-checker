@@ -53,7 +53,19 @@ function normalizeWindow(rawWindow) {
 }
 
 function resolveStrategy(window) {
-  return WINDOW_STRATEGIES[window] || WINDOW_STRATEGIES['5m'];
+  const resolvedWindow = WINDOW_STRATEGIES[window] ? window : '5m';
+  const base = WINDOW_STRATEGIES[resolvedWindow];
+  const budgetBounds = {
+    '5m': { min: 2_500, max: 4_000 },
+    '1h': { min: 3_500, max: 6_000 },
+    '24h': { min: 4_500, max: 7_500 },
+    '7d': { min: 5_000, max: 9_000 },
+  };
+  const bounds = budgetBounds[resolvedWindow] || budgetBounds['5m'];
+  return {
+    ...base,
+    timeoutBudget: Math.max(bounds.min, Math.min(bounds.max, Number(base.timeoutBudget) || bounds.min)),
+  };
 }
 
 function toXrpAmount(amount) {
@@ -148,21 +160,21 @@ function mergeScore(amountScore, rankScore, cap = 'HIGH') {
   return { score, scoreBasis };
 }
 
-function emptyPayload(window = '5m', preset = getPreset('exchanges')) {
+function emptyPayload(window = '5m', preset = getPreset('exchanges'), source = 'xrpl:rpc') {
   const labels = sortLabelsWithUnknownLast((preset.entities || []).map((entity) => entity.label).concat('Unknown'));
   return {
     ok: false,
     ts: Date.now(),
-    source: 'demo',
+    source,
     stale: true,
-    staleReason: 'cached',
+    staleReason: 'error',
     window,
     priceXrpUsd: null,
     summaryReason: 'No data available.',
     summary: { inflowXrp: 0, outflowXrp: 0, netXrp: 0, inflowUsd: null, outflowUsd: null, netUsd: null },
     heatmap: { labels, buckets: [], matrix: [], unit: 'xrp' },
     events: [],
-    debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, scoreBasis: 'amount', warnings: [], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'D', strategy: resolveStrategy(window).name },
+    debug: { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, scoreBasis: 'amount', warnings: [], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'D', strategy: resolveStrategy(window).name, lastError: null },
   };
 }
 
@@ -241,97 +253,110 @@ function aggregateBuckets(rawBuckets, startLedger, endLedger, bucketCount) {
 
 async function buildFreshFlowAttempt({ preset, window, strategy, whaleThreshold, degradeLevel }) {
   const startedAt = Date.now();
-  const debug = { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, scoreBasis: 'amount', warnings: [], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel, strategy: strategy.name };
+  const debug = { endpointsTried: [], ledgersScanned: 0, paymentsCount: 0, cacheHit: false, scoreBasis: 'amount', warnings: [], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel, strategy: strategy.name, lastError: null };
 
   const deadline = startedAt + strategy.timeoutBudget;
-  const timeoutFor = () => Math.max(1_000, Math.min(4_500, deadline - Date.now()));
-
-  const info = await fetchValidatedLedgerIndex(debug, timeoutFor());
-  debug.lastValidatedLedger = info.ledgerIndex;
-
-  const entityMap = buildEntityMap(preset);
-  const labelsSet = new Set((preset.entities || []).map((entity) => entity.label));
-  if (preset.id === 'whales') labelsSet.add('Whale');
-  if (!labelsSet.size) labelsSet.add('Unknown');
-
-  const startLedger = Math.max(1, info.ledgerIndex - strategy.maxLedgers + 1);
-  const rawBucketTotals = [];
-  let inflowXrp = 0;
-  let outflowXrp = 0;
-  const allEvents = [];
-
-  for (let ledgerIndex = startLedger; ledgerIndex <= info.ledgerIndex; ledgerIndex += strategy.sampleStride) {
-    if (Date.now() > deadline) throw new Error('timeout_budget_exceeded');
-    const ledgerBucket = new Map();
-    debug.endpointsTried.push(`${info.endpoint}#ledger:${ledgerIndex}`);
-    let ledgerResponse;
-    try {
-      ledgerResponse = await rpcFetch(info.endpoint, { method: 'ledger', params: [{ ledger_index: ledgerIndex, transactions: true, expand: true, owner_funds: false }] }, timeoutFor(), debug);
-    } catch (error) {
-      debug.warnings.push(`ledger_fetch_failed:${ledgerIndex}:${error instanceof Error ? error.message : 'unknown'}`);
-      rawBucketTotals[ledgerIndex - startLedger] = ledgerBucket;
-      continue;
-    }
-
-    debug.ledgersScanned += 1;
-    const txs = ledgerResponse?.result?.ledger?.transactions || [];
-    for (const entry of txs) {
-      const tx = entry?.tx || entry;
-      if (!tx || tx.TransactionType !== 'Payment') continue;
-      if (tx.metaData?.TransactionResult && tx.metaData.TransactionResult !== 'tesSUCCESS') continue;
-      const amountXrp = toXrpAmount(tx.Amount);
-      if (!amountXrp || amountXrp <= 0) continue;
-      debug.paymentsCount += 1;
-
-      const classified = classifyTx({ tx, amountXrp, preset, entityMap, whaleThreshold });
-      if (!classified.include) continue;
-      labelsSet.add(classified.label || 'Unknown');
-      const signed = classified.dir === 'IN' ? amountXrp : classified.dir === 'OUT' ? -amountXrp : 0;
-      ledgerBucket.set(classified.label, (ledgerBucket.get(classified.label) || 0) + signed);
-      if (signed > 0) inflowXrp += signed;
-      if (signed < 0) outflowXrp += Math.abs(signed);
-
-      if (amountXrp >= getMinEventAmount(window)) {
-        allEvents.push({ time: tx.date || tx.hash || String(Date.now()), from: tx.Account || '', to: tx.Destination || '', dir: classified.dir, label: classified.label || 'Unknown', amountXrp, txHash: tx.hash || null, timeBucket: String(ledgerIndex), reason: classified.reason, labelSource: classified.labelSource, scoreCap: classified.scoreCap });
-      }
-    }
-    rawBucketTotals[ledgerIndex - startLedger] = ledgerBucket;
-  }
-
-  const aggregated = aggregateBuckets(rawBucketTotals, startLedger, info.ledgerIndex, strategy.bucketCount);
-  let labels = sortLabelsWithUnknownLast(Array.from(labelsSet));
-  if (strategy.maxLabels && labels.length > strategy.maxLabels) {
-    labels = labels.slice(0, strategy.maxLabels).concat(labels.includes('Unknown') ? [] : ['Unknown']);
-    debug.warnings.push('degrade:B:labels_reduced');
-  }
-  const matrix = labels.map((label) => aggregated.totals.map((bucket) => Number(bucket?.get(label) || 0)));
-
-  const priceXrpUsd = await fetchXrpUsd(debug, strategy.disablePrice);
-  const sortedEvents = allEvents.sort((a, b) => b.amountXrp - a.amountXrp);
-  const scoredEvents = sortedEvents.slice(0, strategy.eventLimit).map((event, index) => {
-    const merged = mergeScore(scoreByAmount(event.amountXrp), scoreByRank(index, sortedEvents.length), event.scoreCap);
-    return { ...event, score: merged.score, scoreBasis: merged.scoreBasis, amountUsd: priceXrpUsd ? event.amountXrp * priceXrpUsd : null };
-  });
-
-  debug.scoreBasis = scoredEvents[0]?.scoreBasis || 'amount';
-  debug.durationMs = Date.now() - startedAt;
-  const netXrp = inflowXrp - outflowXrp;
-  const sampled = Boolean(strategy.sampled || strategy.sampleStride > 1);
-
-  return {
-    ok: true,
-    ts: Date.now(),
-    source: 'xrpl:rpc',
-    stale: sampled,
-    staleReason: sampled ? 'sampled' : null,
-    window,
-    priceXrpUsd,
-    summaryReason: buildSummaryReason(netXrp, scoredEvents),
-    summary: { inflowXrp, outflowXrp, netXrp, inflowUsd: priceXrpUsd ? inflowXrp * priceXrpUsd : null, outflowUsd: priceXrpUsd ? outflowXrp * priceXrpUsd : null, netUsd: priceXrpUsd ? netXrp * priceXrpUsd : null },
-    heatmap: { labels, buckets: aggregated.buckets, matrix, unit: priceXrpUsd ? 'usd' : 'xrp' },
-    events: scoredEvents,
-    debug,
+  const timeoutFor = (floorMs = 1_000) => {
+    const remaining = deadline - Date.now();
+    const dynamicFloor = Math.max(300, floorMs);
+    return Math.max(dynamicFloor, Math.min(4_500, remaining));
   };
+
+  try {
+    const info = await fetchValidatedLedgerIndex(debug, timeoutFor(800));
+    debug.lastValidatedLedger = info.ledgerIndex;
+
+    const entityMap = buildEntityMap(preset);
+    const labelsSet = new Set((preset.entities || []).map((entity) => entity.label));
+    if (preset.id === 'whales') labelsSet.add('Whale');
+    if (!labelsSet.size) labelsSet.add('Unknown');
+
+    const startLedger = Math.max(1, info.ledgerIndex - strategy.maxLedgers + 1);
+    const rawBucketTotals = [];
+    let inflowXrp = 0;
+    let outflowXrp = 0;
+    const allEvents = [];
+    let attemptedLedgerRpc = false;
+
+    for (let ledgerIndex = startLedger; ledgerIndex <= info.ledgerIndex; ledgerIndex += strategy.sampleStride) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0 && attemptedLedgerRpc) throw new Error('timeout_budget_exceeded');
+      const ledgerBucket = new Map();
+      debug.endpointsTried.push(`${info.endpoint}#ledger:${ledgerIndex}`);
+      let ledgerResponse;
+      try {
+        attemptedLedgerRpc = true;
+        ledgerResponse = await rpcFetch(info.endpoint, { method: 'ledger', params: [{ ledger_index: ledgerIndex, transactions: true, expand: true, owner_funds: false }] }, timeoutFor(remaining <= 0 ? 400 : 800), debug);
+      } catch (error) {
+        debug.warnings.push(`ledger_fetch_failed:${ledgerIndex}:${error instanceof Error ? error.message : 'unknown'}`);
+        rawBucketTotals[ledgerIndex - startLedger] = ledgerBucket;
+        continue;
+      }
+
+      debug.ledgersScanned += 1;
+      const txs = ledgerResponse?.result?.ledger?.transactions || [];
+      for (const entry of txs) {
+        const tx = entry?.tx || entry;
+        if (!tx || tx.TransactionType !== 'Payment') continue;
+        if (tx.metaData?.TransactionResult && tx.metaData.TransactionResult !== 'tesSUCCESS') continue;
+        const amountXrp = toXrpAmount(tx.Amount);
+        if (!amountXrp || amountXrp <= 0) continue;
+        debug.paymentsCount += 1;
+
+        const classified = classifyTx({ tx, amountXrp, preset, entityMap, whaleThreshold });
+        if (!classified.include) continue;
+        labelsSet.add(classified.label || 'Unknown');
+        const signed = classified.dir === 'IN' ? amountXrp : classified.dir === 'OUT' ? -amountXrp : 0;
+        ledgerBucket.set(classified.label, (ledgerBucket.get(classified.label) || 0) + signed);
+        if (signed > 0) inflowXrp += signed;
+        if (signed < 0) outflowXrp += Math.abs(signed);
+
+        if (amountXrp >= getMinEventAmount(window)) {
+          allEvents.push({ time: tx.date || tx.hash || String(Date.now()), from: tx.Account || '', to: tx.Destination || '', dir: classified.dir, label: classified.label || 'Unknown', amountXrp, txHash: tx.hash || null, timeBucket: String(ledgerIndex), reason: classified.reason, labelSource: classified.labelSource, scoreCap: classified.scoreCap });
+        }
+      }
+      rawBucketTotals[ledgerIndex - startLedger] = ledgerBucket;
+    }
+
+    const aggregated = aggregateBuckets(rawBucketTotals, startLedger, info.ledgerIndex, strategy.bucketCount);
+    let labels = sortLabelsWithUnknownLast(Array.from(labelsSet));
+    if (strategy.maxLabels && labels.length > strategy.maxLabels) {
+      labels = labels.slice(0, strategy.maxLabels).concat(labels.includes('Unknown') ? [] : ['Unknown']);
+      debug.warnings.push('degrade:B:labels_reduced');
+    }
+    const matrix = labels.map((label) => aggregated.totals.map((bucket) => Number(bucket?.get(label) || 0)));
+
+    const priceXrpUsd = await fetchXrpUsd(debug, strategy.disablePrice);
+    const sortedEvents = allEvents.sort((a, b) => b.amountXrp - a.amountXrp);
+    const scoredEvents = sortedEvents.slice(0, strategy.eventLimit).map((event, index) => {
+      const merged = mergeScore(scoreByAmount(event.amountXrp), scoreByRank(index, sortedEvents.length), event.scoreCap);
+      return { ...event, score: merged.score, scoreBasis: merged.scoreBasis, amountUsd: priceXrpUsd ? event.amountXrp * priceXrpUsd : null };
+    });
+
+    debug.scoreBasis = scoredEvents[0]?.scoreBasis || 'amount';
+    const netXrp = inflowXrp - outflowXrp;
+    const sampled = Boolean(strategy.sampled || strategy.sampleStride > 1);
+
+    return {
+      ok: true,
+      ts: Date.now(),
+      source: 'xrpl:rpc',
+      stale: sampled,
+      staleReason: sampled ? 'sampled' : null,
+      window,
+      priceXrpUsd,
+      summaryReason: buildSummaryReason(netXrp, scoredEvents),
+      summary: { inflowXrp, outflowXrp, netXrp, inflowUsd: priceXrpUsd ? inflowXrp * priceXrpUsd : null, outflowUsd: priceXrpUsd ? outflowXrp * priceXrpUsd : null, netUsd: priceXrpUsd ? netXrp * priceXrpUsd : null },
+      heatmap: { labels, buckets: aggregated.buckets, matrix, unit: priceXrpUsd ? 'usd' : 'xrp' },
+      events: scoredEvents,
+      debug,
+    };
+  } catch (error) {
+    debug.lastError = error instanceof Error ? error.message : 'unknown';
+    throw error;
+  } finally {
+    debug.durationMs = Math.max(1, Date.now() - startedAt);
+  }
 }
 
 async function buildFreshFlow({ preset, window }) {
@@ -359,6 +384,7 @@ async function buildFreshFlow({ preset, window }) {
 }
 
 export async function onRequestGet({ request }) {
+  const requestStartedAt = Date.now();
   const url = new URL(request.url);
   const presetKey = url.searchParams.get('preset') || 'exchanges';
   const window = normalizeWindow(url.searchParams.get('window') || '5m');
@@ -385,12 +411,16 @@ export async function onRequestGet({ request }) {
           ...cached.data.debug,
           cacheHit: true,
           degradeLevel: 'D',
+          durationMs: Math.max(1, Date.now() - requestStartedAt),
+          lastError: error instanceof Error ? error.message : 'unknown',
           warnings: [...(cached.data.debug?.warnings || []), `fallback:${error instanceof Error ? error.message : 'unknown'}`, 'degrade:D:cache_fallback'],
         },
       });
     }
 
-    const fallback = emptyPayload(window, preset);
+    const fallback = emptyPayload(window, preset, 'xrpl:rpc');
+    fallback.debug.durationMs = Math.max(1, Date.now() - requestStartedAt);
+    fallback.debug.lastError = error instanceof Error ? error.message : 'unknown';
     fallback.debug.warnings.push(`fatal:${error instanceof Error ? error.message : 'unknown'}`);
     return json(fallback, 200);
   }
