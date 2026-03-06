@@ -30,6 +30,8 @@
           <div id="flowSummary" class="flow-summary">
             <p class="flow-summary__headline" data-flow-summary="headline">NET: — | Pressure: — | Window: — | Target: —</p>
             <p class="flow-summary__reason" data-flow-summary="reason">Why: waiting for demo signal...</p>
+            <p class="flow-summary__reason" data-flow-summary="observed">Observation: payments scanned — | ledgers scanned — | matched events — | last updated —</p>
+            <p class="flow-summary__reason" data-flow-summary="last-event">Last detected event: No detected labeled event yet.</p>
           </div>
         </section>
 
@@ -118,6 +120,11 @@
               </thead>
               <tbody id="flowEventsTableBody"></tbody>
             </table>
+          </div>
+          <div id="flowEventsEmptyState" class="flow-note" hidden>
+            <p>No labeled events above threshold in this window.</p>
+            <p>This does not mean no XRP payments occurred.</p>
+            <p>Try 24h or switch preset.</p>
           </div>
           <div id="flowEventCards" class="flow-event-cards"></div>
         </section>

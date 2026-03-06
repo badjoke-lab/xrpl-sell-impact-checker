@@ -30,6 +30,8 @@
       summary: {
         headline: document.querySelector('[data-flow-summary="headline"]'),
         reason: document.querySelector('[data-flow-summary="reason"]'),
+        observed: document.querySelector('[data-flow-summary="observed"]'),
+        lastEvent: document.querySelector('[data-flow-summary="last-event"]'),
       },
       snapshot: {
         inflow: document.querySelector('[data-flow-snapshot="inflow"]'),
@@ -42,6 +44,7 @@
       trendWrap: document.getElementById('flowTrendBars'),
       eventsTableBody: document.getElementById('flowEventsTableBody'),
       eventCards: document.getElementById('flowEventCards'),
+      eventsEmpty: document.getElementById('flowEventsEmptyState'),
       escrow: {
         next: document.getElementById('flowEscrowNext'),
         recent: document.getElementById('flowEscrowRecent'),
@@ -61,7 +64,7 @@
       liteMode: loadBool(LITE_KEY),
       demoOnly: loadBool(DEMO_KEY, true),
       preset: loadValue(PRESET_KEY, 'exchanges') || 'exchanges',
-      window: loadValue(WINDOW_KEY, '5m'),
+      window: loadValue(WINDOW_KEY, '1h'),
       payload: null,
       escrowPayload: null,
       heatmapCells: [],
@@ -70,6 +73,7 @@
       lastRefreshMs: 0,
       timer: null,
       isFetching: false,
+      detectedEventsCache: {},
     };
 
     refs.liteToggle.checked = state.liteMode;
@@ -146,10 +150,15 @@
       return;
     }
 
-    state.mode = 'loading';
-    renderPanels(refs, state);
-    renderHeatmap(refs, state);
-    renderEscrow(refs, state);
+    state.isFetching = true;
+    if (!state.payload) {
+      state.mode = 'loading';
+      renderPanels(refs, state);
+      renderHeatmap(refs, state);
+      renderEscrow(refs, state);
+    } else {
+      renderPanels(refs, state);
+    }
 
     let result;
     if (state.demoOnly) {
@@ -161,16 +170,22 @@
       result = await fetchLivePayload(state);
     }
 
-    state.payload = result.flow;
-    state.escrowPayload = result.escrow;
-    state.lastRefreshMs = Math.max(result.flow?.ts || 0, result.escrow?.ts || 0, Date.now());
-    applyMode(state);
-    buildHeatmapCells(state);
-    renderPanels(refs, state);
-    renderHeatmap(refs, state);
-    renderTrend(refs, state);
-    renderEvents(refs, state);
-    renderEscrow(refs, state);
+    try {
+      state.payload = result.flow;
+      state.escrowPayload = result.escrow;
+      state.lastRefreshMs = Math.max(result.flow?.ts || 0, result.escrow?.ts || 0, Date.now());
+      applyMode(state);
+      buildHeatmapCells(state);
+      updateLastDetectedCache(state);
+      renderPanels(refs, state);
+      renderHeatmap(refs, state);
+      renderTrend(refs, state);
+      renderEvents(refs, state);
+      renderEscrow(refs, state);
+    } finally {
+      state.isFetching = false;
+      renderPanels(refs, state);
+    }
   }
 
   async function fetchLivePayload(state) {
@@ -420,11 +435,13 @@
   }
 
   function renderPanels(refs, state) {
-    toggleOverlay(refs, state.mode);
+    const overlayMode = state.isFetching && state.payload ? 'ok' : state.mode;
+    toggleOverlay(refs, overlayMode);
     const payload = state.payload;
     const liveError = getLiveError(payload, state.demoOnly);
-    safeText(refs.statusMeta, state.mode.toUpperCase());
-    safeText(refs.status, liveError ? `Status: ${state.mode.toUpperCase()} | Live error: ${liveError}` : `Status: ${state.mode.toUpperCase()}`);
+    const statusLabel = state.isFetching && payload ? 'REFRESHING' : state.mode.toUpperCase();
+    safeText(refs.statusMeta, statusLabel);
+    safeText(refs.status, liveError ? `Status: ${statusLabel} | Live error: ${liveError}` : `Status: ${statusLabel}`);
     safeText(refs.debugLine, buildDebugLine(state));
     refs.staleNote.hidden = state.mode !== 'stale';
 
@@ -432,6 +449,8 @@
       ['inflow', 'outflow', 'net', 'window', 'source', 'updated'].forEach((key) => safeText(refs.snapshot[key], '—'));
       safeText(refs.summary.headline, 'NET: — | Pressure: — | Window: — | Target: —');
       safeText(refs.summary.reason, 'Why: waiting for data.');
+      safeText(refs.summary.observed, 'Observation: payments scanned — | ledgers scanned — | matched events — | last updated —');
+      safeText(refs.summary.lastEvent, 'Last detected event: No detected labeled event yet.');
       safeText(refs.refreshMeta, '—');
       return;
     }
@@ -446,13 +465,23 @@
     safeText(refs.snapshot.updated, relativeSeconds(state.lastRefreshMs));
     safeText(refs.refreshMeta, relativeSeconds(state.lastRefreshMs));
 
-    const net = useUsd ? payload.summary.netUsd : payload.summary.netXrp;
-    const pressure = Math.abs(net) > (useUsd ? 700000 : 1000000) ? 'HIGH' : 'MEDIUM';
+    const net = Number(useUsd ? payload.summary.netUsd : payload.summary.netXrp) || 0;
+    const eventCount = (payload.events || []).length;
+    const pressure = inferPressure(net, useUsd, eventCount);
     safeText(refs.summary.headline, `NET: ${useUsd ? formatSignedUsd(net) : formatSignedXrp(net)} | Pressure: ${pressure} | Window: ${payload.window} | Target: ${state.preset}`);
     const escrowNote = buildEscrowSummaryNote(state.escrowPayload);
-    const reason = payload.summaryReason ? `Why: ${payload.summaryReason}` : 'Why: no notable events yet.';
+    const reason = buildSummaryReason(payload, net, eventCount);
     const reasonWithError = liveError ? `${reason} | Live error: ${liveError}` : reason;
     safeText(refs.summary.reason, escrowNote ? `${reasonWithError} | ${escrowNote}` : reasonWithError);
+
+    const dbg = payload.debug || {};
+    safeText(
+      refs.summary.observed,
+      `Observation: payments scanned ${dbg.paymentsCount ?? 0} | ledgers scanned ${dbg.ledgersScanned ?? 0} | matched events ${eventCount} | last updated ${relativeSeconds(state.lastRefreshMs)}`,
+    );
+
+    const lastEvent = findLastDetectedEvent(state);
+    safeText(refs.summary.lastEvent, buildLastEventLine(lastEvent));
   }
 
   function renderHeatmap(refs, state) {
@@ -534,6 +563,15 @@
     const highWindow = state.window === '24h' || state.window === '7d';
     const rows = (state.payload?.events || []).slice(0, (state.liteMode || highWindow) ? 8 : 16);
 
+    if (!rows.length) {
+      refs.eventsTableBody.innerHTML = '';
+      refs.eventCards.innerHTML = '';
+      if (refs.eventsEmpty) refs.eventsEmpty.hidden = false;
+      return;
+    }
+
+    if (refs.eventsEmpty) refs.eventsEmpty.hidden = true;
+
     refs.eventsTableBody.innerHTML = rows.map((row) => `
       <tr>
         <td><details><summary>${formatTime(row.time)}</summary><div>reason: ${row.reason || 'n/a'}<br>label source: ${row.labelSource || 'unknown'}<br>tx: ${row.txHash || 'n/a'}<br>bucket: ${row.timeBucket || 'n/a'}<br>from: ${row.from}<br>to: ${row.to}</div></details></td>
@@ -554,6 +592,57 @@
         <p>tx: ${row.txHash || 'n/a'} / bucket: ${row.timeBucket || 'n/a'}</p>
       </details>
     `).join('');
+  }
+
+  function inferPressure(net, useUsd, eventCount) {
+    const abs = Math.abs(net);
+    const quietLimit = useUsd ? 15_000 : 25_000;
+    const lowLimit = useUsd ? 150_000 : 250_000;
+    const mediumLimit = useUsd ? 700_000 : 1_000_000;
+    if (eventCount === 0 && abs <= quietLimit) return 'QUIET';
+    if (abs >= mediumLimit) return 'HIGH';
+    if (abs >= lowLimit) return 'MEDIUM';
+    return 'LOW';
+  }
+
+  function buildSummaryReason(payload, net, eventCount) {
+    if (eventCount > 0 && payload.summaryReason) return `Why: ${payload.summaryReason}`;
+    const lines = [
+      'Why: No major exchange flow detected in this window.',
+      `Scanned ${payload.debug?.paymentsCount ?? 0} payments across ${payload.debug?.ledgersScanned ?? 0} ledgers.`,
+    ];
+    if (eventCount === 0 && Math.abs(net) <= 25_000) {
+      lines.push('Market looks quiet (near-neutral net flow).');
+    }
+    if (payload.window === '5m' || payload.window === '1h') {
+      lines.push('Try 24h for broader signal coverage.');
+    }
+    return lines.join(' ');
+  }
+
+  function updateLastDetectedCache(state) {
+    const first = (state.payload?.events || [])[0];
+    if (!first) return;
+    const win = state.payload?.window || state.window;
+    const prev = state.detectedEventsCache[win];
+    if (!prev || Date.parse(first.time || '') > Date.parse(prev.time || '')) {
+      state.detectedEventsCache[win] = first;
+    }
+  }
+
+  function findLastDetectedEvent(state) {
+    const current = (state.payload?.events || [])[0];
+    if (current) return current;
+    if (state.detectedEventsCache['24h']) return state.detectedEventsCache['24h'];
+    const cached = Object.values(state.detectedEventsCache)
+      .filter(Boolean)
+      .sort((a, b) => Date.parse(b.time || '') - Date.parse(a.time || ''));
+    return cached[0] || null;
+  }
+
+  function buildLastEventLine(event) {
+    if (!event) return 'Last detected event: No detected labeled event yet.';
+    return `Last detected event: ${formatDateTime(event.time)} | ${event.dir || '—'} | ${event.label || 'unknown'} | ${formatXrp(event.amountXrp || 0)}`;
   }
 
   function buildDebugLine(state) {
