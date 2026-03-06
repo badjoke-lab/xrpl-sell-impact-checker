@@ -19,6 +19,7 @@
       demoToggle: document.getElementById('flow-demo-toggle'),
       presetSelect: document.getElementById('flow-target-preset'),
       windowSelect: document.getElementById('flow-window'),
+      refreshButton: document.getElementById('flow-refresh-button'),
       retryButton: document.getElementById('flow-retry-button'),
       emptyButton: document.getElementById('flow-empty-button'),
       debugButtons: Array.from(document.querySelectorAll('[data-flow-force]')),
@@ -27,23 +28,31 @@
         error: document.querySelector('[data-flow-state="error"]'),
         empty: document.querySelector('[data-flow-state="empty"]'),
       },
-      summary: {
-        headline: document.querySelector('[data-flow-summary="headline"]'),
-        reason: document.querySelector('[data-flow-summary="reason"]'),
-        observed: document.querySelector('[data-flow-summary="observed"]'),
-        lastEvent: document.querySelector('[data-flow-summary="last-event"]'),
+      signal: {
+        statusPill: document.querySelector('[data-flow-signal="status-pill"]'),
+        severity: document.querySelector('[data-flow-signal="severity"]'),
+        impact: document.querySelector('[data-flow-signal="impact"]'),
+        why: document.querySelector('[data-flow-signal="why"]'),
+        observed: document.querySelector('[data-flow-signal="observed"]'),
+        context: document.querySelector('[data-flow-signal="context"]'),
+        ctxPreset: document.querySelector('[data-flow-signal="ctx-preset"]'),
+        ctxWindow: document.querySelector('[data-flow-signal="ctx-window"]'),
+        ctxSource: document.querySelector('[data-flow-signal="ctx-source"]'),
       },
       snapshot: {
         inflow: document.querySelector('[data-flow-snapshot="inflow"]'),
         outflow: document.querySelector('[data-flow-snapshot="outflow"]'),
         net: document.querySelector('[data-flow-snapshot="net"]'),
-        window: document.querySelector('[data-flow-snapshot="window"]'),
+        payments: document.querySelector('[data-flow-snapshot="payments"]'),
+        ledgers: document.querySelector('[data-flow-snapshot="ledgers"]'),
+        matched: document.querySelector('[data-flow-snapshot="matched"]'),
         source: document.querySelector('[data-flow-snapshot="source"]'),
         updated: document.querySelector('[data-flow-snapshot="updated"]'),
       },
-      trendWrap: document.getElementById('flowTrendBars'),
-      eventsTableBody: document.getElementById('flowEventsTableBody'),
-      eventCards: document.getElementById('flowEventCards'),
+      reasonTitle: document.getElementById('flowReasonTitle'),
+      reasonCopy: document.getElementById('flowReasonCopy'),
+      reasonList: document.getElementById('flowReasonList'),
+      recentFlows: document.getElementById('flowRecentFlows'),
       eventsEmpty: document.getElementById('flowEventsEmptyState'),
       escrow: {
         next: document.getElementById('flowEscrowNext'),
@@ -104,6 +113,8 @@
       saveValue(WINDOW_KEY, state.window);
       renderCycle(true);
     });
+
+    refs.refreshButton?.addEventListener('click', () => renderCycle(true));
 
     refs.retryButton?.addEventListener('click', () => {
       state.forcedMode = null;
@@ -179,7 +190,6 @@
       updateLastDetectedCache(state);
       renderPanels(refs, state);
       renderHeatmap(refs, state);
-      renderTrend(refs, state);
       renderEvents(refs, state);
       renderEscrow(refs, state);
     } finally {
@@ -445,43 +455,72 @@
     safeText(refs.debugLine, buildDebugLine(state));
     refs.staleNote.hidden = state.mode !== 'stale';
 
+    const snapshotKeys = ['inflow', 'outflow', 'net', 'payments', 'ledgers', 'matched', 'source', 'updated'];
     if (!payload || (state.mode !== 'ok' && state.mode !== 'stale')) {
-      ['inflow', 'outflow', 'net', 'window', 'source', 'updated'].forEach((key) => safeText(refs.snapshot[key], '—'));
-      safeText(refs.summary.headline, 'NET: — | Pressure: — | Window: — | Target: —');
-      safeText(refs.summary.reason, 'Why: waiting for data.');
-      safeText(refs.summary.observed, 'Observation: payments scanned — | ledgers scanned — | matched events — | last updated —');
-      safeText(refs.summary.lastEvent, 'Last detected event: No detected labeled event yet.');
+      snapshotKeys.forEach((key) => safeText(refs.snapshot[key], '—'));
+      safeText(refs.signal.statusPill, 'LOW');
+      refs.signal.statusPill.className = 'flow-pill low';
+      safeText(refs.signal.severity, 'severity: — · pressure: —');
+      safeText(refs.signal.impact, '—');
+      safeText(refs.signal.why, 'No major labeled flow detected in this window.');
+      safeText(refs.signal.observed, 'Scanned — payments across — ledgers.');
+      safeText(refs.signal.context, 'Partial live data (timeout-limited). Try 24h for broader coverage.');
+      safeText(refs.signal.ctxPreset, `target: ${state.preset || 'unset'}`);
+      safeText(refs.signal.ctxWindow, `window: ${state.window}`);
+      safeText(refs.signal.ctxSource, `source: ${state.demoOnly ? 'demo' : 'live'}`);
+      safeText(refs.reasonTitle, 'No dominant pressure');
+      safeText(refs.reasonCopy, 'No major labeled flow detected in this window.');
+      refs.reasonList.innerHTML = '<li>No major labeled flow detected in this window.</li><li>Scanned 0 payments across 0 ledgers.</li><li>Try 24h for broader coverage.</li>';
       safeText(refs.refreshMeta, '—');
       return;
     }
 
     const useUsd = Number.isFinite(payload?.summary?.inflowUsd) && payload.priceXrpUsd;
+    const net = Number(useUsd ? payload.summary.netUsd : payload.summary.netXrp) || 0;
+    const eventCount = (payload.events || []).length;
+    const dbg = payload.debug || {};
+    const pressure = inferPressure(net, useUsd, eventCount);
+
     safeText(refs.snapshot.inflow, useUsd ? formatUsd(payload.summary.inflowUsd) : formatXrp(payload.summary.inflowXrp));
     safeText(refs.snapshot.outflow, useUsd ? formatUsd(payload.summary.outflowUsd) : formatXrp(payload.summary.outflowXrp));
     safeText(refs.snapshot.net, useUsd ? formatSignedUsd(payload.summary.netUsd) : formatSignedXrp(payload.summary.netXrp));
-    safeText(refs.snapshot.window, payload.window || state.window);
+    safeText(refs.snapshot.payments, `${dbg.paymentsCount ?? 0}`);
+    safeText(refs.snapshot.ledgers, `${dbg.ledgersScanned ?? 0}`);
+    safeText(refs.snapshot.matched, `${eventCount}`);
     const staleTag = payload.staleReason === 'sampled' ? 'sampled' : payload.stale ? 'cached' : '';
     safeText(refs.snapshot.source, `${payload.source}${staleTag ? ` (${staleTag})` : ''}`);
     safeText(refs.snapshot.updated, relativeSeconds(state.lastRefreshMs));
     safeText(refs.refreshMeta, relativeSeconds(state.lastRefreshMs));
 
-    const net = Number(useUsd ? payload.summary.netUsd : payload.summary.netXrp) || 0;
-    const eventCount = (payload.events || []).length;
-    const pressure = inferPressure(net, useUsd, eventCount);
-    safeText(refs.summary.headline, `NET: ${useUsd ? formatSignedUsd(net) : formatSignedXrp(net)} | Pressure: ${pressure} | Window: ${payload.window} | Target: ${state.preset}`);
-    const escrowNote = buildEscrowSummaryNote(state.escrowPayload);
-    const reason = buildSummaryReason(payload, net, eventCount);
-    const reasonWithError = liveError ? `${reason} | Live error: ${liveError}` : reason;
-    safeText(refs.summary.reason, escrowNote ? `${reasonWithError} | ${escrowNote}` : reasonWithError);
+    const severity = pressure;
+    const pillClass = pressure === 'HIGH' ? 'high' : pressure === 'MEDIUM' ? 'medium' : pressure === 'QUIET' ? 'quiet' : 'low';
+    safeText(refs.signal.statusPill, severity);
+    refs.signal.statusPill.className = `flow-pill ${pillClass}`;
+    safeText(refs.signal.severity, `severity: ${pressure === 'HIGH' ? 3 : pressure === 'MEDIUM' ? 2 : 1} · pressure: ${pressure}`);
+    safeText(refs.signal.impact, useUsd ? formatSignedUsd(net) : formatSignedXrp(net));
 
-    const dbg = payload.debug || {};
-    safeText(
-      refs.summary.observed,
-      `Observation: payments scanned ${dbg.paymentsCount ?? 0} | ledgers scanned ${dbg.ledgersScanned ?? 0} | matched events ${eventCount} | last updated ${relativeSeconds(state.lastRefreshMs)}`,
-    );
+    const reason = buildSummaryReason(payload, net, eventCount).replace(/^Why:\s*/, '');
+    safeText(refs.signal.why, reason);
+    safeText(refs.signal.observed, `Scanned ${dbg.paymentsCount ?? 0} payments across ${dbg.ledgersScanned ?? 0} ledgers.`);
+    safeText(refs.signal.ctxPreset, `target: ${state.preset || 'unset'}`);
+    safeText(refs.signal.ctxWindow, `window: ${payload.window || state.window}`);
+    safeText(refs.signal.ctxSource, `source: ${state.demoOnly ? 'demo' : payload.source}`);
 
-    const lastEvent = findLastDetectedEvent(state);
-    safeText(refs.summary.lastEvent, buildLastEventLine(lastEvent));
+    const contextLines = [];
+    if (payload.stale) contextLines.push('Partial live data (timeout-limited).');
+    if (payload.staleReason === 'sampled') contextLines.push('Sampled payload was used for responsiveness.');
+    if (eventCount === 0) contextLines.push('No major labeled flow detected in this window.');
+    if ((payload.window === '5m' || payload.window === '1h') && eventCount === 0) contextLines.push('Try 24h for broader coverage.');
+    safeText(refs.signal.context, contextLines.join(' ') || 'Live payload synchronized.');
+
+    safeText(refs.reasonTitle, eventCount ? 'Labeled flow activity detected' : 'Quiet labeled-flow window');
+    safeText(refs.reasonCopy, reason);
+    refs.reasonList.innerHTML = [
+      `No major labeled flow detected in this window${eventCount ? ' (overridden by detected events).' : '.'}`,
+      `Scanned ${dbg.paymentsCount ?? 0} payments across ${dbg.ledgersScanned ?? 0} ledgers.`,
+      payload.stale ? 'Partial live data (timeout-limited).' : 'Payload freshness: current.',
+      (payload.window === '5m' || payload.window === '1h') ? 'Try 24h for broader coverage.' : 'Window is broad enough for lower-noise context.',
+    ].map((line) => `<li>${line}</li>`).join('');
   }
 
   function renderHeatmap(refs, state) {
@@ -535,62 +574,28 @@
     }
   }
 
-  function renderTrend(refs, state) {
-    const matrix = state.payload?.heatmap?.matrix || [];
-    const cols = Math.max(0, ...(matrix.map((row) => row.length)));
-    const values = [];
-    for (let c = 0; c < cols; c += 1) {
-      let sum = 0;
-      for (let r = 0; r < matrix.length; r += 1) {
-        sum += Number(matrix[r]?.[c] || 0);
-      }
-      values.push(sum);
-    }
-
-    refs.trendWrap.innerHTML = '';
-    values.forEach((value) => {
-      const bar = document.createElement('div');
-      const pct = Math.min(100, Math.max(8, Math.round((Math.abs(value) / 500000) * 100)));
-      bar.style.height = `${pct}%`;
-      bar.className = value < 0 ? 'flow-trend-bar flow-trend-bar--neg' : 'flow-trend-bar flow-trend-bar--pos';
-      bar.title = `Net ${formatSignedXrp(value)}`;
-      refs.trendWrap.appendChild(bar);
-    });
-  }
-
   function renderEvents(refs, state) {
     const useUsd = Number.isFinite(state.payload?.priceXrpUsd);
     const highWindow = state.window === '24h' || state.window === '7d';
-    const rows = (state.payload?.events || []).slice(0, (state.liteMode || highWindow) ? 8 : 16);
+    const rows = (state.payload?.events || []).slice(0, (state.liteMode || highWindow) ? 6 : 8);
 
     if (!rows.length) {
-      refs.eventsTableBody.innerHTML = '';
-      refs.eventCards.innerHTML = '';
-      if (refs.eventsEmpty) refs.eventsEmpty.hidden = false;
+      refs.recentFlows.innerHTML = '';
+      if (refs.eventsEmpty) {
+        refs.eventsEmpty.hidden = false;
+        refs.eventsEmpty.textContent = 'No recent labeled event in this window.';
+      }
       return;
     }
 
     if (refs.eventsEmpty) refs.eventsEmpty.hidden = true;
-
-    refs.eventsTableBody.innerHTML = rows.map((row) => `
-      <tr>
-        <td><details><summary>${formatTime(row.time)}</summary><div>reason: ${row.reason || 'n/a'}<br>label source: ${row.labelSource || 'unknown'}<br>tx: ${row.txHash || 'n/a'}<br>bucket: ${row.timeBucket || 'n/a'}<br>from: ${row.from}<br>to: ${row.to}</div></details></td>
-        <td>${shortAddress(row.from)} → ${shortAddress(row.to)}</td>
-        <td>${row.label}</td>
-        <td>${row.dir}</td>
-        <td>${useUsd && row.amountUsd ? `${formatUsd(row.amountUsd)} (${formatXrp(row.amountXrp)})` : formatXrp(row.amountXrp)}</td>
-        <td>${row.score}</td>
-      </tr>
-    `).join('');
-
-    refs.eventCards.innerHTML = rows.map((row) => `
-      <details class="flow-event-card">
-        <summary>${formatTime(row.time)} • ${row.dir} • ${formatXrp(row.amountXrp)} • ${row.score}</summary>
-        <p>${shortAddress(row.from)} → ${shortAddress(row.to)} (${row.label})</p>
-        <p>reason: ${row.reason || 'n/a'}</p>
-        <p>label source: ${row.labelSource || 'unknown'}</p>
-        <p>tx: ${row.txHash || 'n/a'} / bucket: ${row.timeBucket || 'n/a'}</p>
-      </details>
+    refs.recentFlows.innerHTML = rows.map((row) => `
+      <article class="flow-recent-row">
+        <div class="flow-time">${formatTime(row.time)}</div>
+        <div>${shortAddress(row.from)} → ${shortAddress(row.to)} · ${row.label || 'unknown'}</div>
+        <div>${row.dir || '—'}</div>
+        <div class="flow-amount">${useUsd && row.amountUsd ? `${formatUsd(row.amountUsd)} (${formatXrp(row.amountXrp)})` : formatXrp(row.amountXrp)}</div>
+      </article>
     `).join('');
   }
 
@@ -608,7 +613,7 @@
   function buildSummaryReason(payload, net, eventCount) {
     if (eventCount > 0 && payload.summaryReason) return `Why: ${payload.summaryReason}`;
     const lines = [
-      'Why: No major exchange flow detected in this window.',
+      'Why: No major labeled flow detected in this window.',
       `Scanned ${payload.debug?.paymentsCount ?? 0} payments across ${payload.debug?.ledgersScanned ?? 0} ledgers.`,
     ];
     if (eventCount === 0 && Math.abs(net) <= 25_000) {
