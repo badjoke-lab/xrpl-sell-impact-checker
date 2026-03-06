@@ -306,9 +306,15 @@ async function buildFreshFlowAttempt({ preset, window, strategy, whaleThreshold,
     const allEvents = [];
     let attemptedLedgerRpc = false;
 
+    let partialTimeout = false;
+
     for (let ledgerIndex = startLedger; ledgerIndex <= info.ledgerIndex; ledgerIndex += strategy.sampleStride) {
       const remaining = remainingBudget();
-      if (remaining <= 0 && attemptedLedgerRpc) throw new Error('timeout_budget_exceeded');
+      if (remaining <= 0 && attemptedLedgerRpc) {
+        partialTimeout = true;
+        debug.warnings.push('partial_timeout');
+        break;
+      }
       const ledgerBucket = new Map();
       debug.endpointsTried.push(`${info.endpoint}#ledger:${ledgerIndex}`);
       let ledgerResponse;
@@ -363,17 +369,27 @@ async function buildFreshFlowAttempt({ preset, window, strategy, whaleThreshold,
 
     debug.scoreBasis = scoredEvents[0]?.scoreBasis || 'amount';
     const netXrp = inflowXrp - outflowXrp;
-    const sampled = Boolean(strategy.sampled || strategy.sampleStride > 1);
+    const sampled = Boolean(strategy.sampled || strategy.sampleStride > 1 || partialTimeout);
+
+    if (partialTimeout && !debug.warnings.includes(`degrade:${degradeLevel}`)) {
+      debug.warnings.push(`degrade:${degradeLevel}`);
+    }
+
+    const summaryReason = partialTimeout
+      ? (scoredEvents.length
+          ? `Partial live data (timeout-limited); top flow: ${scoredEvents[0].reason}`
+          : 'Partial live data (timeout-limited).')
+      : buildSummaryReason(netXrp, scoredEvents);
 
     return {
       ok: true,
       ts: Date.now(),
       source: 'xrpl:rpc',
       stale: sampled,
-      staleReason: sampled ? 'sampled' : null,
+      staleReason: partialTimeout ? 'partial' : (sampled ? 'sampled' : null),
       window,
       priceXrpUsd,
-      summaryReason: buildSummaryReason(netXrp, scoredEvents),
+      summaryReason,
       summary: { inflowXrp, outflowXrp, netXrp, inflowUsd: priceXrpUsd ? inflowXrp * priceXrpUsd : null, outflowUsd: priceXrpUsd ? outflowXrp * priceXrpUsd : null, netUsd: priceXrpUsd ? netXrp * priceXrpUsd : null },
       heatmap: { labels, buckets: aggregated.buckets, matrix, unit: priceXrpUsd ? 'usd' : 'xrp' },
       events: scoredEvents,
