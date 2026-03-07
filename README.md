@@ -40,6 +40,12 @@ Dev: Open `http://0.0.0.0:5173` in your browser.
    npx wrangler pages deploy .
    ```
 
+
+### Flow Alert history persistence
+
+- See `docs/flow-alert-history.md` for the GitHub Actions + repo JSON based history design.
+- Production source of truth is `data/flow-history/*.json` updated by workflow.
+
 ### Troubleshooting checklist
 
 - Confirm the static site is reachable: `/` loads without 404s.

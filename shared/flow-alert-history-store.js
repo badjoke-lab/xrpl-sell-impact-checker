@@ -1,4 +1,6 @@
 const BASE_DIR = 'data/flow-history';
+// Canonical production history is committed JSON updated by GitHub Actions.
+// This store is a runtime fallback for local/dev and non-persisted environments.
 const MAX_PER_KEY = 200;
 const memoryStore = globalThis.__xsicFlowAlertHistoryStore || new Map();
 globalThis.__xsicFlowAlertHistoryStore = memoryStore;
