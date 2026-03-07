@@ -4,6 +4,7 @@
   const PRESET_KEY = 'xsic.flowAlert.targetPreset';
   const WINDOW_KEY = 'xsic.flowAlert.window';
   const FORCE_MODES = new Set(['loading', 'ok', 'empty', 'error', 'stale']);
+  const PRIMARY_HISTORY_WINDOWS = new Set(['1h', '24h', '7d']);
 
   function boot() {
     const refs = {
@@ -682,7 +683,7 @@
     safeText(refs.snapshot.subNet, `prev: ${previous ? formatSignedXrp(prevNetXrp) : '—'} / Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'}`);
     safeText(refs.snapshot.subMatched, `prev: ${previous ? `${prevEventCount ?? 0}` : '—'} / recent: ${recentCount ?? 0}`);
 
-    const sourceLabel = resolveSourceLabel(history, payload, state.demoOnly);
+    const sourceLabel = resolveSourceLabel(history, payload, state.demoOnly, state.window);
     safeText(refs.snapshot.source, sourceLabel);
 
     const updatedTs = history?.historyMeta?.newestTs ?? latest?.ts ?? payload?.ts ?? state.lastRefreshMs;
@@ -709,6 +710,7 @@
       `recent: ${recentCount ?? 0} snapshots (${oldest} → ${newest})`,
       `latest: ${formatSignedXrp(netXrp)} / previous: ${previous ? formatSignedXrp(prevNetXrp) : '—'} / Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'}`,
     ];
+    if (!PRIMARY_HISTORY_WINDOWS.has(state.window)) contextLines.push('history mode: supplemental-live (5m)');
     if (latest?.stale || payload.stale) contextLines.push('stale: true');
     if (latest?.partial || payload?.partial) contextLines.push('partial: true');
     safeText(refs.signal.context, contextLines.join(' · '));
@@ -724,9 +726,10 @@
     ].map((line) => `<li>${line}</li>`).join('');
   }
 
-  function resolveSourceLabel(history, payload, demoOnly) {
+  function resolveSourceLabel(history, payload, demoOnly, selectedWindow) {
     if (demoOnly) return 'demo';
-    if (history?.source === 'repo-json') return 'repo-json';
+    if (history?.source === 'repo-json') return 'repo-json(primary)';
+    if (!PRIMARY_HISTORY_WINDOWS.has(selectedWindow || '1h')) return 'live-supplemental(5m)';
     if (history?.source === 'runtime-fallback') return 'runtime';
     if (payload?.source === 'cache' || payload?.staleReason === 'cached') return 'cache';
     return payload?.source === 'cache' ? 'cache' : 'runtime';

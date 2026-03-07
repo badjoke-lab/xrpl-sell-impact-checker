@@ -17,6 +17,7 @@ jobs:
   update-flow-history:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -27,6 +28,12 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Check required history files before update
+        run: |
+          test -f data/flow-history/exchanges-1h.json
+          test -f data/flow-history/exchanges-24h.json
+          test -f data/flow-history/exchanges-7d.json
+
       - name: Update flow history JSON
         run: |
           if [ "${{ github.event.inputs.include_optional || 'false' }}" = "true" ]; then
@@ -34,6 +41,10 @@ jobs:
           else
             node scripts/update_flow_history.mjs
           fi
+
+      - name: Validate history payload shape
+        run: |
+          node -e "const fs=require('fs');const req=['latest','previous','recent','deltaSummary','historyMeta'];for (const f of ['data/flow-history/exchanges-1h.json','data/flow-history/exchanges-24h.json','data/flow-history/exchanges-7d.json']){const p=JSON.parse(fs.readFileSync(f,'utf8'));for (const k of req){if(!(k in p)) throw new Error(`${f}: missing ${k}`);}if(!Array.isArray(p.recent)) throw new Error(`${f}: recent not array`);if((p.historyMeta?.count??0)!==p.recent.length) throw new Error(`${f}: count mismatch`);if(p.recent.length>1){for(let i=1;i<p.recent.length;i+=1){if(Number(p.recent[i-1].ts)>=Number(p.recent[i].ts)) throw new Error(`${f}: ts not strictly ascending`);}}}"
 
       - name: Commit updated history files
         run: |
