@@ -127,6 +127,20 @@
 
         <section class="card flow-flows-card">
           <div class="flow-mini-head">
+            <h3 class="flow-mini-title">Snapshot history (beta)</h3>
+            <div class="flow-mini-meta">latest / previous delta / recent count / last event</div>
+          </div>
+          <ul class="flow-escrow-list">
+            <li>Latest snapshot: <span id="flowHistoryLatestTs">—</span></li>
+            <li>Net delta vs previous: <span id="flowHistoryNetDelta">—</span></li>
+            <li>Recent history count: <span id="flowHistoryRecentCount">—</span></li>
+            <li>Last detected event: <span id="flowHistoryLastEvent">—</span></li>
+          </ul>
+        </section>
+
+
+        <section class="card flow-flows-card">
+          <div class="flow-mini-head">
             <h3 class="flow-mini-title">Recent flows</h3>
             <div class="flow-mini-meta">supporting evidence, not primary signal</div>
           </div>

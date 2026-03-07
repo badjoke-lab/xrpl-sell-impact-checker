@@ -60,6 +60,12 @@
         pattern: document.getElementById('flowEscrowPattern'),
         stats: document.getElementById('flowEscrowStats'),
       },
+      history: {
+        latestTs: document.getElementById('flowHistoryLatestTs'),
+        netDelta: document.getElementById('flowHistoryNetDelta'),
+        recentCount: document.getElementById('flowHistoryRecentCount'),
+        lastEvent: document.getElementById('flowHistoryLastEvent'),
+      },
     };
 
     if (!refs.canvas || !refs.canvasWrap) return;
@@ -76,6 +82,7 @@
       window: loadValue(WINDOW_KEY, '1h'),
       payload: null,
       escrowPayload: null,
+      historyPayload: null,
       heatmapCells: [],
       hoveredCell: null,
       pinnedCell: null,
@@ -158,6 +165,7 @@
       renderPanels(refs, state);
       renderHeatmap(refs, state);
       renderEscrow(refs, state);
+      renderHistory(refs, state);
       return;
     }
 
@@ -167,6 +175,7 @@
       renderPanels(refs, state);
       renderHeatmap(refs, state);
       renderEscrow(refs, state);
+      renderHistory(refs, state);
     } else {
       renderPanels(refs, state);
     }
@@ -176,6 +185,7 @@
       result = {
         flow: makeDemoPayload(state),
         escrow: makeDemoEscrowPayload(state),
+        history: makeDemoHistoryPayload(state),
       };
     } else {
       result = await fetchLivePayload(state);
@@ -184,6 +194,7 @@
     try {
       state.payload = result.flow;
       state.escrowPayload = result.escrow;
+      state.historyPayload = result.history;
       state.lastRefreshMs = Math.max(result.flow?.ts || 0, result.escrow?.ts || 0, Date.now());
       applyMode(state);
       buildHeatmapCells(state);
@@ -192,9 +203,11 @@
       renderHeatmap(refs, state);
       renderEvents(refs, state);
       renderEscrow(refs, state);
+      renderHistory(refs, state);
     } finally {
       state.isFetching = false;
       renderPanels(refs, state);
+      renderHistory(refs, state);
     }
   }
 
@@ -203,13 +216,18 @@
     const escrowWindow = state.window;
     const escrowLimit = state.liteMode || state.window === '24h' || state.window === '7d' ? 5 : 10;
     const escrowUrl = `/api/xrpl/escrow-watch?window=${encodeURIComponent(escrowWindow)}&limit=${escrowLimit}`;
+    const snapshotUrl = `/api/xrpl/flow-snapshot?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}&persist=1`;
+    const historyUrl = `/api/xrpl/flow-history?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}&limit=10`;
 
     const [flow, escrow] = await Promise.all([
       fetchFlowPayload(flowUrl, state),
       fetchEscrowPayload(escrowUrl, escrowWindow),
     ]);
 
-    return { flow, escrow };
+    await fetchSnapshotPersist(snapshotUrl);
+    const history = await fetchHistoryPayload(historyUrl);
+
+    return { flow, escrow, history };
   }
 
   async function fetchFlowPayload(url, state) {
@@ -255,6 +273,24 @@
         staleReason: 'cached',
         debug: { endpointsTried: [], ledgersScanned: 0, txCount: 0, cacheHit: false, warnings: [`fetch_error:${error instanceof Error ? error.message : 'unknown'}`], durationMs: 0, rpcCalls: 0, lastValidatedLedger: null, degradeLevel: 'D', strategy: 'fetch_failed' },
       };
+    }
+  }
+
+  async function fetchSnapshotPersist(url) {
+    try {
+      await fetch(url);
+    } catch {
+      // persistence is best effort
+    }
+  }
+
+  async function fetchHistoryPayload(url) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`http_${response.status}`);
+      return await response.json();
+    } catch {
+      return { ok: false, latest: null, previous: null, recent: [], deltaSummary: { netXrpDelta: null }, historyMeta: { count: 0 } };
     }
   }
 
@@ -381,6 +417,24 @@
     };
   }
 
+  function makeDemoHistoryPayload(state) {
+    const now = Date.now();
+    const recent = Array.from({ length: 6 }, (_, i) => ({
+      ts: now - (i * 60_000),
+      summary: { netXrp: 120000 - i * 15000 },
+      metrics: { matchedEvents: Math.max(0, 5 - i) },
+      latestEvent: i === 0 ? { time: now - 45_000, label: 'Binance', dir: 'IN', amountXrp: 450000, reason: 'demo event' } : null,
+    })).reverse();
+    return {
+      ok: true,
+      latest: recent[recent.length - 1],
+      previous: recent[recent.length - 2],
+      recent,
+      deltaSummary: { netXrpDelta: 15000 },
+      historyMeta: { count: recent.length, oldestTs: recent[0].ts, newestTs: recent[recent.length - 1].ts },
+    };
+  }
+
   function renderEscrow(refs, state) {
     const escrow = state.escrowPayload;
     if (!escrow) {
@@ -414,6 +468,24 @@
     refs.escrow.pattern.innerHTML = notes.length
       ? notes.map((row) => `<li><strong>${row.label}:</strong> ${row.note}</li>`).join('')
       : '<li>No strong pattern detected.</li>';
+  }
+
+  function renderHistory(refs, state) {
+    const history = state.historyPayload;
+    if (!history || !history.latest) {
+      safeText(refs.history.latestTs, '—');
+      safeText(refs.history.netDelta, '—');
+      safeText(refs.history.recentCount, '0');
+      safeText(refs.history.lastEvent, buildLastEventLine(findLastDetectedEvent(state)));
+      return;
+    }
+
+    safeText(refs.history.latestTs, formatDateTime(history.latest.ts));
+    const delta = history.deltaSummary?.netXrpDelta;
+    safeText(refs.history.netDelta, Number.isFinite(delta) ? formatSignedXrp(delta) : '—');
+    safeText(refs.history.recentCount, `${history.historyMeta?.count ?? history.recent?.length ?? 0}`);
+    const lastEvent = history.latest?.latestEvent || findLastDetectedEvent(state);
+    safeText(refs.history.lastEvent, buildLastEventLine(lastEvent));
   }
 
   function buildEscrowSummaryNote(escrowPayload) {
