@@ -701,14 +701,17 @@
 
   function renderEvents(refs, state) {
     const useUsd = Number.isFinite(state.payload?.priceXrpUsd);
-    const highWindow = state.window === '24h' || state.window === '7d';
-    const rows = (state.payload?.events || []).slice(0, (state.liteMode || highWindow) ? 6 : 8);
+    const maxRows = state.liteMode ? 4 : 6;
+    const recent = getRecentDetections(state, maxRows);
+    const rows = recent.rows;
 
     if (!rows.length) {
       refs.recentFlows.innerHTML = '';
       if (refs.eventsEmpty) {
         refs.eventsEmpty.hidden = false;
-        refs.eventsEmpty.textContent = 'No recent labeled event in this window.';
+        refs.eventsEmpty.textContent = state.historyPayload?.historyMeta?.count
+          ? 'History exists, but no labeled event has been recorded.'
+          : 'No recent labeled detection yet.';
       }
       return;
     }
@@ -717,11 +720,104 @@
     refs.recentFlows.innerHTML = rows.map((row) => `
       <article class="flow-recent-row">
         <div class="flow-time">${formatTime(row.time)}</div>
-        <div>${shortAddress(row.from)} → ${shortAddress(row.to)} · ${row.label || 'unknown'}</div>
+        <div>
+          ${row.label || 'unknown'} · ${row.dir || '—'}
+          ${row.from || row.to ? `<div class="flow-meta">${shortAddress(row.from || 'n/a')} → ${shortAddress(row.to || 'n/a')}</div>` : ''}
+          <div class="flow-meta">${formatReason(row.reason)}</div>
+          <div class="flow-meta">${row.sourceWindow || state.window} / ${formatTime(row.sourceSnapshotTs || row.time)}${row.sourceType === 'history' ? ' · history' : ' · fallback'}</div>
+        </div>
         <div>${row.dir || '—'}</div>
         <div class="flow-amount">${useUsd && row.amountUsd ? `${formatUsd(row.amountUsd)} (${formatXrp(row.amountXrp)})` : formatXrp(row.amountXrp)}</div>
       </article>
     `).join('');
+  }
+
+  function formatReason(reason) {
+    if (!reason) return 'No reason details.';
+    if (reason.length <= 120) return reason;
+    return `${reason.slice(0, 117)}...`;
+  }
+
+  function getRecentDetections(state, limit = 6) {
+    const historyRows = extractHistoryRecentDetections(state.historyPayload, state.window, Number.isFinite(state.payload?.priceXrpUsd) ? state.payload.priceXrpUsd : null);
+    if (historyRows.length) {
+      return { rows: historyRows.slice(0, limit), source: 'history' };
+    }
+    const fallbackRows = extractPayloadRecentDetections(state.payload, state.window).slice(0, limit);
+    return { rows: fallbackRows, source: 'payload' };
+  }
+
+  function extractHistoryRecentDetections(historyPayload, defaultWindow, priceXrpUsd) {
+    const snapshots = Array.isArray(historyPayload?.recent) ? historyPayload.recent : [];
+    const rows = [];
+    const seen = new Set();
+
+    snapshots.forEach((snapshot) => {
+      const event = snapshot?.latestEvent;
+      if (!event) return;
+      const normalized = normalizeRecentDetection(event, {
+        sourceType: 'history',
+        sourceSnapshotTs: snapshot.ts,
+        sourceWindow: snapshot.window || defaultWindow,
+        priceXrpUsd,
+      });
+      const dedupeKey = buildDetectionKey(normalized);
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      rows.push(normalized);
+    });
+
+    return rows.sort((a, b) => Date.parse(b.time || '') - Date.parse(a.time || ''));
+  }
+
+  function extractPayloadRecentDetections(payload, defaultWindow) {
+    const events = Array.isArray(payload?.events) ? payload.events : [];
+    const seen = new Set();
+    const rows = [];
+    events.forEach((event) => {
+      const normalized = normalizeRecentDetection(event, {
+        sourceType: 'payload',
+        sourceSnapshotTs: payload?.ts,
+        sourceWindow: payload?.window || defaultWindow,
+        priceXrpUsd: Number.isFinite(payload?.priceXrpUsd) ? payload.priceXrpUsd : null,
+      });
+      const dedupeKey = buildDetectionKey(normalized);
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      rows.push(normalized);
+    });
+    return rows.sort((a, b) => Date.parse(b.time || '') - Date.parse(a.time || ''));
+  }
+
+  function normalizeRecentDetection(event, options) {
+    const amountXrp = Number(event?.amountXrp || 0);
+    const amountUsd = Number.isFinite(event?.amountUsd)
+      ? Number(event.amountUsd)
+      : (Number.isFinite(options.priceXrpUsd) ? amountXrp * options.priceXrpUsd : null);
+    return {
+      time: event?.time || options.sourceSnapshotTs || null,
+      label: event?.label || 'unknown',
+      dir: event?.dir || '—',
+      amountXrp,
+      amountUsd,
+      reason: event?.reason || event?.scoreBasis || '',
+      sourceWindow: options.sourceWindow,
+      sourceSnapshotTs: options.sourceSnapshotTs,
+      sourceType: options.sourceType,
+      txHash: event?.txHash || null,
+      from: event?.from || null,
+      to: event?.to || null,
+    };
+  }
+
+  function buildDetectionKey(row) {
+    return [
+      row.txHash || '',
+      row.time || '',
+      row.label || '',
+      row.dir || '',
+      Number(row.amountXrp || 0).toFixed(6),
+    ].join('|');
   }
 
   function inferPressure(net, useUsd, eventCount) {
@@ -751,9 +847,9 @@
   }
 
   function updateLastDetectedCache(state) {
-    const first = (state.payload?.events || [])[0];
+    const first = getRecentDetections(state, 1).rows[0];
     if (!first) return;
-    const win = state.payload?.window || state.window;
+    const win = first.sourceWindow || state.payload?.window || state.window;
     const prev = state.detectedEventsCache[win];
     if (!prev || Date.parse(first.time || '') > Date.parse(prev.time || '')) {
       state.detectedEventsCache[win] = first;
@@ -761,7 +857,7 @@
   }
 
   function findLastDetectedEvent(state) {
-    const current = (state.payload?.events || [])[0];
+    const current = getRecentDetections(state, 1).rows[0];
     if (current) return current;
     if (state.detectedEventsCache['24h']) return state.detectedEventsCache['24h'];
     const cached = Object.values(state.detectedEventsCache)
