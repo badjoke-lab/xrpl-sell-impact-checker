@@ -48,6 +48,9 @@
         matched: document.querySelector('[data-flow-snapshot="matched"]'),
         source: document.querySelector('[data-flow-snapshot="source"]'),
         updated: document.querySelector('[data-flow-snapshot="updated"]'),
+        subNet: document.querySelector('[data-flow-snapshot-sub="net"]'),
+        subMatched: document.querySelector('[data-flow-snapshot-sub="matched"]'),
+        subUpdated: document.querySelector('[data-flow-snapshot-sub="updated"]'),
       },
       reasonTitle: document.getElementById('flowReasonTitle'),
       reasonCopy: document.getElementById('flowReasonCopy'),
@@ -216,7 +219,7 @@
     const escrowWindow = state.window;
     const escrowLimit = state.liteMode || state.window === '24h' || state.window === '7d' ? 5 : 10;
     const escrowUrl = `/api/xrpl/escrow-watch?window=${encodeURIComponent(escrowWindow)}&limit=${escrowLimit}`;
-    const historyUrl = `/api/xrpl/flow-history?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}&limit=10`;
+    const historyUrl = `/api/xrpl/flow-history?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}&limit=24`;
 
     const [flow, escrow] = await Promise.all([
       fetchFlowPayload(flowUrl, state),
@@ -509,6 +512,7 @@
     const overlayMode = state.isFetching && state.payload ? 'ok' : state.mode;
     toggleOverlay(refs, overlayMode);
     const payload = state.payload;
+    const history = state.historyPayload;
     const liveError = getLiveError(payload, state.demoOnly);
     const statusLabel = state.isFetching && payload ? 'REFRESHING' : state.mode.toUpperCase();
     safeText(refs.statusMeta, statusLabel);
@@ -519,6 +523,9 @@
     const snapshotKeys = ['inflow', 'outflow', 'net', 'payments', 'ledgers', 'matched', 'source', 'updated'];
     if (!payload || (state.mode !== 'ok' && state.mode !== 'stale')) {
       snapshotKeys.forEach((key) => safeText(refs.snapshot[key], '—'));
+      safeText(refs.snapshot.subNet, 'prev: — / Δ —');
+      safeText(refs.snapshot.subMatched, 'prev: — / recent: —');
+      safeText(refs.snapshot.subUpdated, 'history newest: —');
       safeText(refs.signal.statusPill, 'LOW');
       refs.signal.statusPill.className = 'flow-pill low';
       safeText(refs.signal.severity, 'severity: — · pressure: —');
@@ -536,52 +543,109 @@
       return;
     }
 
-    const useUsd = Number.isFinite(payload?.summary?.inflowUsd) && payload.priceXrpUsd;
-    const net = Number(useUsd ? payload.summary.netUsd : payload.summary.netXrp) || 0;
-    const eventCount = (payload.events || []).length;
-    const dbg = payload.debug || {};
-    const pressure = inferPressure(net, useUsd, eventCount);
+    const latest = history?.latest || null;
+    const previous = history?.previous || null;
+    const hasHistoryLatest = Boolean(latest);
+    const summary = latest?.summary || payload.summary || {};
+    const metrics = latest?.metrics || {};
+    const prevSummary = previous?.summary || {};
+    const eventCount = hasHistoryLatest ? (latest?.metrics?.matchedEvents ?? 0) : (payload.events || []).length;
+    const prevEventCount = hasHistoryLatest ? (previous?.metrics?.matchedEvents ?? 0) : null;
+    const recentCount = history?.historyMeta?.count ?? history?.recent?.length ?? 0;
+    const netXrp = Number(summary?.netXrp ?? payload?.summary?.netXrp ?? 0);
+    const prevNetXrp = Number(prevSummary?.netXrp ?? 0);
+    const deltaNetXrpRaw = history?.deltaSummary?.netXrpDelta;
+    const deltaNetXrp = Number.isFinite(deltaNetXrpRaw) ? Number(deltaNetXrpRaw) : (hasHistoryLatest && previous ? netXrp - prevNetXrp : null);
+    const useUsd = Number.isFinite(summary?.inflowUsd) && Number.isFinite(summary?.outflowUsd) && Number.isFinite(summary?.netUsd);
+    const pressure = hasHistoryLatest
+      ? inferPressureHistory(netXrp, deltaNetXrp, eventCount, prevEventCount)
+      : inferPressure(Number(useUsd ? summary.netUsd : netXrp) || 0, useUsd, eventCount);
 
-    safeText(refs.snapshot.inflow, useUsd ? formatUsd(payload.summary.inflowUsd) : formatXrp(payload.summary.inflowXrp));
-    safeText(refs.snapshot.outflow, useUsd ? formatUsd(payload.summary.outflowUsd) : formatXrp(payload.summary.outflowXrp));
-    safeText(refs.snapshot.net, useUsd ? formatSignedUsd(payload.summary.netUsd) : formatSignedXrp(payload.summary.netXrp));
-    safeText(refs.snapshot.payments, `${dbg.paymentsCount ?? 0}`);
-    safeText(refs.snapshot.ledgers, `${dbg.ledgersScanned ?? 0}`);
-    safeText(refs.snapshot.matched, `${eventCount}`);
-    const staleTag = payload.staleReason === 'sampled' ? 'sampled' : payload.stale ? 'cached' : '';
-    safeText(refs.snapshot.source, `${payload.source}${staleTag ? ` (${staleTag})` : ''}`);
-    safeText(refs.snapshot.updated, relativeSeconds(state.lastRefreshMs));
-    safeText(refs.refreshMeta, relativeSeconds(state.lastRefreshMs));
+    safeText(refs.snapshot.inflow, formatXrpOrUsd(summary?.inflowXrp, summary?.inflowUsd, useUsd));
+    safeText(refs.snapshot.outflow, formatXrpOrUsd(summary?.outflowXrp, summary?.outflowUsd, useUsd));
+    safeText(refs.snapshot.net, useUsd ? formatSignedUsd(summary?.netUsd ?? 0) : formatSignedXrp(netXrp));
+    safeText(refs.snapshot.payments, `${metrics?.paymentsScanned ?? payload?.debug?.paymentsCount ?? 0}`);
+    safeText(refs.snapshot.ledgers, `${metrics?.ledgersScanned ?? payload?.debug?.ledgersScanned ?? 0}`);
+    safeText(refs.snapshot.matched, `${eventCount ?? 0}`);
+    safeText(refs.snapshot.subNet, `prev: ${previous ? formatSignedXrp(prevNetXrp) : '—'} / Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'}`);
+    safeText(refs.snapshot.subMatched, `prev: ${previous ? `${prevEventCount ?? 0}` : '—'} / recent: ${recentCount ?? 0}`);
 
-    const severity = pressure;
+    const sourceLabel = resolveSourceLabel(history, payload, state.demoOnly);
+    safeText(refs.snapshot.source, sourceLabel);
+
+    const updatedTs = history?.historyMeta?.newestTs ?? latest?.ts ?? payload?.ts ?? state.lastRefreshMs;
+    safeText(refs.snapshot.updated, formatDateTime(updatedTs));
+    safeText(refs.snapshot.subUpdated, `history newest: ${history?.historyMeta?.newestTs ? formatDateTime(history.historyMeta.newestTs) : '—'}`);
+    safeText(refs.refreshMeta, relativeSeconds(updatedTs));
+
     const pillClass = pressure === 'HIGH' ? 'high' : pressure === 'MEDIUM' ? 'medium' : pressure === 'QUIET' ? 'quiet' : 'low';
-    safeText(refs.signal.statusPill, severity);
+    safeText(refs.signal.statusPill, pressure);
     refs.signal.statusPill.className = `flow-pill ${pillClass}`;
     safeText(refs.signal.severity, `severity: ${pressure === 'HIGH' ? 3 : pressure === 'MEDIUM' ? 2 : 1} · pressure: ${pressure}`);
-    safeText(refs.signal.impact, useUsd ? formatSignedUsd(net) : formatSignedXrp(net));
+    safeText(refs.signal.impact, useUsd ? formatSignedUsd(summary?.netUsd ?? 0) : formatSignedXrp(netXrp));
 
-    const reason = buildSummaryReason(payload, net, eventCount).replace(/^Why:\s*/, '');
+    const reason = buildSignalReason(latest, previous, history, payload, eventCount, recentCount, deltaNetXrp);
     safeText(refs.signal.why, reason);
-    safeText(refs.signal.observed, `Scanned ${dbg.paymentsCount ?? 0} payments across ${dbg.ledgersScanned ?? 0} ledgers.`);
+    safeText(refs.signal.observed, `Scanned ${metrics?.paymentsScanned ?? payload?.debug?.paymentsCount ?? 0} payments across ${metrics?.ledgersScanned ?? payload?.debug?.ledgersScanned ?? 0} ledgers.`);
     safeText(refs.signal.ctxPreset, `target: ${state.preset || 'unset'}`);
-    safeText(refs.signal.ctxWindow, `window: ${payload.window || state.window}`);
-    safeText(refs.signal.ctxSource, `source: ${state.demoOnly ? 'demo' : payload.source}`);
+    safeText(refs.signal.ctxWindow, `window: ${latest?.window || payload.window || state.window}`);
+    safeText(refs.signal.ctxSource, `source: ${sourceLabel}`);
 
-    const contextLines = [];
-    if (payload.stale) contextLines.push('Partial live data (timeout-limited).');
-    if (payload.staleReason === 'sampled') contextLines.push('Sampled payload was used for responsiveness.');
-    if (eventCount === 0) contextLines.push('No major labeled flow detected in this window.');
-    if ((payload.window === '5m' || payload.window === '1h') && eventCount === 0) contextLines.push('Try 24h for broader coverage.');
-    safeText(refs.signal.context, contextLines.join(' ') || 'Live payload synchronized.');
+    const oldest = history?.historyMeta?.oldestTs ? formatDateTime(history.historyMeta.oldestTs) : '—';
+    const newest = history?.historyMeta?.newestTs ? formatDateTime(history.historyMeta.newestTs) : '—';
+    const contextLines = [
+      `recent: ${recentCount ?? 0} snapshots (${oldest} → ${newest})`,
+      `latest: ${formatSignedXrp(netXrp)} / previous: ${previous ? formatSignedXrp(prevNetXrp) : '—'} / Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'}`,
+    ];
+    if (latest?.stale || payload.stale) contextLines.push('stale: true');
+    if (latest?.partial || payload?.partial) contextLines.push('partial: true');
+    safeText(refs.signal.context, contextLines.join(' · '));
 
     safeText(refs.reasonTitle, eventCount ? 'Labeled flow activity detected' : 'Quiet labeled-flow window');
     safeText(refs.reasonCopy, reason);
+    const fallbackLast = latest?.latestEvent || previous?.latestEvent || findLastDetectedEvent(state);
     refs.reasonList.innerHTML = [
-      `No major labeled flow detected in this window${eventCount ? ' (overridden by detected events).' : '.'}`,
-      `Scanned ${dbg.paymentsCount ?? 0} payments across ${dbg.ledgersScanned ?? 0} ledgers.`,
-      payload.stale ? 'Partial live data (timeout-limited).' : 'Payload freshness: current.',
-      (payload.window === '5m' || payload.window === '1h') ? 'Try 24h for broader coverage.' : 'Window is broad enough for lower-noise context.',
+      `Latest net: ${formatSignedXrp(netXrp)}${previous ? ` / Previous: ${formatSignedXrp(prevNetXrp)}` : ''}`,
+      `Net delta: ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'} / Recent snapshots: ${recentCount ?? 0}`,
+      `Last detected event: ${buildLastEventLine(fallbackLast).replace('Last detected event: ', '')}`,
+      latest?.stale || payload.stale ? 'Snapshot freshness: stale/cached.' : 'Snapshot freshness: current.',
     ].map((line) => `<li>${line}</li>`).join('');
+  }
+
+  function resolveSourceLabel(history, payload, demoOnly) {
+    if (demoOnly) return 'demo';
+    if (history?.source === 'repo-json') return 'repo-json';
+    if (history?.source === 'runtime-fallback') return 'runtime';
+    if (payload?.source === 'cache' || payload?.staleReason === 'cached') return 'cache';
+    return payload?.source === 'cache' ? 'cache' : 'runtime';
+  }
+
+  function formatXrpOrUsd(xrpValue, usdValue, useUsd) {
+    if (useUsd) return formatUsd(usdValue ?? 0);
+    return formatXrp(xrpValue ?? 0);
+  }
+
+  function inferPressureHistory(netXrp, deltaNetXrp, eventCount, prevEventCount) {
+    const absNet = Math.abs(netXrp || 0);
+    const absDelta = Math.abs(deltaNetXrp || 0);
+    if (eventCount === 0 && absNet <= 25_000 && absDelta <= 25_000 && (prevEventCount || 0) === 0) return 'QUIET';
+    if (absNet >= 1_000_000 || absDelta >= 1_000_000) return 'HIGH';
+    if (absNet >= 250_000 || absDelta >= 250_000 || eventCount >= 2) return 'MEDIUM';
+    return 'LOW';
+  }
+
+  function buildSignalReason(latest, previous, history, payload, eventCount, recentCount, deltaNetXrp) {
+    if (latest?.latestEvent?.reason) return latest.latestEvent.reason;
+    const previousEvent = previous?.latestEvent;
+    const recentHasEvent = (history?.recent || []).some((row) => row?.latestEvent);
+    if (!latest?.latestEvent && previousEvent) {
+      return `No event in latest snapshot, but ${recentCount ?? 0} recent detections. Last detected event: ${formatDateTime(previousEvent.time || previous?.ts)} ${previousEvent.label ? `(${previousEvent.label})` : ''}.`;
+    }
+    if (!latest?.latestEvent && recentHasEvent) {
+      return `No event in latest snapshot, but ${recentCount ?? 0} recent detections. Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'}.`;
+    }
+    if (eventCount > 0 && payload.summaryReason) return payload.summaryReason;
+    return `No major labeled flow detected in this window. Previous snapshot Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'} / recent count ${recentCount ?? 0}.`;
   }
 
   function renderHeatmap(refs, state) {
@@ -834,6 +898,11 @@
   function formatSignedXrp(value) {
     const sign = value > 0 ? '+' : '';
     return `${sign}${formatXrp(value)}`;
+  }
+
+  function formatSignedCompactXrp(value) {
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${Math.round(value || 0).toLocaleString()} XRP`;
   }
 
   function shortAddress(address) {
