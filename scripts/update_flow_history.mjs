@@ -6,6 +6,8 @@ import process from 'node:process';
 const BASE_URL = process.env.FLOW_HISTORY_BASE_URL || 'https://xsic.badjoke-lab.com';
 const OUTPUT_DIR = path.join(process.cwd(), 'data/flow-history');
 const MAX_RECENT = Number(process.env.FLOW_HISTORY_MAX_RECENT || 168);
+// Primary observation windows: 1h baseline, 24h comparison, 7d trend.
+// 5m remains supplemental and is intentionally excluded from default history writes.
 const DEFAULT_TARGETS = [
   { preset: 'exchanges', window: '1h' },
   { preset: 'exchanges', window: '24h' },
