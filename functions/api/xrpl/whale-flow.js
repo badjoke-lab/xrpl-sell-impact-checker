@@ -10,17 +10,17 @@ const PRICE_CACHE_TTL_MS = 5 * 60_000;
 const MIN_RPC_GRACE_MS = 1_200;
 
 const WINDOW_STRATEGIES = {
-  '5m': { name: '5m_small', maxLedgers: 26, bucketCount: 10, eventLimit: 24, timeoutBudget: 4_000, sampled: false, sampleStride: 1 },
-  '1h': { name: '1h_medium', maxLedgers: 60, bucketCount: 14, eventLimit: 32, timeoutBudget: 6_000, sampled: false, sampleStride: 1 },
-  '24h': { name: '24h_sampled', maxLedgers: 120, bucketCount: 16, eventLimit: 24, timeoutBudget: 7_500, sampled: true, sampleStride: 3 },
-  '7d': { name: '7d_sampled', maxLedgers: 220, bucketCount: 18, eventLimit: 20, timeoutBudget: 9_000, sampled: true, sampleStride: 8 },
+  '5m': { name: '5m_assist', maxLedgers: 18, bucketCount: 8, eventLimit: 10, timeoutBudget: 3_200, sampled: false, sampleStride: 1 },
+  '1h': { name: '1h_baseline', maxLedgers: 84, bucketCount: 16, eventLimit: 30, timeoutBudget: 6_500, sampled: false, sampleStride: 1 },
+  '24h': { name: '24h_primary', maxLedgers: 180, bucketCount: 18, eventLimit: 36, timeoutBudget: 8_500, sampled: true, sampleStride: 2 },
+  '7d': { name: '7d_trend', maxLedgers: 280, bucketCount: 14, eventLimit: 28, timeoutBudget: 10_500, sampled: true, sampleStride: 9 },
 };
 
 const EVENT_MIN_XRP_BY_WINDOW = {
-  '5m': 60_000,
-  '1h': 150_000,
-  '24h': 350_000,
-  '7d': 500_000,
+  '5m': 100_000,
+  '1h': 120_000,
+  '24h': 180_000,
+  '7d': 320_000,
 };
 
 const flowCache = globalThis.__xsicWhaleFlowCache || new Map();
@@ -57,10 +57,10 @@ function resolveStrategy(window) {
   const resolvedWindow = WINDOW_STRATEGIES[window] ? window : '5m';
   const base = WINDOW_STRATEGIES[resolvedWindow];
   const budgetBounds = {
-    '5m': { min: 2_500, max: 4_000 },
-    '1h': { min: 3_500, max: 6_000 },
-    '24h': { min: 4_500, max: 7_500 },
-    '7d': { min: 5_000, max: 9_000 },
+    '5m': { min: 2_200, max: 3_500 },
+    '1h': { min: 4_000, max: 6_500 },
+    '24h': { min: 5_500, max: 8_500 },
+    '7d': { min: 6_500, max: 10_500 },
   };
   const bounds = budgetBounds[resolvedWindow] || budgetBounds['5m'];
   return {

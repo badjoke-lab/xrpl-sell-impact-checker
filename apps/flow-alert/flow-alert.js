@@ -6,6 +6,62 @@
   const FORCE_MODES = new Set(['loading', 'ok', 'empty', 'error', 'stale']);
   const PRIMARY_HISTORY_WINDOWS = new Set(['1h', '24h', '7d']);
 
+
+  const WINDOW_PROFILE = {
+    '5m': {
+      role: 'short-window assist',
+      quietHint: 'Short window assist mode: low signal density is normal.',
+      emptyHint: 'No labeled flow in this short assist window yet. This is normal—try 1h or 24h for denser signal.',
+      try24h: true,
+      quietAbsNetXrp: 40_000,
+      quietDeltaXrp: 40_000,
+      lowAbsNetXrp: 180_000,
+      mediumAbsNetXrp: 700_000,
+      eventMedium: 2,
+      eventHigh: 4,
+    },
+    '1h': {
+      role: 'standard observation window',
+      quietHint: 'No major labeled flow in the standard 1h window.',
+      emptyHint: 'No major labeled flow in the standard 1h window. If conditions stay quiet, compare with 24h for broader context.',
+      try24h: true,
+      quietAbsNetXrp: 70_000,
+      quietDeltaXrp: 70_000,
+      lowAbsNetXrp: 250_000,
+      mediumAbsNetXrp: 1_000_000,
+      eventMedium: 2,
+      eventHigh: 5,
+    },
+    '24h': {
+      role: 'primary comparison window',
+      quietHint: 'No major labeled flow across the broader 24h primary window.',
+      emptyHint: 'No major labeled flow across the broader 24h primary window.',
+      try24h: false,
+      quietAbsNetXrp: 120_000,
+      quietDeltaXrp: 120_000,
+      lowAbsNetXrp: 300_000,
+      mediumAbsNetXrp: 1_200_000,
+      eventMedium: 3,
+      eventHigh: 6,
+    },
+    '7d': {
+      role: 'trend confirmation window',
+      quietHint: 'No major labeled trend flow detected in the sampled 7d window.',
+      emptyHint: 'No major labeled trend flow detected in the sampled 7d window. Use 24h for primary comparisons.',
+      try24h: true,
+      quietAbsNetXrp: 220_000,
+      quietDeltaXrp: 220_000,
+      lowAbsNetXrp: 500_000,
+      mediumAbsNetXrp: 1_800_000,
+      eventMedium: 3,
+      eventHigh: 7,
+    },
+  };
+
+  function getWindowProfile(windowKey) {
+    return WINDOW_PROFILE[windowKey] || WINDOW_PROFILE['1h'];
+  }
+
   function boot() {
     const refs = {
       canvasWrap: document.getElementById('flowCanvasWrap'),
@@ -643,15 +699,20 @@
       refs.signal.statusPill.className = 'flow-pill low';
       safeText(refs.signal.severity, 'severity: — · pressure: —');
       safeText(refs.signal.impact, '—');
-      safeText(refs.signal.why, 'No major labeled flow detected in this window.');
+      safeText(refs.signal.why, getWindowProfile(state.window).emptyHint);
       safeText(refs.signal.observed, 'Scanned — payments across — ledgers.');
-      safeText(refs.signal.context, 'Partial live data (timeout-limited). Try 24h for broader coverage.');
+      safeText(refs.signal.context, `${getWindowProfile(state.window).quietHint} Partial live data (timeout-limited).`);
       safeText(refs.signal.ctxPreset, `target: ${state.preset || 'unset'}`);
       safeText(refs.signal.ctxWindow, `window: ${state.window}`);
       safeText(refs.signal.ctxSource, `source: ${state.demoOnly ? 'demo' : 'live'}`);
       safeText(refs.reasonTitle, 'No dominant pressure');
-      safeText(refs.reasonCopy, 'No major labeled flow detected in this window.');
-      refs.reasonList.innerHTML = '<li>No major labeled flow detected in this window.</li><li>Scanned 0 payments across 0 ledgers.</li><li>Try 24h for broader coverage.</li>';
+      safeText(refs.reasonCopy, getWindowProfile(state.window).emptyHint);
+      const fallbackProfile = getWindowProfile(state.window);
+      refs.reasonList.innerHTML = [
+        `<li>${fallbackProfile.emptyHint}</li>`,
+        '<li>Scanned 0 payments across 0 ledgers.</li>',
+        fallbackProfile.try24h ? '<li>Try 24h for broader comparison context.</li>' : `<li>Window role: ${fallbackProfile.role}.</li>`,
+      ].join('');
       safeText(refs.refreshMeta, '—');
       return;
     }
@@ -670,9 +731,10 @@
     const deltaNetXrpRaw = history?.deltaSummary?.netXrpDelta;
     const deltaNetXrp = Number.isFinite(deltaNetXrpRaw) ? Number(deltaNetXrpRaw) : (hasHistoryLatest && previous ? netXrp - prevNetXrp : null);
     const useUsd = Number.isFinite(summary?.inflowUsd) && Number.isFinite(summary?.outflowUsd) && Number.isFinite(summary?.netUsd);
+    const activeWindow = latest?.window || payload.window || state.window;
     const pressure = hasHistoryLatest
-      ? inferPressureHistory(netXrp, deltaNetXrp, eventCount, prevEventCount)
-      : inferPressure(Number(useUsd ? summary.netUsd : netXrp) || 0, useUsd, eventCount);
+      ? inferPressureHistory(netXrp, deltaNetXrp, eventCount, prevEventCount, activeWindow)
+      : inferPressure(Number(useUsd ? summary.netUsd : netXrp) || 0, useUsd, eventCount, activeWindow);
 
     safeText(refs.snapshot.inflow, formatXrpOrUsd(summary?.inflowXrp, summary?.inflowUsd, useUsd));
     safeText(refs.snapshot.outflow, formatXrpOrUsd(summary?.outflowXrp, summary?.outflowUsd, useUsd));
@@ -706,23 +768,26 @@
 
     const oldest = history?.historyMeta?.oldestTs ? formatDateTime(history.historyMeta.oldestTs) : '—';
     const newest = history?.historyMeta?.newestTs ? formatDateTime(history.historyMeta.newestTs) : '—';
+    const activeProfile = getWindowProfile(activeWindow);
     const contextLines = [
+      `window role: ${activeProfile.role}`,
       `recent: ${recentCount ?? 0} snapshots (${oldest} → ${newest})`,
       `latest: ${formatSignedXrp(netXrp)} / previous: ${previous ? formatSignedXrp(prevNetXrp) : '—'} / Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'}`,
     ];
-    if (!PRIMARY_HISTORY_WINDOWS.has(state.window)) contextLines.push('history mode: supplemental-live (5m)');
+    if (!PRIMARY_HISTORY_WINDOWS.has(state.window)) contextLines.push('history mode: supplemental-live (5m assist)');
     if (latest?.stale || payload.stale) contextLines.push('stale: true');
     if (latest?.partial || payload?.partial) contextLines.push('partial: true');
     safeText(refs.signal.context, contextLines.join(' · '));
 
-    safeText(refs.reasonTitle, eventCount ? 'Labeled flow activity detected' : 'Quiet labeled-flow window');
+    safeText(refs.reasonTitle, eventCount ? 'Labeled flow activity detected' : `Quiet ${activeWindow} labeled-flow window`);
     safeText(refs.reasonCopy, reason);
     const fallbackLast = latest?.latestEvent || previous?.latestEvent || findLastDetectedEvent(state);
     refs.reasonList.innerHTML = [
       `Latest net: ${formatSignedXrp(netXrp)}${previous ? ` / Previous: ${formatSignedXrp(prevNetXrp)}` : ''}`,
       `Net delta: ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'} / Recent snapshots: ${recentCount ?? 0}`,
       `Last detected event: ${buildLastEventLine(fallbackLast).replace('Last detected event: ', '')}`,
-      latest?.stale || payload.stale ? 'Snapshot freshness: stale/cached.' : 'Snapshot freshness: current.',
+      eventCount === 0 ? activeProfile.quietHint : `Window role: ${activeProfile.role}.`,
+      (activeProfile.try24h && (eventCount === 0 || recentCount <= 2)) ? 'Suggestion: Try 24h for broader comparison context.' : (latest?.stale || payload.stale ? 'Snapshot freshness: stale/cached.' : 'Snapshot freshness: current.'),
     ].map((line) => `<li>${line}</li>`).join('');
   }
 
@@ -740,17 +805,20 @@
     return formatXrp(xrpValue ?? 0);
   }
 
-  function inferPressureHistory(netXrp, deltaNetXrp, eventCount, prevEventCount) {
+  function inferPressureHistory(netXrp, deltaNetXrp, eventCount, prevEventCount, window) {
+    const profile = getWindowProfile(window);
     const absNet = Math.abs(netXrp || 0);
     const absDelta = Math.abs(deltaNetXrp || 0);
-    if (eventCount === 0 && absNet <= 25_000 && absDelta <= 25_000 && (prevEventCount || 0) === 0) return 'QUIET';
-    if (absNet >= 1_000_000 || absDelta >= 1_000_000) return 'HIGH';
-    if (absNet >= 250_000 || absDelta >= 250_000 || eventCount >= 2) return 'MEDIUM';
+    if (eventCount === 0 && absNet <= profile.quietAbsNetXrp && absDelta <= profile.quietDeltaXrp && (prevEventCount || 0) === 0) return 'QUIET';
+    if (absNet >= profile.mediumAbsNetXrp || absDelta >= profile.mediumAbsNetXrp || eventCount >= profile.eventHigh) return 'HIGH';
+    if (absNet >= profile.lowAbsNetXrp || absDelta >= profile.lowAbsNetXrp || eventCount >= profile.eventMedium) return 'MEDIUM';
     return 'LOW';
   }
 
   function buildSignalReason(latest, previous, history, payload, eventCount, recentCount, deltaNetXrp) {
     if (latest?.latestEvent?.reason) return latest.latestEvent.reason;
+    const activeWindow = latest?.window || payload?.window;
+    const profile = getWindowProfile(activeWindow);
     const previousEvent = previous?.latestEvent;
     const recentHasEvent = (history?.recent || []).some((row) => row?.latestEvent);
     if (!latest?.latestEvent && previousEvent) {
@@ -760,7 +828,8 @@
       return `No event in latest snapshot, but ${recentCount ?? 0} recent detections. Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'}.`;
     }
     if (eventCount > 0 && payload.summaryReason) return payload.summaryReason;
-    return `No major labeled flow detected in this window. Previous snapshot Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'} / recent count ${recentCount ?? 0}.`;
+    const base = `${profile.emptyHint} Previous snapshot Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'} / recent count ${recentCount ?? 0}.`;
+    return profile.try24h ? `${base} Try 24h for broader comparison context.` : base;
   }
 
   function renderHeatmap(refs, state) {
@@ -824,9 +893,11 @@
       refs.recentFlows.innerHTML = '';
       if (refs.eventsEmpty) {
         refs.eventsEmpty.hidden = false;
+        const activeWindow = state.payload?.window || state.window;
+        const profile = getWindowProfile(activeWindow);
         refs.eventsEmpty.textContent = state.historyPayload?.historyMeta?.count
-          ? 'History exists, but no labeled event has been recorded.'
-          : 'No recent labeled detection yet.';
+          ? `History exists, but no labeled event has been recorded for the ${profile.role}.`
+          : `No recent labeled detection yet in the ${profile.role}.`;
       }
       return;
     }
@@ -935,27 +1006,26 @@
     ].join('|');
   }
 
-  function inferPressure(net, useUsd, eventCount) {
+  function inferPressure(net, useUsd, eventCount, window) {
+    const profile = getWindowProfile(window);
     const abs = Math.abs(net);
-    const quietLimit = useUsd ? 15_000 : 25_000;
-    const lowLimit = useUsd ? 150_000 : 250_000;
-    const mediumLimit = useUsd ? 700_000 : 1_000_000;
-    if (eventCount === 0 && abs <= quietLimit) return 'QUIET';
-    if (abs >= mediumLimit) return 'HIGH';
-    if (abs >= lowLimit) return 'MEDIUM';
+    if (eventCount === 0 && abs <= profile.quietAbsNetXrp) return 'QUIET';
+    if (abs >= profile.mediumAbsNetXrp || eventCount >= profile.eventHigh) return 'HIGH';
+    if (abs >= profile.lowAbsNetXrp || eventCount >= profile.eventMedium) return 'MEDIUM';
     return 'LOW';
   }
 
   function buildSummaryReason(payload, net, eventCount) {
     if (eventCount > 0 && payload.summaryReason) return `Why: ${payload.summaryReason}`;
+    const profile = getWindowProfile(payload.window);
     const lines = [
-      'Why: No major labeled flow detected in this window.',
+      `Why: ${profile.emptyHint}`,
       `Scanned ${payload.debug?.paymentsCount ?? 0} payments across ${payload.debug?.ledgersScanned ?? 0} ledgers.`,
     ];
-    if (eventCount === 0 && Math.abs(net) <= 25_000) {
-      lines.push('Market looks quiet (near-neutral net flow).');
+    if (eventCount === 0 && Math.abs(net) <= profile.quietAbsNetXrp) {
+      lines.push(profile.quietHint);
     }
-    if (payload.window === '5m' || payload.window === '1h') {
+    if (profile.try24h) {
       lines.push('Try 24h for broader signal coverage.');
     }
     return lines.join(' ');
