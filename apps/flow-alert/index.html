@@ -81,6 +81,19 @@
             <span class="flow-context-chip" data-flow-signal="ctx-source">source: demo</span>
             <div class="flow-context-line" data-flow-signal="context">Partial live data (timeout-limited). Try 24h for broader coverage.</div>
           </div>
+          <div class="flow-history-strip" data-flow-history-strip hidden>
+            <div class="flow-history-row">
+              <div class="flow-signal-label">Recent net</div>
+              <svg class="flow-history-sparkline" data-flow-history="net-svg" viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label="Recent net flow"></svg>
+              <div class="flow-meta" data-flow-history="net-compare">latest vs oldest: —</div>
+            </div>
+            <div class="flow-history-row">
+              <div class="flow-signal-label">Recent detections</div>
+              <div class="flow-history-bars" data-flow-history="matched-bars" role="img" aria-label="Recent matched events"></div>
+              <div class="flow-meta" data-flow-history="matched-compare">latest vs oldest: —</div>
+            </div>
+            <div class="flow-meta" data-flow-history="status" hidden>History building…</div>
+          </div>
         </section>
 
         <section class="flow-metrics-grid">

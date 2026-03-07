@@ -2309,6 +2309,28 @@ svg polygon[fill="black"]{
 .flow-copy { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 .flow-context-chip { display: inline-flex; width: fit-content; border-radius: 999px; padding: 5px 9px; background: var(--flow-panel-subtle); border: 1px solid var(--flow-border); font-size: 11px; }
 
+.flow-history-strip {
+  grid-column: 1 / -1;
+  border: 1px solid var(--flow-border);
+  border-radius: 10px;
+  background: var(--flow-panel-subtle);
+  padding: 8px 10px;
+  display: grid;
+  gap: 8px;
+}
+.flow-history-row { display: grid; gap: 4px; }
+.flow-history-sparkline { width: 100%; height: 28px; display: block; }
+.flow-history-zero { stroke: #cbd5e1; stroke-width: .9; stroke-dasharray: 2 2; }
+.flow-history-net { fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.flow-history-net.is-pos { stroke: var(--flow-accent); }
+.flow-history-net.is-neg { stroke: var(--flow-danger); }
+.flow-history-dot { stroke: #fff; stroke-width: .8; }
+.flow-history-dot.is-pos { fill: var(--flow-accent); }
+.flow-history-dot.is-neg { fill: var(--flow-danger); }
+.flow-history-bars { height: 24px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(4px, 1fr); gap: 3px; align-items: end; }
+.flow-history-bar { display: block; width: 100%; height: calc(var(--bar-h, 0.06) * 100%); min-height: 2px; border-radius: 2px; background: rgba(37, 99, 235, .35); }
+.flow-history-bar.is-latest { background: rgba(37, 99, 235, .8); }
+
 .flow-metrics-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .flow-metric-card { padding: 12px; min-height: 88px; display: grid; gap: 6px; align-content: start; min-width: 0; }
 .flow-metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--flow-soft); font-weight: 700; }
