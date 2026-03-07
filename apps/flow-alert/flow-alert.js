@@ -216,7 +216,6 @@
     const escrowWindow = state.window;
     const escrowLimit = state.liteMode || state.window === '24h' || state.window === '7d' ? 5 : 10;
     const escrowUrl = `/api/xrpl/escrow-watch?window=${encodeURIComponent(escrowWindow)}&limit=${escrowLimit}`;
-    const snapshotUrl = `/api/xrpl/flow-snapshot?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}&persist=1`;
     const historyUrl = `/api/xrpl/flow-history?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}&limit=10`;
 
     const [flow, escrow] = await Promise.all([
@@ -224,7 +223,6 @@
       fetchEscrowPayload(escrowUrl, escrowWindow),
     ]);
 
-    await fetchSnapshotPersist(snapshotUrl);
     const history = await fetchHistoryPayload(historyUrl);
 
     return { flow, escrow, history };
@@ -275,15 +273,6 @@
       };
     }
   }
-
-  async function fetchSnapshotPersist(url) {
-    try {
-      await fetch(url);
-    } catch {
-      // persistence is best effort
-    }
-  }
-
   async function fetchHistoryPayload(url) {
     try {
       const response = await fetch(url);

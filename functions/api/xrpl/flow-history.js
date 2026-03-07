@@ -6,6 +6,65 @@ import {
   getHistorySummary,
 } from '../../../shared/flow-alert-history-store.js';
 
+function sanitize(value) {
+  return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function historyFileName(preset, window) {
+  return `${sanitize(preset)}-${sanitize(window)}.json`;
+}
+
+function resolveBaseUrl(request) {
+  if (!request) return null;
+  try {
+    const url = new URL(request.url);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeStaticPayload(payload, preset, window, limit) {
+  const recentAll = Array.isArray(payload?.recent) ? payload.recent : [];
+  const recent = recentAll.slice(Math.max(0, recentAll.length - limit));
+  const latest = payload?.latest || recent[recent.length - 1] || null;
+  const previous = payload?.previous || (recent.length >= 2 ? recent[recent.length - 2] : null);
+  const deltaSummary = payload?.deltaSummary || buildDeltaSummary(latest, previous);
+  const historyMeta = {
+    count: payload?.historyMeta?.count ?? recentAll.length,
+    oldestTs: payload?.historyMeta?.oldestTs ?? recentAll[0]?.ts ?? null,
+    newestTs: payload?.historyMeta?.newestTs ?? latest?.ts ?? null,
+    preset: payload?.historyMeta?.preset || preset,
+    window: payload?.historyMeta?.window || window,
+    updatedAt: payload?.historyMeta?.updatedAt || null,
+  };
+
+  return {
+    latest,
+    previous,
+    recent,
+    deltaSummary,
+    historyMeta,
+  };
+}
+
+async function readStaticHistory(request, preset, window, limit) {
+  const baseUrl = resolveBaseUrl(request);
+  if (!baseUrl) return null;
+  const fileName = historyFileName(preset, window);
+
+  try {
+    const response = await fetch(`${baseUrl}/data/flow-history/${fileName}`, {
+      headers: { 'cache-control': 'no-cache' },
+    });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return normalizeStaticPayload(payload, preset, window, limit);
+  } catch {
+    return null;
+  }
+}
+
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -33,6 +92,27 @@ export async function onRequestGet({ request }) {
   const window = normalizeWindow(url.searchParams.get('window'));
   const limit = resolveLimit(url.searchParams.get('limit'));
 
+  const staticHistory = await readStaticHistory(request, preset, window, limit);
+
+  if (staticHistory) {
+    const recentNetSeries = staticHistory.recent.map((row) => ({ ts: row.ts, netXrp: row.summary?.netXrp ?? 0 }));
+    const recentEventCountSeries = staticHistory.recent.map((row) => ({ ts: row.ts, matchedEvents: row.metrics?.matchedEvents ?? 0 }));
+
+    return json({
+      ok: true,
+      preset,
+      window,
+      latest: staticHistory.latest,
+      previous: staticHistory.previous,
+      recent: staticHistory.recent,
+      deltaSummary: staticHistory.deltaSummary,
+      recentNetSeries,
+      recentEventCountSeries,
+      historyMeta: staticHistory.historyMeta,
+      source: 'repo-json',
+    });
+  }
+
   const [latest, previous, recent, historyMeta] = await Promise.all([
     getLatestSnapshot(preset, window),
     getPreviousSnapshot(preset, window),
@@ -55,5 +135,6 @@ export async function onRequestGet({ request }) {
     recentNetSeries,
     recentEventCountSeries,
     historyMeta,
+    source: 'runtime-fallback',
   });
 }
