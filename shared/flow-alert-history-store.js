@@ -38,7 +38,7 @@ function sanitize(value) {
 function keyFor(preset, window) {
   const p = normalizePreset(preset);
   const w = normalizeWindow(window);
-  return { preset: p, window: w, key: `${sanitize(p)}__${sanitize(w)}` };
+  return { preset: p, window: w, key: `${sanitize(p)}__${sanitize(w)}`, fileName: `${sanitize(p)}-${sanitize(w)}.json` };
 }
 
 async function readFileList(filePath) {
@@ -47,7 +47,9 @@ async function readFileList(filePath) {
   try {
     const raw = await api.fs.readFile(filePath, 'utf8');
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed?.snapshots) ? parsed.snapshots : [];
+    if (Array.isArray(parsed?.snapshots)) return parsed.snapshots;
+    if (Array.isArray(parsed?.recent)) return parsed.recent;
+    return [];
   } catch {
     return null;
   }
@@ -68,7 +70,7 @@ async function writeFileList(filePath, payload) {
 async function fileFor(resolved) {
   const api = await getFsApi();
   if (!api) return null;
-  return api.path.join(process.cwd(), BASE_DIR, `${resolved.key}.json`);
+  return api.path.join(process.cwd(), BASE_DIR, resolved.fileName);
 }
 
 function sortByTs(snapshots) {

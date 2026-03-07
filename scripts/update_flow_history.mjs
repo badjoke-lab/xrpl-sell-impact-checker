@@ -67,10 +67,25 @@ function snapshotFingerprint(snapshot) {
 
 function normalizeRows(rows) {
   if (!Array.isArray(rows)) return [];
-  return rows
+  const sorted = rows
     .filter((row) => row && Number.isFinite(Number(row.ts)))
     .map((row) => ({ ...row, ts: Number(row.ts) }))
     .sort((a, b) => a.ts - b.ts);
+
+  const deduped = [];
+  for (const row of sorted) {
+    const prev = deduped[deduped.length - 1];
+    if (!prev) {
+      deduped.push(row);
+      continue;
+    }
+    const sameTs = Number(prev.ts) === Number(row.ts);
+    const sameFingerprint = snapshotFingerprint(prev) === snapshotFingerprint(row);
+    if (sameTs || sameFingerprint) continue;
+    deduped.push(row);
+  }
+
+  return deduped;
 }
 
 function buildHistoryPayload(preset, window, rows, updatedAt = new Date().toISOString()) {

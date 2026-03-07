@@ -6,6 +6,8 @@ import {
   getHistorySummary,
 } from '../../../shared/flow-alert-history-store.js';
 
+const PRIMARY_HISTORY_WINDOWS = new Set(['1h', '24h', '7d']);
+
 function sanitize(value) {
   return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
 }
@@ -91,8 +93,11 @@ export async function onRequestGet({ request }) {
   const preset = url.searchParams.get('preset') || 'exchanges';
   const window = normalizeWindow(url.searchParams.get('window'));
   const limit = resolveLimit(url.searchParams.get('limit'));
+  const shouldUseRepoHistory = PRIMARY_HISTORY_WINDOWS.has(window);
 
-  const staticHistory = await readStaticHistory(request, preset, window, limit);
+  const staticHistory = shouldUseRepoHistory
+    ? await readStaticHistory(request, preset, window, limit)
+    : null;
 
   if (staticHistory) {
     const recentNetSeries = staticHistory.recent.map((row) => ({ ts: row.ts, netXrp: row.summary?.netXrp ?? 0 }));
@@ -110,6 +115,7 @@ export async function onRequestGet({ request }) {
       recentEventCountSeries,
       historyMeta: staticHistory.historyMeta,
       source: 'repo-json',
+      historyMode: 'primary',
     });
   }
 
@@ -136,5 +142,6 @@ export async function onRequestGet({ request }) {
     recentEventCountSeries,
     historyMeta,
     source: 'runtime-fallback',
+    historyMode: shouldUseRepoHistory ? 'primary' : 'supplemental-live',
   });
 }
