@@ -114,26 +114,124 @@ function buildSummaryReason(netXrp, events) {
   return `${direction}; top flow: ${leader.reason}`;
 }
 
+function describeEntity(entity) {
+  if (!entity) return 'unknown';
+  return `${entity.label} [${entity.type}/${entity.tag}]`;
+}
+
+function buildLabelSource(presetId, fromEntity, toEntity) {
+  const sources = [`preset:${presetId}`];
+  if (fromEntity) sources.push(`from:${describeEntity(fromEntity)}`);
+  if (toEntity) sources.push(`to:${describeEntity(toEntity)}`);
+  return sources.join(' | ');
+}
+
 function classifyTx({ tx, amountXrp, preset, entityMap, whaleThreshold }) {
   const fromEntity = entityMap.get(tx.Account);
   const toEntity = entityMap.get(tx.Destination);
   const fromExchange = fromEntity?.type === 'exchange';
   const toExchange = toEntity?.type === 'exchange';
+  const fromRipple = fromEntity?.type === 'ripple';
+  const toRipple = toEntity?.type === 'ripple';
 
   const isWhalePreset = preset.id === 'whales';
+  const isRipplePreset = preset.id === 'ripple';
   const meetsWhale = amountXrp >= whaleThreshold;
 
+  if (isRipplePreset) {
+    const labelSource = buildLabelSource(preset.id, fromEntity, toEntity);
+    if (fromRipple && toExchange) {
+      return {
+        dir: 'IN',
+        label: toEntity.label,
+        reason: `ripple-related source (${fromEntity.label}) to exchange (${toEntity.label}) → distribution/sell-side candidate`,
+        labelSource,
+        scoreCap: 'HIGH',
+        include: true,
+      };
+    }
+    if (fromExchange && toRipple) {
+      return {
+        dir: 'OUT',
+        label: fromEntity.label,
+        reason: `exchange (${fromEntity.label}) to ripple-related destination (${toEntity.label}) → treasury/escrow return candidate`,
+        labelSource,
+        scoreCap: 'MED',
+        include: true,
+      };
+    }
+    if (fromRipple && toRipple) {
+      return {
+        dir: 'XFER',
+        label: toEntity.label,
+        reason: `ripple-to-ripple transfer (${fromEntity.label} → ${toEntity.label}) → treasury/escrow internal movement candidate`,
+        labelSource,
+        scoreCap: 'LOW',
+        include: true,
+      };
+    }
+    if (toRipple) {
+      return {
+        dir: 'IN',
+        label: toEntity.label,
+        reason: `ripple-related destination matched preset (${toEntity.label}) → treasury/escrow-related movement candidate`,
+        labelSource,
+        scoreCap: 'MED',
+        include: true,
+      };
+    }
+    if (fromRipple) {
+      return {
+        dir: 'OUT',
+        label: fromEntity.label,
+        reason: `ripple-related source matched preset (${fromEntity.label}) → treasury/escrow-related outflow candidate`,
+        labelSource,
+        scoreCap: 'MED',
+        include: true,
+      };
+    }
+    return { include: false };
+  }
+
   if (toExchange && fromExchange) {
-    return { dir: 'XFER', label: toEntity.label, reason: `exchange-to-exchange transfer (${fromEntity.label} → ${toEntity.label}) → internal movement candidate`, labelSource: `matched preset: ${fromEntity.label}, ${toEntity.label}`, scoreCap: 'MED', include: true };
+    return {
+      dir: 'XFER',
+      label: toEntity.label,
+      reason: `exchange-to-exchange transfer (${fromEntity.label} → ${toEntity.label}) → internal movement candidate`,
+      labelSource: buildLabelSource(preset.id, fromEntity, toEntity),
+      scoreCap: 'LOW',
+      include: true,
+    };
   }
   if (toExchange) {
-    return { dir: 'IN', label: toEntity.label, reason: `to exchange address (${toEntity.label}) → potential sell pressure`, labelSource: `matched preset: ${toEntity.label}`, scoreCap: 'HIGH', include: true };
+    return {
+      dir: 'IN',
+      label: toEntity.label,
+      reason: `to exchange address (${toEntity.label}) → potential sell pressure`,
+      labelSource: buildLabelSource(preset.id, fromEntity, toEntity),
+      scoreCap: 'HIGH',
+      include: true,
+    };
   }
   if (fromExchange) {
-    return { dir: 'OUT', label: fromEntity.label, reason: `from exchange address (${fromEntity.label}) → potential withdrawal`, labelSource: `matched preset: ${fromEntity.label}`, scoreCap: 'HIGH', include: true };
+    return {
+      dir: 'OUT',
+      label: fromEntity.label,
+      reason: `from exchange address (${fromEntity.label}) → potential withdrawal`,
+      labelSource: buildLabelSource(preset.id, fromEntity, toEntity),
+      scoreCap: 'MED',
+      include: true,
+    };
   }
   if (isWhalePreset && meetsWhale) {
-    return { dir: 'XFER', label: 'Whale', reason: `large transfer (${Math.round(amountXrp).toLocaleString()} XRP) above whale threshold`, labelSource: 'matched preset rule: whale threshold', scoreCap: 'HIGH', include: true };
+    return {
+      dir: 'XFER',
+      label: 'Whale',
+      reason: `large transfer (${Math.round(amountXrp).toLocaleString()} XRP) above whale threshold (${Math.round(whaleThreshold).toLocaleString()} XRP)`,
+      labelSource: `preset:whales | rule:minAmountXrp>=${Math.round(whaleThreshold).toLocaleString()}`,
+      scoreCap: 'HIGH',
+      include: true,
+    };
   }
   return { include: false };
 }
