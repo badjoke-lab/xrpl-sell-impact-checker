@@ -69,6 +69,14 @@
         recentCount: document.getElementById('flowHistoryRecentCount'),
         lastEvent: document.getElementById('flowHistoryLastEvent'),
       },
+      historyStrip: {
+        root: document.querySelector('[data-flow-history-strip]'),
+        netSvg: document.querySelector('[data-flow-history="net-svg"]'),
+        netCompare: document.querySelector('[data-flow-history="net-compare"]'),
+        matchedBars: document.querySelector('[data-flow-history="matched-bars"]'),
+        matchedCompare: document.querySelector('[data-flow-history="matched-compare"]'),
+        status: document.querySelector('[data-flow-history="status"]'),
+      },
     };
 
     if (!refs.canvas || !refs.canvasWrap) return;
@@ -169,6 +177,7 @@
       renderHeatmap(refs, state);
       renderEscrow(refs, state);
       renderHistory(refs, state);
+      renderHistoryStrip(refs, state);
       return;
     }
 
@@ -179,6 +188,7 @@
       renderHeatmap(refs, state);
       renderEscrow(refs, state);
       renderHistory(refs, state);
+      renderHistoryStrip(refs, state);
     } else {
       renderPanels(refs, state);
     }
@@ -207,10 +217,12 @@
       renderEvents(refs, state);
       renderEscrow(refs, state);
       renderHistory(refs, state);
+      renderHistoryStrip(refs, state);
     } finally {
       state.isFetching = false;
       renderPanels(refs, state);
       renderHistory(refs, state);
+      renderHistoryStrip(refs, state);
     }
   }
 
@@ -478,6 +490,106 @@
     safeText(refs.history.recentCount, `${history.historyMeta?.count ?? history.recent?.length ?? 0}`);
     const lastEvent = history.latest?.latestEvent || findLastDetectedEvent(state);
     safeText(refs.history.lastEvent, buildLastEventLine(lastEvent));
+  }
+
+  function renderHistoryStrip(refs, state) {
+    const strip = refs.historyStrip;
+    if (!strip?.root) return;
+    const series = buildHistorySeries(state.historyPayload);
+
+    if (!series.hasHistory) {
+      strip.root.hidden = true;
+      return;
+    }
+
+    strip.root.hidden = false;
+    const canDraw = series.points.length > 1;
+    if (!canDraw) {
+      strip.status.hidden = false;
+      safeText(strip.status, 'History building…');
+      if (strip.netSvg) strip.netSvg.innerHTML = '';
+      if (strip.matchedBars) strip.matchedBars.innerHTML = '';
+      safeText(strip.netCompare, 'latest vs oldest: —');
+      safeText(strip.matchedCompare, 'latest vs oldest: —');
+      return;
+    }
+
+    strip.status.hidden = true;
+    drawNetSparkline(strip.netSvg, series.net);
+    drawMatchedBars(strip.matchedBars, series.matched);
+
+    const latestNet = series.net.at(-1);
+    const oldestNet = series.net[0];
+    safeText(strip.netCompare, `latest vs oldest: ${formatSignedCompactXrp(latestNet)} vs ${formatSignedCompactXrp(oldestNet)}`);
+
+    const latestMatched = series.matched.at(-1);
+    const oldestMatched = series.matched[0];
+    safeText(strip.matchedCompare, `latest vs oldest: ${latestMatched} vs ${oldestMatched}`);
+  }
+
+  function buildHistorySeries(historyPayload) {
+    const snapshots = Array.isArray(historyPayload?.recent) ? historyPayload.recent : [];
+    const points = snapshots
+      .filter((row) => row && Number.isFinite(Date.parse(row.ts || '')))
+      .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+
+    const net = points.map((row) => {
+      const value = Number(row?.summary?.netXrp);
+      return Number.isFinite(value) ? value : 0;
+    });
+    const matched = points.map((row) => {
+      const value = Number(row?.metrics?.matchedEvents);
+      return Number.isFinite(value) ? Math.max(0, value) : 0;
+    });
+
+    return { hasHistory: snapshots.length > 0, points, net, matched };
+  }
+
+  function drawNetSparkline(svgNode, values) {
+    if (!svgNode) return;
+    if (!Array.isArray(values) || values.length < 2) {
+      svgNode.innerHTML = '';
+      return;
+    }
+
+    const width = 100;
+    const height = 28;
+    const padding = 2;
+    const min = Math.min(...values, 0);
+    const max = Math.max(...values, 0);
+    const span = Math.max(max - min, 1);
+    const xFor = (i) => (values.length === 1 ? width / 2 : (i / (values.length - 1)) * width);
+    const yFor = (v) => {
+      const ratio = (v - min) / span;
+      return (height - padding) - (ratio * (height - padding * 2));
+    };
+
+    const zeroY = yFor(0);
+    const path = values.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(2)} ${yFor(v).toFixed(2)}`).join(' ');
+    const latest = values.at(-1);
+
+    svgNode.innerHTML = `
+      <line x1="0" y1="${zeroY.toFixed(2)}" x2="100" y2="${zeroY.toFixed(2)}" class="flow-history-zero" />
+      <path d="${path}" class="flow-history-net ${latest >= 0 ? 'is-pos' : 'is-neg'}" />
+      <circle cx="100" cy="${yFor(latest).toFixed(2)}" r="1.7" class="flow-history-dot ${latest >= 0 ? 'is-pos' : 'is-neg'}" />
+    `;
+  }
+
+  function drawMatchedBars(container, values) {
+    if (!container) return;
+    if (!Array.isArray(values) || values.length < 2) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const max = Math.max(...values, 0);
+    container.innerHTML = values.map((value, index) => {
+      const ratio = max > 0 ? value / max : 0;
+      const minRatio = value > 0 ? 0.18 : 0.06;
+      const heightRatio = Math.max(minRatio, ratio);
+      const latestClass = index === values.length - 1 ? 'is-latest' : '';
+      return `<span class="flow-history-bar ${latestClass}" style="--bar-h:${heightRatio.toFixed(4)}" title="${value}"></span>`;
+    }).join('');
   }
 
   function buildEscrowSummaryNote(escrowPayload) {
