@@ -1,5 +1,43 @@
 {
   "latest": {
+    "ts": 1772988334825,
+    "preset": "exchanges",
+    "window": "1h",
+    "source": "xrpl:rpc",
+    "stale": true,
+    "staleReason": "cached",
+    "summary": {
+      "inflowXrp": 6135.125477999999,
+      "outflowXrp": 0,
+      "netXrp": 6135.125477999999,
+      "inflowUsd": null,
+      "outflowUsd": null,
+      "netUsd": null
+    },
+    "metrics": {
+      "paymentsScanned": 696,
+      "ledgersScanned": 24,
+      "matchedEvents": 0,
+      "rpcCalls": 85
+    },
+    "latestEvent": null,
+    "escrow": {
+      "nextAmountXrp": null,
+      "recentCount": 0,
+      "stats": {
+        "sumXrp": 0,
+        "count": 0,
+        "avgXrp": 0,
+        "maxXrp": 0
+      }
+    },
+    "debugSummary": {
+      "strategy": "1h_baseline_none",
+      "degradeLevel": "none",
+      "warningCount": 61
+    }
+  },
+  "previous": {
     "ts": 1772984230180,
     "preset": "exchanges",
     "window": "1h",
@@ -35,44 +73,6 @@
       "strategy": "1h_baseline_A",
       "degradeLevel": "A",
       "warningCount": 64
-    }
-  },
-  "previous": {
-    "ts": 1772980924434,
-    "preset": "exchanges",
-    "window": "1h",
-    "source": "xrpl:rpc",
-    "stale": false,
-    "staleReason": null,
-    "summary": {
-      "inflowXrp": 0,
-      "outflowXrp": 0,
-      "netXrp": 0,
-      "inflowUsd": null,
-      "outflowUsd": null,
-      "netUsd": null
-    },
-    "metrics": {
-      "paymentsScanned": 92,
-      "ledgersScanned": 6,
-      "matchedEvents": 0,
-      "rpcCalls": 110
-    },
-    "latestEvent": null,
-    "escrow": {
-      "nextAmountXrp": null,
-      "recentCount": 0,
-      "stats": {
-        "sumXrp": 0,
-        "count": 0,
-        "avgXrp": 0,
-        "maxXrp": 0
-      }
-    },
-    "debugSummary": {
-      "strategy": "1h_baseline_A",
-      "degradeLevel": "A",
-      "warningCount": 59
     }
   },
   "recent": [
@@ -1139,20 +1139,58 @@
         "degradeLevel": "A",
         "warningCount": 64
       }
+    },
+    {
+      "ts": 1772988334825,
+      "preset": "exchanges",
+      "window": "1h",
+      "source": "xrpl:rpc",
+      "stale": true,
+      "staleReason": "cached",
+      "summary": {
+        "inflowXrp": 6135.125477999999,
+        "outflowXrp": 0,
+        "netXrp": 6135.125477999999,
+        "inflowUsd": null,
+        "outflowUsd": null,
+        "netUsd": null
+      },
+      "metrics": {
+        "paymentsScanned": 696,
+        "ledgersScanned": 24,
+        "matchedEvents": 0,
+        "rpcCalls": 85
+      },
+      "latestEvent": null,
+      "escrow": {
+        "nextAmountXrp": null,
+        "recentCount": 0,
+        "stats": {
+          "sumXrp": 0,
+          "count": 0,
+          "avgXrp": 0,
+          "maxXrp": 0
+        }
+      },
+      "debugSummary": {
+        "strategy": "1h_baseline_none",
+        "degradeLevel": "none",
+        "warningCount": 61
+      }
     }
   ],
   "deltaSummary": {
-    "inflowXrpDelta": 0,
+    "inflowXrpDelta": 6135.125477999999,
     "outflowXrpDelta": 0,
-    "netXrpDelta": 0,
+    "netXrpDelta": 6135.125477999999,
     "matchedEventsDelta": 0
   },
   "historyMeta": {
-    "count": 28,
+    "count": 29,
     "oldestTs": 1772846510875,
-    "newestTs": 1772984230180,
+    "newestTs": 1772988334825,
     "preset": "exchanges",
     "window": "1h",
-    "updatedAt": "2026-03-08T15:37:10.222Z"
+    "updatedAt": "2026-03-08T16:45:34.871Z"
   }
 }
