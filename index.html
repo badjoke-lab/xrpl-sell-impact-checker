@@ -6,47 +6,73 @@
     <title>XSIC — XRPL Signal & Insight Console</title>
     <meta
       name="description"
-      content="XSIC Console entrance for XRPL Sell Impact, Liquidity Pulse, Flow Alert, and Exposure Graph apps."
+      content="XSIC home for XRPL sell impact, liquidity pulse, flow alert, and exposure graph tools."
     />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="icon" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
   </head>
-  <body data-nav-key="console">
+  <body data-nav-key="home">
     <div class="app page console-page">
       <header class="app__header global-header">
         <div class="app__header-top">
-          <a href="/" class="brand-link" aria-label="XSIC Console Home">
+          <a href="/" class="brand-link" aria-label="XSIC Home">
             <div class="app__brand">
               <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
               <h1 class="app__title">XSIC</h1>
             </div>
           </a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
           <div data-global-nav></div>
         </div>
       </header>
 
       <main class="page__content">
         <section class="card console-hero">
-          <h2 class="page__title">XRPL Signal &amp; Insight Console</h2>
-          <p class="page__lede">A lightweight entrance to 4 XRPL apps for signal checks, flow tracking, and exposure context.</p>
+          <p class="eyebrow">XRPL toolset</p>
+          <h2 class="page__title">Signal, liquidity, flow, and exposure — in one lightweight XRPL console.</h2>
+          <p class="page__lede">Use XSIC to check sell impact before execution, scan liquidity conditions, monitor exchange and whale flow, and inspect issuer or trustline exposure.</p>
         </section>
 
         <section class="console-layout">
           <section class="card" aria-labelledby="apps-heading">
-            <h3 id="apps-heading">Apps</h3>
+            <div class="card__header">
+              <div>
+                <p class="eyebrow">Direct access</p>
+                <h3 id="apps-heading">Apps</h3>
+              </div>
+            </div>
             <div class="apps-grid">
-              <article class="app-card"><h4>Sell Impact</h4><p>Estimate DEX/AMM impact before execution.</p><a class="secondary-button" href="/apps/sell-impact/">Open</a></article>
-              <article class="app-card"><h4>Liquidity Pulse</h4><p>AMM/DEX liquidity pulse at a glance.</p><a class="secondary-button" href="/apps/liquidity-pulse/">Open</a></article>
-              <article class="app-card"><h4>Flow Alert</h4><p>Monitor exchange and whale flows.</p><a class="secondary-button" href="/apps/flow-alert/">Open</a></article>
-              <article class="app-card"><h4>Exposure Graph</h4><p>View issuer and trustline exposure.</p><a class="secondary-button" href="/apps/exposure-graph/">Open</a></article>
+              <article class="app-card">
+                <h4>Sell Impact</h4>
+                <p>Estimate expected DEX / AMM execution impact before selling.</p>
+                <a class="secondary-button" href="/apps/sell-impact/">Open</a>
+              </article>
+              <article class="app-card">
+                <h4>Liquidity Pulse</h4>
+                <p>Check liquidity conditions across tracked XRPL markets at a glance.</p>
+                <a class="secondary-button" href="/apps/liquidity-pulse/">Open</a>
+              </article>
+              <article class="app-card">
+                <h4>Flow Alert</h4>
+                <p>Track exchange, whale, and labeled flow pressure with context.</p>
+                <a class="secondary-button" href="/apps/flow-alert/">Open</a>
+              </article>
+              <article class="app-card">
+                <h4>Exposure Graph</h4>
+                <p>View issuer and trustline exposure structure for XRPL assets.</p>
+                <a class="secondary-button" href="/apps/exposure-graph/">Open</a>
+              </article>
             </div>
           </section>
 
-          <aside class="card status-card" aria-labelledby="updates-heading" data-status-strip="health">
-            <h3 id="updates-heading">Updates</h3>
+          <aside class="card status-card" aria-labelledby="status-heading" data-status-strip="health">
+            <div class="card__header">
+              <div>
+                <p class="eyebrow">Site health</p>
+                <h3 id="status-heading">Status</h3>
+              </div>
+            </div>
             <p><strong>API:</strong> <span data-health="status">OK / stale / down</span></p>
             <p><strong>Last refresh:</strong> <span data-health="last-refresh">—</span></p>
             <details>
@@ -55,18 +81,20 @@
             </details>
           </aside>
         </section>
-        <section class="card" aria-label="Shared UI state mount"><div class="ui-mount" data-ui-mount="console"></div></section>
+
+        <section class="card" aria-labelledby="about-xsic-heading">
+          <div class="card__header">
+            <div>
+              <p class="eyebrow">About</p>
+              <h3 id="about-xsic-heading">What XSIC is</h3>
+            </div>
+          </div>
+          <p class="page__lede">XSIC is a lightweight set of XRPL analysis tools. It is for signal support and market context, not investment advice.</p>
+        </section>
       </main>
       <div data-global-footer></div>
     </div>
-    <script src="/shared/ui-kit.js"></script>
     <script src="/shared/nav.js"></script>
     <script src="/shared/status.js"></script>
-    <script>
-      window.XSICUiKit?.renderEmptyState('[data-ui-mount="console"]', {
-        title: 'Ready for shared states',
-        body: 'Console can now reuse loading/error/empty components across apps.',
-      });
-    </script>
   </body>
 </html>
