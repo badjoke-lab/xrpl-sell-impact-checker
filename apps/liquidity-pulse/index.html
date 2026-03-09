@@ -24,21 +24,16 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
           <div data-global-nav></div>
         </div>
-        <p class="app__catchcopy">XRPL Signal & Insight Console · Apps</p>
       </header>
 
-      <main class="page__content page-shell liquidity-pulse" aria-live="polite">
-        <section class="page-shell__hero">
-          <p class="eyebrow">App suite</p>
-          <h2 class="page__title page-shell__title">Liquidity Pulse</h2>
-          <p class="page__lede page-shell__note">Real AMM snapshots when Functions are available; automatic demo fallback for static hosting.</p>
-        </section>
-
-        <section class="card card--dense">
+      <main class="page__content liquidity-pulse" aria-live="polite">
+        <section class="card">
+          <h2 class="page__title">Liquidity Pulse</h2>
+          <p class="page__lede">Real AMM snapshots when Functions are available; automatic demo fallback for static hosting.</p>
           <noscript>
-            <p class="state-banner state-banner--error">JavaScript is disabled. Live liquidity pulse updates are unavailable, but the page structure is still visible.</p>
+            <p style="margin:8px 0 0;color:#b91c1c;">JavaScript is disabled. Live liquidity pulse updates are unavailable, but the page structure is still visible.</p>
           </noscript>
-          <div id="lpActions" class="flow-toolbar">
+          <div id="lpActions" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
             <label><input id="lite-mode-toggle" type="checkbox" /> Lite mode</label>
             <label><input id="demo-mode-toggle" type="checkbox" /> Demo only</label>
             <button id="retry-button" class="secondary-button" type="button">Retry</button>
@@ -47,24 +42,15 @@
           </div>
         </section>
 
-        <section id="lpCanvasWrap" class="card flow-canvas-wrap">
-          <div class="section-heading">
-            <p class="eyebrow">Main view</p>
-            <h3>Pulse canvas</h3>
-            <p class="section-note">Near-real-time liquidity movement view for the selected pool.</p>
-          </div>
-          <canvas id="lpCanvas" class="lp-canvas mono-value"></canvas>
-          <div data-state-overlay="loading" class="flow-overlay">Loading snapshot…</div>
-          <div data-state-overlay="error" class="flow-overlay" hidden>Could not load live snapshot. Toggle Demo only or Retry.</div>
-          <div data-state-overlay="empty" class="flow-overlay" hidden>No liquidity data available for this pool.</div>
+        <section id="lpCanvasWrap" class="card" style="position:relative;overflow:hidden;">
+          <canvas id="lpCanvas" style="width:100%;height:230px;border-radius:12px;"></canvas>
+          <div data-state-overlay="loading">Loading snapshot…</div>
+          <div data-state-overlay="error" hidden>Could not load live snapshot. Toggle Demo only or Retry.</div>
+          <div data-state-overlay="empty" hidden>No liquidity data available for this pool.</div>
         </section>
 
         <section id="lpSnapshot" class="card">
-          <div class="section-heading">
-            <p class="eyebrow">Snapshot</p>
-            <h3>Latest summary</h3>
-          </div>
-          <dl class="lp-snapshot-grid mono-value">
+          <dl style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;">
             <dt>Pool</dt><dd data-snapshot="pool">—</dd>
             <dt>Price</dt><dd data-snapshot="price">—</dd>
             <dt>Liquidity (USD)</dt><dd data-snapshot="liquidityUsd">—</dd>
@@ -72,23 +58,19 @@
             <dt>Deviation</dt><dd data-snapshot="deviationBps">—</dd>
             <dt>Source</dt><dd data-snapshot="source">—</dd>
           </dl>
-          <p data-snapshot="staleNote" class="state-banner state-banner--notice" hidden>Data may be delayed.</p>
+          <p data-snapshot="staleNote" style="margin:8px 0 0;font-size:.85rem;color:#475569;" hidden>Data may be delayed.</p>
         </section>
 
         <section id="lpTrends" class="card">
-          <div class="section-heading">
-            <p class="eyebrow">History</p>
-            <h3>Pulse trend</h3>
-            <p class="section-note">Relative pulse from 1h, 6h, and 24h windows.</p>
-          </div>
-          <div class="flow-trend-bars">
-            <div data-trend="1h"></div>
-            <div data-trend="6h"></div>
-            <div data-trend="24h"></div>
+          <h3>Pulse trend</h3>
+          <div style="display:flex;gap:12px;height:120px;align-items:flex-end;">
+            <div style="flex:1;background:#dbeafe;border-radius:8px 8px 0 0;height:12%;" data-trend="1h"></div>
+            <div style="flex:1;background:#93c5fd;border-radius:8px 8px 0 0;height:12%;" data-trend="6h"></div>
+            <div style="flex:1;background:#60a5fa;border-radius:8px 8px 0 0;height:12%;" data-trend="24h"></div>
           </div>
         </section>
 
-        <section id="lpStatus" class="card info-block mono-value">
+        <section id="lpStatus" class="card" style="font-size:.9rem;color:#334155;">
           Status: waiting for initialization…
         </section>
       </main>
