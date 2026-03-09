@@ -1,15 +1,9 @@
 (function () {
   const LINKS = [
-    { key: 'console', label: 'Console', href: '/' },
+    { key: 'home', label: 'Home', href: '/' },
     { key: 'apps', label: 'Apps', href: '/apps/' },
     { key: 'docs', label: 'Docs', href: '/methods/' },
     { key: 'donate', label: 'Donate', href: '/donate/' },
-    {
-      key: 'contact',
-      label: 'Contact',
-      href: 'https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC',
-      target: '_blank',
-    },
   ];
 
   const activeKey = document.body?.dataset.navKey;
@@ -27,10 +21,6 @@
       link.href = item.href;
       link.textContent = item.label;
       link.dataset.navItem = item.key;
-      if (item.target) {
-        link.target = item.target;
-        link.rel = 'noopener';
-      }
       if (activeKey && activeKey === item.key) {
         link.classList.add('is-active');
         link.setAttribute('aria-current', 'page');
@@ -65,23 +55,5 @@
           <a href="/donate/">Donate</a>
         </nav>
       </footer>`;
-  }
-
-  const liteToggle = document.querySelector('[data-lite-mode-toggle]');
-  if (liteToggle && window.XSICUiKit) {
-    const renderToggle = () => {
-      const on = window.XSICUiKit.getLiteMode();
-      liteToggle.textContent = on ? 'Lite mode: ON' : 'Lite mode: OFF';
-      liteToggle.setAttribute('aria-pressed', String(on));
-    };
-
-    liteToggle.addEventListener('click', () => {
-      const next = !window.XSICUiKit.getLiteMode();
-      window.XSICUiKit.setLiteMode(next);
-      renderToggle();
-    });
-
-    window.addEventListener('xsic:lite-mode-change', renderToggle);
-    renderToggle();
   }
 })();
