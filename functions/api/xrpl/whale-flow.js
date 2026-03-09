@@ -9,6 +9,29 @@ const FLOW_CACHE_TTL_MS = 45_000;
 const PRICE_CACHE_TTL_MS = 5 * 60_000;
 const MIN_RPC_GRACE_MS = 1_200;
 
+const XRP_USD_PRICE_SOURCES = {
+  primary: {
+    name: 'coingecko',
+    url: 'https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd',
+    parse: (payload) => Number(payload?.ripple?.usd),
+  },
+  fallbacks: [
+    {
+      name: 'binance',
+      url: 'https://api.binance.com/api/v3/ticker/price?symbol=XRPUSDT',
+      parse: (payload) => Number(payload?.price),
+    },
+    {
+      name: 'kraken',
+      url: 'https://api.kraken.com/0/public/Ticker?pair=XRPUSD',
+      parse: (payload) => {
+        const firstPair = Object.values(payload?.result || {})[0];
+        return Number(firstPair?.c?.[0]);
+      },
+    },
+  ],
+};
+
 const WINDOW_STRATEGIES = {
   '5m': { name: '5m_assist', maxLedgers: 18, bucketCount: 8, eventLimit: 10, timeoutBudget: 3_200, sampled: false, sampleStride: 1 },
   '1h': { name: '1h_baseline', maxLedgers: 84, bucketCount: 16, eventLimit: 30, timeoutBudget: 6_500, sampled: false, sampleStride: 1 },
@@ -316,18 +339,39 @@ async function fetchXrpUsd(debug, skipPrice = false) {
   }
   const now = Date.now();
   if (priceCache.fetchedAt && now - priceCache.fetchedAt <= PRICE_CACHE_TTL_MS) return priceCache.value;
+  const fetchPriceFromSource = async (source) => {
+    const response = await fetch(source.url, { headers: { accept: 'application/json' } });
+    if (!response.ok) throw new Error(`${source.name}_http_${response.status}`);
+    const price = source.parse(await response.json());
+    if (!Number.isFinite(price) || price <= 0) throw new Error(`${source.name}_invalid_price`);
+    return price;
+  };
+
+  let primaryError = null;
   try {
-    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd', { headers: { accept: 'application/json' } });
-    if (!response.ok) throw new Error(`coingecko_http_${response.status}`);
-    const price = Number((await response.json())?.ripple?.usd);
-    if (!Number.isFinite(price) || price <= 0) throw new Error('coingecko_invalid_price');
+    const price = await fetchPriceFromSource(XRP_USD_PRICE_SOURCES.primary);
     priceCache.value = price;
     priceCache.fetchedAt = now;
     return price;
   } catch (error) {
-    debug.warnings.push(`price_unavailable:${error instanceof Error ? error.message : 'unknown'}`);
-    return null;
+    primaryError = error instanceof Error ? error.message : 'unknown';
+    debug.warnings.push(`price_primary_failed:${primaryError}`);
   }
+
+  for (const source of XRP_USD_PRICE_SOURCES.fallbacks) {
+    try {
+      const price = await fetchPriceFromSource(source);
+      priceCache.value = price;
+      priceCache.fetchedAt = now;
+      debug.warnings.push(`price_fallback_used:${source.name}`);
+      return price;
+    } catch (error) {
+      debug.warnings.push(`price_fallback_failed:${error instanceof Error ? error.message : 'unknown'}`);
+    }
+  }
+
+  debug.warnings.push(`price_unavailable:${primaryError || 'all_sources_failed'}`);
+  return null;
 }
 
 function aggregateBuckets(rawBuckets, startLedger, endLedger, bucketCount) {
