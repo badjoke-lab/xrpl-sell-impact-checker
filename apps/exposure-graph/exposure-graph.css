@@ -22,6 +22,20 @@
 .exposure-graph-page .eg-pill { width: fit-content; padding: 4px 10px; border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary-ink); font-size: 12px; font-weight: 700; }
 .exposure-graph-page .eg-hero-value { font-size: clamp(1.3rem,3vw,1.8rem); font-weight: 740; letter-spacing: -0.03em; }
 .exposure-graph-page .eg-meta { color: var(--color-text-soft); font-size: 13px; margin: 0; }
+
+.exposure-graph-page .eg-overall-card { padding: 14px; display: grid; gap: 10px; border: 1px solid var(--color-border); }
+.exposure-graph-page .eg-overall-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.exposure-graph-page .eg-overall-status-wrap { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.exposure-graph-page .eg-status-chip { border-radius: 999px; padding: 4px 10px; font-weight: 700; font-size: 12px; }
+.exposure-graph-page .eg-status-chip--low { background: rgba(16,185,129,.14); color: #047857; }
+.exposure-graph-page .eg-status-chip--medium { background: rgba(245,158,11,.16); color: #b45309; }
+.exposure-graph-page .eg-status-chip--high { background: rgba(220,38,38,.14); color: #b91c1c; }
+.exposure-graph-page .eg-status-chip--unknown { background: rgba(107,114,128,.16); color: #4b5563; }
+.exposure-graph-page .eg-badge { border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; background: var(--color-surface-soft); color: var(--color-text-soft); text-transform: lowercase; }
+.exposure-graph-page .eg-overall-foot { display: grid; gap: 6px; }
+.exposure-graph-page .eg-legend { margin-top: 10px; border-top: 1px solid var(--color-border); padding-top: 10px; }
+.exposure-graph-page .eg-legend-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.exposure-graph-page .eg-legend-grid strong { font-size: 12px; }
 .exposure-graph-page .eg-metrics-grid { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0,1fr)); }
 .exposure-graph-page .eg-metric-card { padding: 14px; }
 .exposure-graph-page .eg-metric-label { font-size: 12px; color: var(--color-text-soft); }
@@ -70,6 +84,7 @@
   .exposure-graph-page .eg-signal-card,
   .exposure-graph-page .eg-metrics-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .exposure-graph-page .eg-panel-grid { grid-template-columns: 1fr; }
+  .exposure-graph-page .eg-legend-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -82,5 +97,6 @@
   .exposure-graph-page .eg-list-card,
   .exposure-graph-page .eg-mainviz-card { padding: 12px; }
   .exposure-graph-page .eg-watch-row { font-size: 12px; }
+  .exposure-graph-page .eg-overall-head { flex-direction: column; }
   .exposure-graph-page .eg-evidence-item > header { align-items: flex-start; flex-direction: column; }
 }

@@ -66,6 +66,8 @@
 
         <section class="eg-metrics-grid" id="egMetricsGrid"></section>
 
+        <section class="card eg-overall-card" id="egOverallSummary"></section>
+
         <section class="card eg-tabs-card">
           <div class="eg-tabs" role="tablist" aria-label="Exposure Graph views">
             <button id="egTabExposure" class="eg-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="egPanelExposure" data-eg-tab-target="egPanelExposure">Exposure</button>
@@ -82,6 +84,7 @@
                 <span class="eg-context-chip">issuer centered / live bounded svg</span>
               </div>
               <div id="egGraphMount" class="eg-svg-wrap"></div>
+              <div id="egLegendMount" class="eg-legend"></div>
             </section>
 
             <aside class="eg-side-stack">
