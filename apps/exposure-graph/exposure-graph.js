@@ -7,12 +7,19 @@
   const XRPL_PROXY_ENDPOINT = '/api/xrpl';
   const XRPL_RPC_ENDPOINTS = ['https://xrplcluster.com/', 'https://s1.ripple.com:51234/'];
   const MAX_VISIBLE_COUNTERPARTIES = 8;
+  const URL_ISSUER_KEY = 'issuer';
+  const ISSUER_PRESETS = [
+    { label: 'Bitstamp', issuer: 'rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B' },
+    { label: 'GateHub', issuer: 'rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq' },
+    { label: 'Ripple', issuer: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh' },
+  ];
 
   const state = {
     mode: 'ok',
     selectedNodeId: 'issuer',
     activeTab: 'egPanelExposure',
     issuer: 'rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq',
+    refreshSeq: 0,
     risk: { status: 'idle', error: null, flags: null, accountFlags: null, source: null },
     exposure: { status: 'idle', error: null, model: null, source: null },
   };
@@ -20,6 +27,7 @@
   function boot() {
     const refs = {
       issuerInput: document.getElementById('egIssuerInput'),
+      presets: document.getElementById('egPresets'),
       signalCard: document.getElementById('egSignalCard'),
       metricsGrid: document.getElementById('egMetricsGrid'),
       graphMount: document.getElementById('egGraphMount'),
@@ -38,7 +46,10 @@
       refreshBtn: document.getElementById('egRefreshBtn'),
     };
 
+    state.issuer = getIssuerFromUrl() || state.issuer;
     refs.issuerInput.value = state.issuer;
+    hydratePresets(refs);
+
     refs.tabs.forEach((tab) => tab.addEventListener('click', () => setActiveTab(refs, tab.dataset.egTabTarget)));
     refs.debugButtons.forEach((button) => button.addEventListener('click', async () => {
       state.mode = button.dataset.egForce;
@@ -52,14 +63,49 @@
 
     const triggerRefresh = async () => {
       state.issuer = refs.issuerInput.value.trim();
+      syncIssuerToUrl(state.issuer);
       await refreshAllData(refs);
       render(refs);
     };
 
     refs.refreshBtn?.addEventListener('click', triggerRefresh);
     refs.issuerInput?.addEventListener('change', triggerRefresh);
+    refs.issuerInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        triggerRefresh();
+      }
+    });
 
     refreshAllData(refs).finally(() => render(refs));
+  }
+
+  function hydratePresets(refs) {
+    if (!refs.presets) return;
+    refs.presets.innerHTML = ISSUER_PRESETS.map((preset) => `<button type="button" class="eg-preset" data-eg-preset="${preset.issuer}">${preset.label}</button>`).join('');
+    refs.presets.querySelectorAll('[data-eg-preset]').forEach((button) => button.addEventListener('click', async () => {
+      state.mode = 'ok';
+      state.issuer = button.dataset.egPreset;
+      refs.issuerInput.value = state.issuer;
+      syncIssuerToUrl(state.issuer);
+      await refreshAllData(refs);
+      render(refs);
+    }));
+  }
+
+  function getIssuerFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(URL_ISSUER_KEY)?.trim() || '';
+  }
+
+  function syncIssuerToUrl(issuer) {
+    const url = new URL(window.location.href);
+    if (!issuer) {
+      url.searchParams.delete(URL_ISSUER_KEY);
+    } else {
+      url.searchParams.set(URL_ISSUER_KEY, issuer);
+    }
+    window.history.replaceState({}, '', url);
   }
 
   function setActiveTab(refs, targetId) {
@@ -90,6 +136,7 @@
   }
 
   async function refreshAllData(refs) {
+    const seq = ++state.refreshSeq;
     if (state.mode !== 'ok') {
       applyForcedMode();
       return;
@@ -109,6 +156,8 @@
       fetchIssuerRisk(state.issuer),
       fetchIssuerExposure(state.issuer),
     ]);
+
+    if (seq !== state.refreshSeq) return;
 
     if (riskResult.status === 'fulfilled') {
       const { flags, accountFlags, source } = riskResult.value;
@@ -141,12 +190,12 @@
     });
 
     if (!response.ok) {
-      throw new Error('Exposure fetch failed at XRPL proxy.');
+      throw new Error('Exposure fetch failed at XSIC XRPL proxy.');
     }
 
     const json = await response.json();
-    const lines = json?.result?.result?.lines || json?.result?.lines || [];
     const source = json?.endpointUsed || XRPL_PROXY_ENDPOINT;
+    const lines = extractAccountLines(json);
 
     if (!Array.isArray(lines)) {
       throw new Error('Exposure data format is invalid.');
@@ -156,6 +205,18 @@
       source,
       model: buildExposureModel(issuer, lines),
     };
+  }
+
+  function extractAccountLines(json) {
+    const candidates = [
+      json?.result?.result?.lines,
+      json?.result?.lines,
+      json?.result?.data?.lines,
+      json?.data?.result?.lines,
+      json?.data?.lines,
+      json?.lines,
+    ];
+    return candidates.find((item) => Array.isArray(item)) || [];
   }
 
   function buildExposureModel(issuer, lines) {
@@ -194,13 +255,11 @@
       },
       ...counterparties.map((party, index) => {
         const angle = (Math.PI * 2 * index) / Math.max(counterparties.length, 1) - Math.PI / 2;
-        const ringX = 250;
-        const ringY = 122;
         return {
           ...party,
           name: party.label,
-          x: 380 + Math.cos(angle) * ringX,
-          y: 194 + Math.sin(angle) * ringY,
+          x: 380 + Math.cos(angle) * 250,
+          y: 194 + Math.sin(angle) * 122,
           r: 9 + Math.min(13, Math.round(party.share * 100)),
         };
       }),
@@ -227,11 +286,9 @@
     for (const endpoint of XRPL_ACCOUNT_INFO_ENDPOINTS) {
       const url = `${endpoint}${encodeURIComponent(issuer)}&ledger_index=validated`;
       const response = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!response.ok) {
-        continue;
-      }
+      if (!response.ok) continue;
       const json = await response.json();
-      const accountData = json?.result?.account_data || json?.account_data || json?.data?.account_data;
+      const accountData = extractAccountInfo(json);
       if (accountData) {
         payload = accountData;
         source = endpoint.split('?')[0];
@@ -246,11 +303,9 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ method: 'account_info', params: [{ account: issuer, ledger_index: 'validated' }] }),
         });
-        if (!rpcRes.ok) {
-          continue;
-        }
+        if (!rpcRes.ok) continue;
         const rpcJson = await rpcRes.json();
-        const rpcAccount = rpcJson?.result?.account_data;
+        const rpcAccount = extractAccountInfo(rpcJson);
         if (rpcAccount) {
           payload = rpcAccount;
           source = rpcUrl;
@@ -276,8 +331,17 @@
     };
   }
 
+  function extractAccountInfo(json) {
+    return json?.result?.account_data
+      || json?.result?.result?.account_data
+      || json?.data?.result?.account_data
+      || json?.data?.account_data
+      || json?.account_data
+      || null;
+  }
+
   function render(refs) {
-    refs.status.textContent = `${state.mode.toUpperCase()} / ${state.exposure.status}`;
+    refs.status.textContent = `${state.mode.toUpperCase()} / ${state.exposure.status} / ${state.risk.status}`;
     refs.updated.textContent = new Date().toLocaleTimeString();
     refs.debugStatus.textContent = `EG_DEBUG · mode=${state.mode} · tab=${state.activeTab} · exposure=${state.exposure.status} · risk=${state.risk.status}`;
 
@@ -289,7 +353,7 @@
 
   function renderExposure(refs) {
     if (state.exposure.status === 'loading') {
-      refs.graphMount.innerHTML = '<div class="eg-empty">Loading live issuer exposure…</div>';
+      refs.graphMount.innerHTML = '<div class="eg-empty">Loading live issuer exposure from validated XRPL ledger…</div>';
       refs.entityDetail.innerHTML = '<p class="eg-meta">Awaiting exposure model.</p>';
       refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration summary will appear after load.</p>';
       refs.watchList.innerHTML = '<p class="eg-meta">Watch / activity panel is waiting for data.</p>';
@@ -297,7 +361,7 @@
     }
 
     if (state.exposure.status === 'no_issuer') {
-      refs.graphMount.innerHTML = '<div class="eg-empty">Enter a valid issuer to build a live exposure graph.</div>';
+      refs.graphMount.innerHTML = '<div class="eg-empty">Enter a valid issuer or use a preset to build a live exposure graph.</div>';
       refs.entityDetail.innerHTML = '<p class="eg-meta">No issuer selected.</p>';
       refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration metrics unavailable.</p>';
       refs.watchList.innerHTML = '<p class="eg-meta">No activity rows without issuer data.</p>';
@@ -306,7 +370,7 @@
 
     if (state.exposure.status === 'error') {
       refs.graphMount.innerHTML = `<div class="eg-error">${state.exposure.error || 'Exposure data unavailable.'}</div>`;
-      refs.entityDetail.innerHTML = '<p class="eg-meta">No selected entity while error is active.</p>';
+      refs.entityDetail.innerHTML = '<p class="eg-meta">The issuer could not be modeled from current API output.</p>';
       refs.concentrationList.innerHTML = '<p class="eg-meta">No concentration data.</p>';
       refs.watchList.innerHTML = '<p class="eg-meta">No watch items.</p>';
       return;
@@ -347,7 +411,7 @@
       <div class="eg-signal-block"><div class="eg-signal-label">Status</div><span class="eg-pill">${concentrationLabel}</span><p class="eg-meta">issuer concentration from live trustlines</p></div>
       <div class="eg-signal-block"><div class="eg-signal-label">Top concentration</div><div class="eg-hero-value">${toPct(topShare)}</div><p class="eg-meta">largest visible counterparty share</p></div>
       <div class="eg-signal-block"><div class="eg-signal-label">Coverage</div><p class="eg-meta">${model ? `${model.counterparties.length} counterparties shown (max ${MAX_VISIBLE_COUNTERPARTIES})` : 'No model loaded'}</p></div>
-      <div class="eg-signal-block"><div class="eg-signal-label">Context</div><p class="eg-meta">Exposure = structure, Risk = issuer controls.</p></div>`;
+      <div class="eg-signal-block"><div class="eg-signal-label">Context</div><p class="eg-meta">Exposure = trustline concentration. Risk = issuer account-control evidence.</p></div>`;
   }
 
   function renderMetrics(mount) {
@@ -432,21 +496,11 @@
   }
 
   function getRiskModel() {
-    if (state.mode === 'empty' || state.risk.status === 'empty') {
-      return buildUnknownRiskModel('No evidence available in empty mode.');
-    }
-    if (state.risk.status === 'invalid') {
-      return buildUnknownRiskModel(state.risk.error);
-    }
-    if (state.mode === 'error' || state.risk.status === 'error') {
-      return buildUnknownRiskModel(state.risk.error || 'Risk data unavailable due to a fetch failure.');
-    }
-    if (state.risk.status === 'loading') {
-      return buildUnknownRiskModel('Loading live issuer account flags from XRPL.');
-    }
-    if (state.risk.status !== 'ready' || !state.risk.flags) {
-      return buildUnknownRiskModel('Risk evidence is unavailable.');
-    }
+    if (state.mode === 'empty' || state.risk.status === 'empty') return buildUnknownRiskModel('No evidence available in empty mode.');
+    if (state.risk.status === 'invalid') return buildUnknownRiskModel(state.risk.error);
+    if (state.mode === 'error' || state.risk.status === 'error') return buildUnknownRiskModel(state.risk.error || 'Risk data unavailable due to a fetch failure.');
+    if (state.risk.status === 'loading') return buildUnknownRiskModel('Loading live issuer account flags from XRPL.');
+    if (state.risk.status !== 'ready' || !state.risk.flags) return buildUnknownRiskModel('Risk evidence is unavailable.');
 
     const entries = Object.entries(state.risk.flags);
     const observedCount = entries.filter(([, v]) => v === 'Observed').length;
@@ -463,7 +517,11 @@
         title: flag,
         status,
         kind: status.toLowerCase().replace(/\s+/g, '-'),
-        note: `This state is ${status.toLowerCase()} from live issuer account flags and may change as the issuer updates controls.`,
+        note: status === 'Observed'
+          ? 'Observed means the issuer flag is set in current account data.'
+          : status === 'Not observed'
+            ? 'Not observed means the flag is not set in current account data.'
+            : 'Unknown means the app cannot confirm this control from current data.',
       })),
     };
   }
