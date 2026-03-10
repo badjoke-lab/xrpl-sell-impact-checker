@@ -4,36 +4,133 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Exposure Graph — XSIC</title>
+    <meta name="description" content="Read issuer exposure concentration and issuer-control risk in one static shell." />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/apps/exposure-graph/exposure-graph.css" />
     <link rel="icon" href="/favicon.png" />
   </head>
   <body data-nav-key="apps">
-    <div class="app page console-page">
+    <div class="app page console-page exposure-graph-page">
       <header class="app__header global-header">
         <div class="app__header-top">
-          <a href="/" class="brand-link"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><h1 class="app__title">XSIC</h1></div></a>
+          <a href="/" class="brand-link" aria-label="Home">
+            <div class="app__brand">
+              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+              <h1 class="app__title">Exposure Graph — XSIC</h1>
+            </div>
+          </a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          
           <div data-global-nav></div>
         </div>
       </header>
-      <main class="page__content">
-        <section class="card">
-          <h2 class="page__title">Exposure Graph</h2>
-          <p class="page__lede">Coming soon. Shared states are ready for this app.</p>
+
+      <main class="page__content eg-shell" aria-live="polite">
+        <section class="eg-hero-head">
+          <p class="eyebrow">Issuer exposure / concentration / issuer risk</p>
+          <h2 class="eg-page-title">Exposure Graph</h2>
+          <p class="eg-page-subtitle">Read one issuer in two ways: <strong>Exposure</strong> for structure and concentration, and <strong>Risk</strong> for issuer controls with evidence.</p>
         </section>
-        <section class="card" aria-label="Shared UI state mount"><div class="ui-mount" data-ui-mount="exposure-graph"></div></section>
+
+        <section class="card eg-controls-card">
+          <div class="eg-controls-grid">
+            <label class="eg-field">Issuer
+              <input type="text" class="eg-control" value="rIssuerDemoXYZ" readonly />
+            </label>
+            <label class="eg-field">Window
+              <select class="eg-control" aria-label="Window" disabled>
+                <option>24h</option>
+              </select>
+            </label>
+            <label class="eg-field">Render mode
+              <select id="egRenderMode" class="eg-control" disabled>
+                <option>Static shell</option>
+              </select>
+            </label>
+            <button type="button" class="eg-button" id="egRefreshBtn">Refresh</button>
+            <div class="eg-status-inline">Status: <strong id="egStatusText">OK</strong></div>
+            <div class="eg-status-inline">Updated: <strong id="egUpdatedText">—</strong></div>
+          </div>
+        </section>
+
+        <section class="card eg-signal-card" id="egSignalCard"></section>
+
+        <section class="eg-metrics-grid" id="egMetricsGrid"></section>
+
+        <section class="card eg-tabs-card">
+          <div class="eg-tabs" role="tablist" aria-label="Exposure Graph views">
+            <button id="egTabExposure" class="eg-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="egPanelExposure" data-eg-tab-target="egPanelExposure">Exposure</button>
+            <button id="egTabRisk" class="eg-tab" type="button" role="tab" aria-selected="false" aria-controls="egPanelRisk" data-eg-tab-target="egPanelRisk">Risk</button>
+          </div>
+          <p class="eg-tab-copy">Flow Alert-aligned shell with split structure and issuer-control views.</p>
+        </section>
+
+        <section id="egPanelExposure" class="eg-tab-panel is-active" role="tabpanel" aria-labelledby="egTabExposure">
+          <section class="eg-panel-grid">
+            <section class="card eg-mainviz-card">
+              <div class="eg-mainviz-head">
+                <h3 class="eg-section-title">Exposure network</h3>
+                <span class="eg-context-chip">issuer centered / static svg</span>
+              </div>
+              <div id="egGraphMount" class="eg-svg-wrap"></div>
+            </section>
+
+            <aside class="eg-side-stack">
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Selected entity</h3>
+                <div id="egEntityDetail"></div>
+              </section>
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Concentration list</h3>
+                <div id="egConcentrationList"></div>
+              </section>
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Watch / activity</h3>
+                <div id="egWatchList"></div>
+              </section>
+            </aside>
+          </section>
+        </section>
+
+        <section id="egPanelRisk" class="eg-tab-panel" role="tabpanel" aria-labelledby="egTabRisk" hidden>
+          <section class="eg-panel-grid eg-panel-grid--risk">
+            <section class="card eg-mainviz-card">
+              <div class="eg-mainviz-head">
+                <h3 class="eg-section-title">Issuer control radar</h3>
+                <span class="eg-context-chip">evidence-backed only</span>
+              </div>
+              <div id="egRadarMount" class="eg-svg-wrap"></div>
+            </section>
+
+            <aside class="eg-side-stack">
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Root cause summary</h3>
+                <div id="egRootCause"></div>
+              </section>
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Evidence list</h3>
+                <div id="egEvidence"></div>
+              </section>
+            </aside>
+          </section>
+        </section>
+
+        <section class="card eg-debug-card">
+          <details>
+            <summary>Debug / force mode</summary>
+            <div class="eg-debug-buttons">
+              <button type="button" class="eg-button eg-button--ghost" data-eg-force="ok">Force ok</button>
+              <button type="button" class="eg-button eg-button--ghost" data-eg-force="empty">Force empty</button>
+              <button type="button" class="eg-button eg-button--ghost" data-eg-force="error">Force error</button>
+            </div>
+            <p class="eg-debug-status" id="egDebugStatus">EG_DEBUG · static shell ready</p>
+          </details>
+        </section>
       </main>
+
       <div data-global-footer></div>
     </div>
-    <script src="/shared/ui-kit.js"></script>
+
     <script src="/shared/nav.js"></script>
-    <script>
-      window.XSICUiKit?.renderErrorState('[data-ui-mount="exposure-graph"]', {
-        title: 'Demo error state',
-        body: 'Graph module is not connected yet. This is a reusable error container.',
-        onRetry: () => window.XSICUiKit?.renderLoadingState('[data-ui-mount="exposure-graph"]', { label: 'Retrying…' }),
-      });
-    </script>
+    <script src="/apps/exposure-graph/exposure-graph.js"></script>
   </body>
 </html>
