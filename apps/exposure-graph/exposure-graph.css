@@ -38,7 +38,9 @@
 .exposure-graph-page .eg-svg-wrap { border: 1px solid var(--color-border); border-radius: 12px; background: linear-gradient(180deg,#fff,#fbfbfd); padding: 8px; }
 .exposure-graph-page .eg-graph-svg,
 .exposure-graph-page .eg-radar-svg { width: 100%; height: auto; display: block; }
-.exposure-graph-page .eg-node { cursor: pointer; }
+.exposure-graph-page .eg-node { cursor: pointer; outline: none; }
+.exposure-graph-page .eg-node:focus-visible circle { stroke: #111827; stroke-width: 2; }
+.exposure-graph-page .eg-graph-svg text { user-select: none; }
 .exposure-graph-page .eg-side-stack { display: grid; gap: 12px; }
 .exposure-graph-page .eg-mini-title { margin: 0 0 10px; font-size: 0.95rem; }
 .exposure-graph-page .eg-kv { display: grid; gap: 6px; font-size: 13px; color: var(--color-text-soft); }
