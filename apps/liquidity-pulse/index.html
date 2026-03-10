@@ -12,7 +12,7 @@
     <link rel="icon" href="/favicon.png" />
   </head>
   <body data-nav-key="apps">
-    <div class="app page console-page liquidity-pulse-page">
+    <div class="app page console-page flow-alert-page liquidity-pulse-page">
       <header class="app__header global-header">
         <div class="app__header-top">
           <a href="/" class="brand-link" aria-label="Home">
@@ -26,52 +26,164 @@
         </div>
       </header>
 
-      <main class="page__content liquidity-pulse" aria-live="polite">
-        <section class="card">
-          <h2 class="page__title">Liquidity Pulse</h2>
-          <p class="page__lede">Real AMM snapshots when Functions are available; automatic demo fallback for static hosting.</p>
+      <main class="page__content flow-alert liquidity-pulse" aria-live="polite">
+        <section class="flow-hero-head">
+          <h2 class="flow-page-title">Liquidity Pulse</h2>
+          <p class="flow-page-subtitle">
+            AMM/DEX liquidity shell aligned to Flow Alert with live snapshot compatibility, trend context, and staged fallback states.
+          </p>
           <noscript>
-            <p style="margin:8px 0 0;color:#b91c1c;">JavaScript is disabled. Live liquidity pulse updates are unavailable, but the page structure is still visible.</p>
+            <p class="flow-note">
+              JavaScript is disabled. Live liquidity pulse updates are unavailable, but the page structure remains readable.
+            </p>
           </noscript>
-          <div id="lpActions" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-            <label><input id="lite-mode-toggle" type="checkbox" /> Lite mode</label>
-            <label><input id="demo-mode-toggle" type="checkbox" /> Demo only</label>
-            <button id="retry-button" class="secondary-button" type="button">Retry</button>
-            <a class="secondary-button" href="/apps/">Back to apps</a>
-            <a class="secondary-button" href="/">Back home</a>
+        </section>
+
+        <section id="lpActions" class="card flow-controls-card">
+          <div class="flow-controls-grid">
+            <label class="flow-field">Preset
+              <select class="flow-control" aria-label="Liquidity target preset">
+                <option>XRP / RLUSD</option>
+              </select>
+            </label>
+            <label class="flow-field">Window
+              <select class="flow-control" aria-label="Liquidity trend window">
+                <option>5m / 1h / 24h blend</option>
+              </select>
+            </label>
+            <div class="flow-toggle-group">
+              <label><input id="lite-mode-toggle" type="checkbox" /> Lite mode</label>
+              <label><input id="demo-mode-toggle" type="checkbox" /> Demo only</label>
+            </div>
+            <button id="retry-button" class="flow-button" type="button">Retry</button>
+            <a class="flow-button" href="/apps/">Back to apps</a>
+            <a class="flow-button" href="/">Back home</a>
           </div>
         </section>
 
-        <section id="lpCanvasWrap" class="card" style="position:relative;overflow:hidden;">
-          <canvas id="lpCanvas" style="width:100%;height:230px;border-radius:12px;"></canvas>
-          <div data-state-overlay="loading">Loading snapshot…</div>
-          <div data-state-overlay="error" hidden>Could not load live snapshot. Toggle Demo only or Retry.</div>
-          <div data-state-overlay="empty" hidden>No liquidity data available for this pool.</div>
-        </section>
-
-        <section id="lpSnapshot" class="card">
-          <dl style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;">
-            <dt>Pool</dt><dd data-snapshot="pool">—</dd>
-            <dt>Price</dt><dd data-snapshot="price">—</dd>
-            <dt>Liquidity (USD)</dt><dd data-snapshot="liquidityUsd">—</dd>
-            <dt>Swaps (5m)</dt><dd data-snapshot="swaps5m">—</dd>
-            <dt>Deviation</dt><dd data-snapshot="deviationBps">—</dd>
-            <dt>Source</dt><dd data-snapshot="source">—</dd>
-          </dl>
-          <p data-snapshot="staleNote" style="margin:8px 0 0;font-size:.85rem;color:#475569;" hidden>Data may be delayed.</p>
-        </section>
-
-        <section id="lpTrends" class="card">
-          <h3>Pulse trend</h3>
-          <div style="display:flex;gap:12px;height:120px;align-items:flex-end;">
-            <div style="flex:1;background:#dbeafe;border-radius:8px 8px 0 0;height:12%;" data-trend="1h"></div>
-            <div style="flex:1;background:#93c5fd;border-radius:8px 8px 0 0;height:12%;" data-trend="6h"></div>
-            <div style="flex:1;background:#60a5fa;border-radius:8px 8px 0 0;height:12%;" data-trend="24h"></div>
+        <section class="card">
+          <div data-snapshot="staleNote" id="lpStaleBanner" class="flow-note" hidden>
+            Data may be delayed. Latest known liquidity snapshot is retained while refresh continues.
           </div>
         </section>
 
-        <section id="lpStatus" class="card" style="font-size:.9rem;color:#334155;">
-          Status: waiting for initialization…
+        <section id="lpSnapshot" class="card flow-signal-card">
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Status</div>
+            <span class="flow-pill">LIQUIDITY</span>
+            <div class="flow-meta" id="lpStatus">Status: waiting for initialization…</div>
+          </div>
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Pool</div>
+            <div class="flow-hero-value" data-snapshot="pool">—</div>
+            <div class="flow-meta">active routing pool label</div>
+          </div>
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Price</div>
+            <p class="flow-copy" data-snapshot="price">—</p>
+            <div class="flow-meta">latest normalized swap price</div>
+          </div>
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Context</div>
+            <span class="flow-context-chip">mode: live/demo</span>
+            <span class="flow-context-chip">pool: xrp-rlusd</span>
+            <span class="flow-context-chip">source: synchronized in metrics</span>
+            <div class="flow-context-line">Sampling interval adapts to Lite mode and visibility.</div>
+          </div>
+          <div id="lpTrends" class="flow-history-strip">
+            <div class="flow-history-row">
+              <div class="flow-signal-label">1h pulse</div>
+              <div class="flow-history-bars" role="img" aria-label="1 hour liquidity pulse">
+                <div data-trend="1h" style="height:12%"></div>
+              </div>
+              <div class="flow-meta">trend bar normalized each refresh</div>
+            </div>
+            <div class="flow-history-row">
+              <div class="flow-signal-label">6h pulse</div>
+              <div class="flow-history-bars" role="img" aria-label="6 hour liquidity pulse">
+                <div data-trend="6h" style="height:12%"></div>
+              </div>
+              <div class="flow-meta">medium horizon pulse estimate</div>
+            </div>
+            <div class="flow-history-row">
+              <div class="flow-signal-label">24h pulse</div>
+              <div class="flow-history-bars" role="img" aria-label="24 hour liquidity pulse">
+                <div data-trend="24h" style="height:12%"></div>
+              </div>
+              <div class="flow-meta">session baseline and drift context</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="flow-metrics-grid">
+          <article class="card flow-metric-card">
+            <div class="flow-metric-label">Liquidity (USD)</div>
+            <div class="flow-metric-value" data-snapshot="liquidityUsd">—</div>
+          </article>
+          <article class="card flow-metric-card">
+            <div class="flow-metric-label">Swaps (5m)</div>
+            <div class="flow-metric-value" data-snapshot="swaps5m">—</div>
+          </article>
+          <article class="card flow-metric-card flow-metric-card--highlight">
+            <div class="flow-metric-label">Deviation</div>
+            <div class="flow-metric-value" data-snapshot="deviationBps">—</div>
+          </article>
+          <article class="card flow-metric-card">
+            <div class="flow-metric-label">Source</div>
+            <div class="flow-metric-value flow-metric-value--small" data-snapshot="source">—</div>
+          </article>
+        </section>
+
+        <section id="lpCanvasWrap" class="card flow-mainviz-card">
+          <div class="flow-mainviz-head">
+            <div>
+              <h3 class="flow-section-title">Main Viz</h3>
+              <p class="flow-section-note">Animated liquidity pulse canvas with runtime fallback overlays.</p>
+            </div>
+            <span class="flow-context-chip">pulse / liquidity</span>
+          </div>
+          <div class="flow-mainviz-body">
+            <div class="flow-viz-panel">
+              <canvas id="lpCanvas" aria-label="Liquidity pulse visualization"></canvas>
+              <div data-state-overlay="loading" class="flow-overlay">Loading snapshot…</div>
+              <div data-state-overlay="error" class="flow-overlay" hidden>
+                <p>Could not load live snapshot. Toggle Demo only or Retry.</p>
+              </div>
+              <div data-state-overlay="empty" class="flow-overlay" hidden>
+                <p>No liquidity data available for this pool.</p>
+              </div>
+            </div>
+            <aside class="flow-reason-panel">
+              <div class="flow-signal-label">Reason / Context</div>
+              <h4 class="flow-reason-title">Liquidity momentum brief</h4>
+              <p class="flow-reason-copy">Price, liquidity, and swap cadence combine into a single pulse score for quick ops triage.</p>
+              <ul class="flow-reason-list">
+                <li>Lite mode lowers animation + polling load.</li>
+                <li>Demo mode guarantees deterministic fallback output.</li>
+                <li>Retry triggers immediate fetch and loop restart.</li>
+              </ul>
+            </aside>
+          </div>
+        </section>
+
+        <section class="card flow-flows-card">
+          <div class="flow-mini-head">
+            <h3 class="flow-mini-title">Snapshot support</h3>
+            <div class="flow-mini-meta">guardrails / integration / navigation</div>
+          </div>
+          <ul class="flow-escrow-list">
+            <li>Pool data is reflected in the signal summary above.</li>
+            <li>Price context is refreshed on every successful snapshot render.</li>
+            <li>Source and stale status stay visible in the metrics + stale banner blocks.</li>
+          </ul>
+        </section>
+
+        <section class="card flow-debug-card">
+          <details>
+            <summary>Debug (collapsed)</summary>
+            <p class="flow-debug-status">DOM compatibility shell is active for existing liquidity-pulse.js selectors.</p>
+            <p class="flow-debug-status flow-debug-mono">IDs retained: #lpActions #lpCanvasWrap #lpSnapshot #lpTrends #lpStatus</p>
+          </details>
         </section>
       </main>
       <div data-global-footer></div>
