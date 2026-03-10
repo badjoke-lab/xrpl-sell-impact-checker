@@ -50,6 +50,16 @@
             <div class="eg-status-inline">Status: <strong id="egStatusText">OK</strong></div>
             <div class="eg-status-inline">Updated: <strong id="egUpdatedText">—</strong></div>
           </div>
+          <div class="eg-presets" id="egPresets" aria-label="Issuer presets"></div>
+        </section>
+
+        <section class="card eg-help-card">
+          <h3 class="eg-mini-title">How to read this view</h3>
+          <ul class="eg-list eg-list--tight">
+            <li><strong>Bounded graph:</strong> this view intentionally shows only issuer + top counterparties (fixed max) for fast live refresh and stable layout.</li>
+            <li><strong>Exposure:</strong> absolute trustline balances from <code>account_lines</code>, treated as concentration weight by counterparty share.</li>
+            <li><strong>Observed / Not observed / Unknown:</strong> issuer-control status from live account flags; unknown means the runtime could not confirm that control now.</li>
+          </ul>
         </section>
 
         <section class="card eg-signal-card" id="egSignalCard"></section>
@@ -61,7 +71,7 @@
             <button id="egTabExposure" class="eg-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="egPanelExposure" data-eg-tab-target="egPanelExposure">Exposure</button>
             <button id="egTabRisk" class="eg-tab" type="button" role="tab" aria-selected="false" aria-controls="egPanelRisk" data-eg-tab-target="egPanelRisk">Risk</button>
           </div>
-          <p class="eg-tab-copy">Flow Alert-aligned shell with split structure and issuer-control views.</p>
+          <p class="eg-tab-copy">Exposure shows concentration structure. Risk shows issuer-control evidence from account flags.</p>
         </section>
 
         <section id="egPanelExposure" class="eg-tab-panel is-active" role="tabpanel" aria-labelledby="egTabExposure">
