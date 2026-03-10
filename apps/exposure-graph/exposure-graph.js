@@ -30,7 +30,9 @@
       presets: document.getElementById('egPresets'),
       signalCard: document.getElementById('egSignalCard'),
       metricsGrid: document.getElementById('egMetricsGrid'),
+      overallSummary: document.getElementById('egOverallSummary'),
       graphMount: document.getElementById('egGraphMount'),
+      legendMount: document.getElementById('egLegendMount'),
       entityDetail: document.getElementById('egEntityDetail'),
       concentrationList: document.getElementById('egConcentrationList'),
       watchList: document.getElementById('egWatchList'),
@@ -347,6 +349,7 @@
 
     renderSignal(refs.signalCard);
     renderMetrics(refs.metricsGrid);
+    renderOverallSummary(refs.overallSummary);
     renderExposure(refs);
     renderRisk(refs);
   }
@@ -357,6 +360,7 @@
       refs.entityDetail.innerHTML = '<p class="eg-meta">Awaiting exposure model.</p>';
       refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration summary will appear after load.</p>';
       refs.watchList.innerHTML = '<p class="eg-meta">Watch / activity panel is waiting for data.</p>';
+      renderLegend(refs.legendMount);
       return;
     }
 
@@ -365,6 +369,7 @@
       refs.entityDetail.innerHTML = '<p class="eg-meta">No issuer selected.</p>';
       refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration metrics unavailable.</p>';
       refs.watchList.innerHTML = '<p class="eg-meta">No activity rows without issuer data.</p>';
+      renderLegend(refs.legendMount);
       return;
     }
 
@@ -373,6 +378,7 @@
       refs.entityDetail.innerHTML = '<p class="eg-meta">The issuer could not be modeled from current API output.</p>';
       refs.concentrationList.innerHTML = '<p class="eg-meta">No concentration data.</p>';
       refs.watchList.innerHTML = '<p class="eg-meta">No watch items.</p>';
+      renderLegend(refs.legendMount);
       return;
     }
 
@@ -381,10 +387,12 @@
       refs.entityDetail.innerHTML = '<p class="eg-meta">No counterparties to inspect.</p>';
       refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration metrics unavailable because total exposure is zero.</p>';
       refs.watchList.innerHTML = '<p class="eg-meta">No activity rows in current exposure snapshot.</p>';
+      renderLegend(refs.legendMount);
       return;
     }
 
     renderGraph(refs);
+    renderLegend(refs.legendMount);
     renderEntity(refs);
 
     const model = state.exposure.model;
@@ -400,6 +408,124 @@
       const flag = party.share >= 0.25 ? 'watch high' : party.share >= 0.12 ? 'watch medium' : 'stable';
       return `<div class="eg-watch-row"><span>#${index + 1} ${party.label}</span><strong>${flag}</strong></div>`;
     }).join('') || '<p class="eg-meta">No watch rows.</p>';
+  }
+
+
+
+  function getExposureSignal() {
+    const model = state.exposure.model;
+    if (state.exposure.status === 'ready' && model) {
+      const top1 = model.counterparties?.[0]?.share || 0;
+      const top3 = model.top3Share || 0;
+      const visibilityRatio = model.lineCount > 0 ? model.counterparties.length / model.lineCount : 0;
+      const bounded = model.lineCount > model.counterparties.length;
+      let badge = 'distributed';
+      let score = 1;
+      if (top1 >= 0.5 || top3 >= 0.82) {
+        badge = 'highly concentrated';
+        score = 3;
+      } else if (top1 >= 0.25 || top3 >= 0.6) {
+        badge = 'moderately concentrated';
+        score = 2;
+      }
+      if (bounded && visibilityRatio < 0.3) {
+        badge = 'limited visibility';
+      }
+      return { status: 'ready', badge, score, bounded, top1, top3, top5: model.top5Share || 0, visibilityRatio, lineCount: model.lineCount, visibleCount: model.counterparties.length };
+    }
+    return { status: state.exposure.status, badge: 'limited visibility', score: 0, bounded: true, top1: 0, top3: 0, top5: 0, visibilityRatio: 0, lineCount: 0, visibleCount: 0 };
+  }
+
+  function getRiskSignal() {
+    const model = getRiskModel();
+    const entries = Object.values(model.statuses || {});
+    const unknownCount = entries.filter((v) => v === 'Unknown').length;
+    const observedCount = entries.filter((v) => v === 'Observed').length;
+    const controlRiskCount = ['GlobalFreeze', 'Clawback', 'RequireAuth'].filter((key) => model.statuses?.[key] === 'Observed').length;
+    return {
+      statuses: model.statuses,
+      unknownCount,
+      observedCount,
+      controlRiskCount,
+      hasUnknown: unknownCount > 0,
+    };
+  }
+
+  function getOverallSummaryModel() {
+    const exposure = getExposureSignal();
+    const risk = getRiskSignal();
+
+    if (state.exposure.status === 'no_issuer' || state.risk.status === 'invalid') {
+      return {
+        status: 'Unknown',
+        insights: ['Enter a valid issuer to compute concentration and issuer-control signals.'],
+        why: 'Without a valid issuer, neither concentration nor control risk can be evaluated.',
+        confidence: 'Low confidence: no issuer data loaded.',
+        exposureBadge: 'limited visibility',
+      };
+    }
+
+    let score = exposure.score + risk.controlRiskCount;
+    if (risk.hasUnknown) score -= 1;
+    if (state.exposure.status !== 'ready' || state.risk.status !== 'ready') score = 0;
+
+    const status = score >= 5 ? 'High' : score >= 3 ? 'Medium' : score > 0 ? 'Low' : 'Unknown';
+    const insights = [];
+
+    if (exposure.status === 'ready') {
+      insights.push(`Exposure is ${exposure.badge}; top holder share is ${toPct(exposure.top1)} and top 3 share is ${toPct(exposure.top3)}.`);
+      insights.push(`Visible counterparties: ${exposure.visibleCount}/${exposure.lineCount}${exposure.bounded ? ' (bounded top counterparties view).' : '.'}`);
+    } else {
+      insights.push('Exposure concentration is not currently available from live trustline data.');
+    }
+
+    const observedControls = ['Freeze', 'GlobalFreeze', 'Clawback', 'RequireAuth'].filter((key) => risk.statuses?.[key] === 'Observed');
+    insights.push(observedControls.length
+      ? `Issuer controls observed: ${observedControls.join(', ')}.`
+      : 'No issuer-control flags are currently observed from account flags.');
+
+    if (risk.hasUnknown) {
+      insights.push(`Risk evidence has ${risk.unknownCount} unknown control checks; treat this as a bounded-confidence read.`);
+    }
+
+    const why = 'Concentration can amplify issuer actions: when exposures cluster, issuer controls (Freeze / GlobalFreeze / Clawback / RequireAuth) can impact a larger share of holders at once.';
+    const confidence = (state.exposure.status === 'ready' && state.risk.status === 'ready' && !risk.hasUnknown)
+      ? 'Higher confidence: both dimensions loaded from live sources; exposure still uses bounded top-counterparties rendering.'
+      : 'Bounded confidence: one or more dimensions are unknown, loading, or bounded to top counterparties only.';
+
+    return { status, insights: insights.slice(0, 5), why, confidence, exposureBadge: exposure.badge };
+  }
+
+  function renderOverallSummary(mount) {
+    if (!mount) return;
+    const model = getOverallSummaryModel();
+    const statusClass = `eg-status-chip--${model.status.toLowerCase()}`;
+    mount.innerHTML = `
+      <div class="eg-overall-head">
+        <div>
+          <p class="eyebrow">Overall Summary</p>
+          <h3 class="eg-section-title">Decision-grade combined read</h3>
+        </div>
+        <div class="eg-overall-status-wrap">
+          <span class="eg-status-chip ${statusClass}">${model.status}</span>
+          <span class="eg-badge">${model.exposureBadge}</span>
+        </div>
+      </div>
+      <ul class="eg-list eg-list--tight">${model.insights.map((item) => `<li>${item}</li>`).join('')}</ul>
+      <div class="eg-overall-foot">
+        <p class="eg-meta"><strong>Why this matters:</strong> ${model.why}</p>
+        <p class="eg-meta"><strong>Confidence:</strong> ${model.confidence}</p>
+      </div>`;
+  }
+
+  function renderLegend(mount) {
+    if (!mount) return;
+    mount.innerHTML = `
+      <div class="eg-legend-grid">
+        <div><strong>Node meaning</strong><p class="eg-meta">Center node is issuer. Outer nodes are top counterparties by absolute trustline exposure.</p></div>
+        <div><strong>Edge thickness</strong><p class="eg-meta">Thicker edges indicate higher visible share concentration from issuer to that counterparty.</p></div>
+        <div><strong>Bounded view</strong><p class="eg-meta">Graph is intentionally limited to top ${MAX_VISIBLE_COUNTERPARTIES} counterparties for fast live refresh and stable layout.</p></div>
+      </div>`;
   }
 
   function renderSignal(mount) {
@@ -439,7 +565,8 @@
     const lines = links.map(([a, b]) => {
       const n1 = nodeById.get(a);
       const n2 = nodeById.get(b);
-      return `<line x1="${n1.x}" y1="${n1.y}" x2="${n2.x}" y2="${n2.y}" stroke="rgba(111,99,194,.35)" stroke-width="2" />`;
+      const strokeWidth = Math.max(1.5, Math.min(8, (n2.share || 0) * 22));
+      return `<line x1="${n1.x}" y1="${n1.y}" x2="${n2.x}" y2="${n2.y}" stroke="rgba(111,99,194,.35)" stroke-width="${strokeWidth}" />`;
     }).join('');
 
     const nodes = model.nodes.map((n) => {
