@@ -231,6 +231,7 @@
       .filter((line) => line.account && Number.isFinite(line.exposureValue) && line.exposureValue > 0)
       .sort((a, b) => b.exposureValue - a.exposureValue);
 
+    const usableLineCount = enriched.length;
     const totalExposure = enriched.reduce((sum, row) => sum + row.exposureValue, 0);
     const counterparties = enriched.slice(0, MAX_VISIBLE_COUNTERPARTIES).map((row, index) => {
       const share = totalExposure > 0 ? row.exposureValue / totalExposure : 0;
@@ -274,6 +275,7 @@
       issuer,
       totalExposure,
       lineCount: lines.length,
+      usableLineCount,
       coveredExposure: counterparties.reduce((sum, item) => sum + item.exposureValue, 0),
       counterparties,
       nodes,
@@ -383,10 +385,13 @@
     }
 
     if (state.exposure.status === 'empty') {
-      refs.graphMount.innerHTML = '<div class="eg-empty">No trustline exposure detected for this issuer in validated ledger data.</div>';
-      refs.entityDetail.innerHTML = '<p class="eg-meta">No counterparties to inspect.</p>';
-      refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration metrics unavailable because total exposure is zero.</p>';
-      refs.watchList.innerHTML = '<p class="eg-meta">No activity rows in current exposure snapshot.</p>';
+      const model = state.exposure.model;
+      const hasLines = Number(model?.lineCount || 0) > 0;
+      const noUsableLines = hasLines && Number(model?.usableLineCount || 0) === 0;
+      refs.graphMount.innerHTML = `<div class="eg-empty">${noUsableLines ? 'Trustlines were returned, but none had usable positive balances for concentration weighting.' : 'No trustline exposure detected for this issuer in validated ledger data.'}</div>`;
+      refs.entityDetail.innerHTML = `<p class="eg-meta">${noUsableLines ? 'This can happen when balances are zero, missing, or non-numeric in the current snapshot.' : 'No counterparties to inspect.'}</p>`;
+      refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration metrics unavailable because total exposure is zero. Try another issuer or refresh later.</p>';
+      refs.watchList.innerHTML = '<p class="eg-meta">No watch rows because no weighted counterparties are available.</p>';
       renderLegend(refs.legendMount);
       return;
     }
@@ -401,7 +406,8 @@
         <li>Top 3 share: ${toPct(model.top3Share)}</li>
         <li>Top 5 share: ${toPct(model.top5Share)}</li>
         <li>Visible nodes: ${model.nodes.length} (bounded)</li>
-        <li>Total counterparties in snapshot: ${model.lineCount}</li>
+        <li>Usable counterparties: ${model.usableLineCount}/${model.lineCount}</li>
+        <li>${model.usableLineCount <= 3 ? 'Very few counterparties detected; concentration may swing quickly.' : 'Snapshot includes enough counterparties for stable ranking.'}</li>
       </ul>`;
 
     refs.watchList.innerHTML = model.counterparties.slice(0, 5).map((party, index) => {
@@ -431,9 +437,21 @@
       if (bounded && visibilityRatio < 0.3) {
         badge = 'limited visibility';
       }
-      return { status: 'ready', badge, score, bounded, top1, top3, top5: model.top5Share || 0, visibilityRatio, lineCount: model.lineCount, visibleCount: model.counterparties.length };
+      return {
+        status: 'ready',
+        badge,
+        score,
+        bounded,
+        top1,
+        top3,
+        top5: model.top5Share || 0,
+        visibilityRatio,
+        lineCount: model.lineCount,
+        usableLineCount: model.usableLineCount || 0,
+        visibleCount: model.counterparties.length,
+      };
     }
-    return { status: state.exposure.status, badge: 'limited visibility', score: 0, bounded: true, top1: 0, top3: 0, top5: 0, visibilityRatio: 0, lineCount: 0, visibleCount: 0 };
+    return { status: state.exposure.status, badge: 'limited visibility', score: 0, bounded: true, top1: 0, top3: 0, top5: 0, visibilityRatio: 0, lineCount: 0, usableLineCount: 0, visibleCount: 0 };
   }
 
   function getRiskSignal() {
@@ -462,19 +480,25 @@
         why: 'Without a valid issuer, neither concentration nor control risk can be evaluated.',
         confidence: 'Low confidence: no issuer data loaded.',
         exposureBadge: 'limited visibility',
+        scoreBreakdown: 'Exposure score 0 + control score 0',
       };
     }
 
+    const exposureReady = state.exposure.status === 'ready';
+    const riskReady = state.risk.status === 'ready';
     let score = exposure.score + risk.controlRiskCount;
     if (risk.hasUnknown) score -= 1;
-    if (state.exposure.status !== 'ready' || state.risk.status !== 'ready') score = 0;
+    if (!exposureReady || !riskReady) score = 0;
 
     const status = score >= 5 ? 'High' : score >= 3 ? 'Medium' : score > 0 ? 'Low' : 'Unknown';
     const insights = [];
 
     if (exposure.status === 'ready') {
       insights.push(`Exposure is ${exposure.badge}; top holder share is ${toPct(exposure.top1)} and top 3 share is ${toPct(exposure.top3)}.`);
-      insights.push(`Visible counterparties: ${exposure.visibleCount}/${exposure.lineCount}${exposure.bounded ? ' (bounded top counterparties view).' : '.'}`);
+      insights.push(`Visible counterparties: ${exposure.visibleCount}/${exposure.usableLineCount || exposure.lineCount}${exposure.bounded ? ' (bounded top counterparties view).' : '.'}`);
+      if ((exposure.usableLineCount || 0) <= 3) {
+        insights.push('Very few weighted counterparties were found, so concentration labels can change sharply between refreshes.');
+      }
     } else {
       insights.push('Exposure concentration is not currently available from live trustline data.');
     }
@@ -488,12 +512,25 @@
       insights.push(`Risk evidence has ${risk.unknownCount} unknown control checks; treat this as a bounded-confidence read.`);
     }
 
-    const why = 'Concentration can amplify issuer actions: when exposures cluster, issuer controls (Freeze / GlobalFreeze / Clawback / RequireAuth) can impact a larger share of holders at once.';
-    const confidence = (state.exposure.status === 'ready' && state.risk.status === 'ready' && !risk.hasUnknown)
-      ? 'Higher confidence: both dimensions loaded from live sources; exposure still uses bounded top-counterparties rendering.'
-      : 'Bounded confidence: one or more dimensions are unknown, loading, or bounded to top counterparties only.';
+    if (!exposureReady && riskReady) {
+      insights.push('Partial fetch: issuer-control risk loaded, but exposure is unavailable or empty.');
+    } else if (exposureReady && !riskReady) {
+      insights.push('Partial fetch: exposure loaded, but issuer-control evidence is unavailable.');
+    }
 
-    return { status, insights: insights.slice(0, 5), why, confidence, exposureBadge: exposure.badge };
+    const why = 'Concentration can amplify issuer actions: when exposures cluster, issuer controls (Freeze / GlobalFreeze / Clawback / RequireAuth) can impact a larger share of holders at once.';
+    const confidence = (exposureReady && riskReady && !risk.hasUnknown)
+      ? 'Higher confidence: both dimensions loaded from live sources; exposure still uses bounded top-counterparties rendering.'
+      : 'Bounded confidence: one or more dimensions are unknown, loading, failed, or bounded to top counterparties only.';
+
+    return {
+      status,
+      insights: insights.slice(0, 6),
+      why,
+      confidence,
+      exposureBadge: exposure.badge,
+      scoreBreakdown: `Exposure score ${exposureReady ? exposure.score : 0} + control score ${riskReady ? risk.controlRiskCount : 0}${risk.hasUnknown ? ' - unknown penalty 1' : ''}`
+    };
   }
 
   function renderOverallSummary(mount) {
@@ -514,6 +551,7 @@
       <ul class="eg-list eg-list--tight">${model.insights.map((item) => `<li>${item}</li>`).join('')}</ul>
       <div class="eg-overall-foot">
         <p class="eg-meta"><strong>Why this matters:</strong> ${model.why}</p>
+        <p class="eg-meta"><strong>Method:</strong> ${model.scoreBreakdown}</p>
         <p class="eg-meta"><strong>Confidence:</strong> ${model.confidence}</p>
       </div>`;
   }
@@ -531,12 +569,14 @@
   function renderSignal(mount) {
     const model = state.exposure.model;
     const topShare = model?.counterparties?.[0]?.share || 0;
-    const concentrationLabel = topShare >= 0.35 ? 'High' : topShare >= 0.2 ? 'Medium' : 'Low';
+    const concentrationLabel = state.exposure.status === 'ready'
+      ? (topShare >= 0.35 ? 'High' : topShare >= 0.2 ? 'Medium' : 'Low')
+      : 'Unknown';
 
     mount.innerHTML = `
       <div class="eg-signal-block"><div class="eg-signal-label">Status</div><span class="eg-pill">${concentrationLabel}</span><p class="eg-meta">issuer concentration from live trustlines</p></div>
-      <div class="eg-signal-block"><div class="eg-signal-label">Top concentration</div><div class="eg-hero-value">${toPct(topShare)}</div><p class="eg-meta">largest visible counterparty share</p></div>
-      <div class="eg-signal-block"><div class="eg-signal-label">Coverage</div><p class="eg-meta">${model ? `${model.counterparties.length} counterparties shown (max ${MAX_VISIBLE_COUNTERPARTIES})` : 'No model loaded'}</p></div>
+      <div class="eg-signal-block"><div class="eg-signal-label">Top concentration</div><div class="eg-hero-value">${toPct(topShare)}</div><p class="eg-meta">largest visible counterparty share (High ≥35%, Medium ≥20%)</p></div>
+      <div class="eg-signal-block"><div class="eg-signal-label">Coverage</div><p class="eg-meta">${model ? `${model.counterparties.length} shown / ${model.usableLineCount} usable / ${model.lineCount} reported` : 'No model loaded yet. Enter an issuer or use a preset.'}</p></div>
       <div class="eg-signal-block"><div class="eg-signal-label">Context</div><p class="eg-meta">Exposure = trustline concentration. Risk = issuer account-control evidence.</p></div>`;
   }
 

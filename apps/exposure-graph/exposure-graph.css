@@ -64,6 +64,11 @@
 .exposure-graph-page .eg-mini-title { margin: 0 0 10px; font-size: 0.95rem; }
 .exposure-graph-page .eg-kv { display: grid; gap: 6px; font-size: 13px; color: var(--color-text-soft); }
 .exposure-graph-page .eg-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--color-text-soft); font-size: 13px; }
+.exposure-graph-page .eg-methods summary { cursor: pointer; list-style: none; }
+.exposure-graph-page .eg-methods summary::-webkit-details-marker { display: none; }
+.exposure-graph-page .eg-methods summary::before { content: "▸"; margin-right: 8px; color: var(--color-text-soft); }
+.exposure-graph-page .eg-methods[open] summary::before { content: "▾"; }
+.exposure-graph-page .eg-methods .eg-list { margin-top: 10px; }
 .exposure-graph-page .eg-watch-row { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
 .exposure-graph-page .eg-watch-row:last-child { border-bottom: 0; }
 .exposure-graph-page .eg-debug-card { padding: 12px 14px; }

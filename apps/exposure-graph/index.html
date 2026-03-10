@@ -54,12 +54,15 @@
         </section>
 
         <section class="card eg-help-card">
-          <h3 class="eg-mini-title">How to read this view</h3>
-          <ul class="eg-list eg-list--tight">
-            <li><strong>Bounded graph:</strong> this view intentionally shows only issuer + top counterparties (fixed max) for fast live refresh and stable layout.</li>
-            <li><strong>Exposure:</strong> absolute trustline balances from <code>account_lines</code>, treated as concentration weight by counterparty share.</li>
-            <li><strong>Observed / Not observed / Unknown:</strong> issuer-control status from live account flags; unknown means the runtime could not confirm that control now.</li>
-          </ul>
+          <details class="eg-methods" open>
+            <summary><strong>How this works (methods)</strong></summary>
+            <ul class="eg-list eg-list--tight">
+              <li><strong>Exposure in this app:</strong> concentration weight from absolute trustline balances in live <code>account_lines</code> data.</li>
+              <li><strong>Bounded graph includes:</strong> issuer + top counterparties by exposure (fixed max for fast, stable rendering). It <strong>excludes</strong> long-tail counterparties from node display.</li>
+              <li><strong>Overall Low / Medium / High / Unknown:</strong> derived from concentration score + observed issuer controls, then reduced when evidence is unknown; returns Unknown when issuer is invalid or one dimension fails.</li>
+              <li><strong>Observed / Not observed / Unknown:</strong> derived from current account flag evidence. Unknown means the app could not verify that control from current data.</li>
+            </ul>
+          </details>
         </section>
 
         <section class="card eg-signal-card" id="egSignalCard"></section>
