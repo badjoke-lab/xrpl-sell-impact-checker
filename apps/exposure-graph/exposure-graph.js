@@ -644,11 +644,11 @@
 
     const node = model.nodes.find((item) => item.id === state.selectedNodeId) || model.nodes[0];
     if (node.id === 'issuer') {
-      refs.entityDetail.innerHTML = `<div class="eg-kv"><strong>Issuer</strong><div>${model.issuer}</div><div>Total exposure: ${formatAmount(model.totalExposure)}</div><div>Data source: ${state.exposure.source}</div></div>`;
+      refs.entityDetail.innerHTML = `<div class="eg-kv"><strong>Issuer</strong><div class="eg-break-anywhere">${model.issuer}</div><div>Total exposure: ${formatAmount(model.totalExposure)}</div><div class="eg-break-anywhere">Data source: ${state.exposure.source}</div></div>`;
       return;
     }
 
-    refs.entityDetail.innerHTML = `<div class="eg-kv"><strong>${node.label}</strong><div>${node.address}</div><div>Visible share: ${toPct(node.share)}</div><div>Exposure: ${formatAmount(node.exposureValue)} ${node.currency}</div></div>`;
+    refs.entityDetail.innerHTML = `<div class="eg-kv"><strong>${node.label}</strong><div class="eg-break-anywhere">${node.address}</div><div>Visible share: ${toPct(node.share)}</div><div>Exposure: ${formatAmount(node.exposureValue)} ${node.currency}</div></div>`;
   }
 
   function renderRisk(refs) {
@@ -684,13 +684,23 @@
         title: flag,
         status,
         kind: status.toLowerCase().replace(/\s+/g, '-'),
-        note: status === 'Observed'
-          ? 'Observed means the issuer flag is set in current account data.'
-          : status === 'Not observed'
-            ? 'Not observed means the flag is not set in current account data.'
-            : 'Unknown means the app cannot confirm this control from current data.',
+        note: describeRiskEvidence(flag, status),
       })),
     };
+  }
+
+  function describeRiskEvidence(flag, status) {
+    if (status === 'Unknown') {
+      return 'Unknown means the app cannot confirm this control from current data.';
+    }
+    if (flag === 'Freeze') {
+      return status === 'Observed'
+        ? 'Observed means lsfNoFreeze is not set, so issuer-side freeze remains possible.'
+        : 'Not observed means lsfNoFreeze is set, so issuer-side freeze is disabled.';
+    }
+    return status === 'Observed'
+      ? 'Observed means the issuer flag is set in current account data.'
+      : 'Not observed means the flag is not set in current account data.';
   }
 
   function buildUnknownRiskModel(message) {
