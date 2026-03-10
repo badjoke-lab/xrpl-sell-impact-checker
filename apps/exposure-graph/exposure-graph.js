@@ -4,24 +4,17 @@
     '/api/xrpl/account-info?address=',
     '/api/xrpl/account-info?account=',
   ];
+  const XRPL_PROXY_ENDPOINT = '/api/xrpl';
   const XRPL_RPC_ENDPOINTS = ['https://xrplcluster.com/', 'https://s1.ripple.com:51234/'];
+  const MAX_VISIBLE_COUNTERPARTIES = 8;
 
   const state = {
     mode: 'ok',
-    selectedNodeId: 'exchange',
+    selectedNodeId: 'issuer',
     activeTab: 'egPanelExposure',
     issuer: 'rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq',
     risk: { status: 'idle', error: null, flags: null, accountFlags: null, source: null },
-    nodes: [
-      { id: 'issuer', name: 'Issuer', x: 360, y: 190, r: 16, share: '100%', detail: 'Anchor node issuing sampled trustline relationships.' },
-      { id: 'exchange', name: 'Exchange cluster', x: 470, y: 120, r: 14, share: '31.2%', detail: 'Largest visible concentration cluster.' },
-      { id: 'market', name: 'Market maker', x: 510, y: 240, r: 12, share: '18.7%', detail: 'High turnover pool with recurring route overlap.' },
-      { id: 'custody', name: 'Custody desk', x: 270, y: 115, r: 11, share: '14.1%', detail: 'Operational cluster with stable carry behavior.' },
-      { id: 'wallets', name: 'Retail wallets', x: 250, y: 255, r: 10, share: '9.8%', detail: 'Long-tail wallet cluster with diffuse behavior.' },
-      { id: 'unknown', name: 'Unknown dense', x: 140, y: 180, r: 10, share: '7.1%', detail: 'Unlabeled dense pocket worth monitoring.' },
-    ],
-    concentration: ['Top 10 share: 63.8%', 'Largest cluster: Exchange 31.2%', 'Unknown dense nodes: 7.1%'],
-    watch: [['Exchange cluster', 'watch high'], ['Market maker', 'stable medium'], ['Unknown dense', 'review labels']],
+    exposure: { status: 'idle', error: null, model: null, source: null },
   };
 
   function boot() {
@@ -50,22 +43,23 @@
     refs.debugButtons.forEach((button) => button.addEventListener('click', async () => {
       state.mode = button.dataset.egForce;
       if (state.mode === 'ok') {
-        await refreshRiskData(refs);
+        await refreshAllData(refs);
+      } else {
+        applyForcedMode();
       }
       render(refs);
     }));
-    refs.refreshBtn?.addEventListener('click', async () => {
-      state.issuer = refs.issuerInput.value.trim();
-      await refreshRiskData(refs);
-      render(refs);
-    });
-    refs.issuerInput?.addEventListener('change', async () => {
-      state.issuer = refs.issuerInput.value.trim();
-      await refreshRiskData(refs);
-      render(refs);
-    });
 
-    refreshRiskData(refs).finally(() => render(refs));
+    const triggerRefresh = async () => {
+      state.issuer = refs.issuerInput.value.trim();
+      await refreshAllData(refs);
+      render(refs);
+    };
+
+    refs.refreshBtn?.addEventListener('click', triggerRefresh);
+    refs.issuerInput?.addEventListener('change', triggerRefresh);
+
+    refreshAllData(refs).finally(() => render(refs));
   }
 
   function setActiveTab(refs, targetId) {
@@ -83,29 +77,148 @@
     });
   }
 
-  async function refreshRiskData(refs) {
+  function applyForcedMode() {
     if (state.mode === 'error') {
       state.risk = { status: 'error', error: 'Forced error mode is active.', flags: null, accountFlags: null, source: null };
+      state.exposure = { status: 'error', error: 'Forced error mode is active.', model: null, source: null };
       return;
     }
     if (state.mode === 'empty') {
       state.risk = { status: 'empty', error: null, flags: null, accountFlags: null, source: null };
+      state.exposure = { status: 'empty', error: null, model: null, source: null };
+    }
+  }
+
+  async function refreshAllData(refs) {
+    if (state.mode !== 'ok') {
+      applyForcedMode();
       return;
     }
+
     if (!isValidIssuer(state.issuer)) {
       state.risk = { status: 'invalid', error: 'Enter a valid XRPL issuer address to load risk evidence.', flags: null, accountFlags: null, source: null };
+      state.exposure = { status: 'no_issuer', error: 'Enter a valid XRPL issuer address to load exposure.', model: null, source: null };
       return;
     }
 
     state.risk = { status: 'loading', error: null, flags: null, accountFlags: null, source: null };
+    state.exposure = { status: 'loading', error: null, model: null, source: null };
     render(refs);
 
-    try {
-      const { flags, accountFlags, source } = await fetchIssuerRisk(state.issuer);
+    const [riskResult, exposureResult] = await Promise.allSettled([
+      fetchIssuerRisk(state.issuer),
+      fetchIssuerExposure(state.issuer),
+    ]);
+
+    if (riskResult.status === 'fulfilled') {
+      const { flags, accountFlags, source } = riskResult.value;
       state.risk = { status: 'ready', error: null, flags, accountFlags, source };
-    } catch (error) {
-      state.risk = { status: 'error', error: error?.message || 'Unable to fetch issuer account data right now.', flags: null, accountFlags: null, source: null };
+    } else {
+      state.risk = { status: 'error', error: riskResult.reason?.message || 'Unable to fetch issuer account data right now.', flags: null, accountFlags: null, source: null };
     }
+
+    if (exposureResult.status === 'fulfilled') {
+      const { model, source } = exposureResult.value;
+      if (!model.counterparties.length || model.totalExposure === 0) {
+        state.exposure = { status: 'empty', error: null, model, source };
+      } else {
+        state.exposure = { status: 'ready', error: null, model, source };
+        if (!model.nodes.some((node) => node.id === state.selectedNodeId)) {
+          state.selectedNodeId = 'issuer';
+        }
+      }
+    } else {
+      state.exposure = { status: 'error', error: exposureResult.reason?.message || 'Unable to fetch issuer exposure.', model: null, source: null };
+    }
+  }
+
+  async function fetchIssuerExposure(issuer) {
+    const payload = { method: 'account_lines', params: [{ account: issuer, ledger_index: 'validated', limit: 400 }] };
+    const response = await fetch(XRPL_PROXY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error('Exposure fetch failed at XRPL proxy.');
+    }
+
+    const json = await response.json();
+    const lines = json?.result?.result?.lines || json?.result?.lines || [];
+    const source = json?.endpointUsed || XRPL_PROXY_ENDPOINT;
+
+    if (!Array.isArray(lines)) {
+      throw new Error('Exposure data format is invalid.');
+    }
+
+    return {
+      source,
+      model: buildExposureModel(issuer, lines),
+    };
+  }
+
+  function buildExposureModel(issuer, lines) {
+    const enriched = lines
+      .map((line) => {
+        const exposureValue = Math.abs(Number.parseFloat(String(line.balance ?? '0')) || 0);
+        const account = String(line.account || '').trim();
+        return { account, currency: line.currency || 'IOU', exposureValue };
+      })
+      .filter((line) => line.account && Number.isFinite(line.exposureValue) && line.exposureValue > 0)
+      .sort((a, b) => b.exposureValue - a.exposureValue);
+
+    const totalExposure = enriched.reduce((sum, row) => sum + row.exposureValue, 0);
+    const counterparties = enriched.slice(0, MAX_VISIBLE_COUNTERPARTIES).map((row, index) => {
+      const share = totalExposure > 0 ? row.exposureValue / totalExposure : 0;
+      return {
+        id: `cp-${index + 1}`,
+        address: row.account,
+        label: `${row.account.slice(0, 6)}…${row.account.slice(-4)}`,
+        currency: row.currency,
+        exposureValue: row.exposureValue,
+        share,
+      };
+    });
+
+    const nodes = [
+      {
+        id: 'issuer',
+        name: 'Issuer',
+        address: issuer,
+        exposureValue: totalExposure,
+        share: 1,
+        x: 380,
+        y: 194,
+        r: 19,
+      },
+      ...counterparties.map((party, index) => {
+        const angle = (Math.PI * 2 * index) / Math.max(counterparties.length, 1) - Math.PI / 2;
+        const ringX = 250;
+        const ringY = 122;
+        return {
+          ...party,
+          name: party.label,
+          x: 380 + Math.cos(angle) * ringX,
+          y: 194 + Math.sin(angle) * ringY,
+          r: 9 + Math.min(13, Math.round(party.share * 100)),
+        };
+      }),
+    ];
+
+    const top3Share = counterparties.slice(0, 3).reduce((sum, item) => sum + item.share, 0);
+    const top5Share = counterparties.slice(0, 5).reduce((sum, item) => sum + item.share, 0);
+
+    return {
+      issuer,
+      totalExposure,
+      lineCount: lines.length,
+      coveredExposure: counterparties.reduce((sum, item) => sum + item.exposureValue, 0),
+      counterparties,
+      nodes,
+      top3Share,
+      top5Share,
+    };
   }
 
   async function fetchIssuerRisk(issuer) {
@@ -164,31 +277,147 @@
   }
 
   function render(refs) {
-    refs.status.textContent = state.mode.toUpperCase();
+    refs.status.textContent = `${state.mode.toUpperCase()} / ${state.exposure.status}`;
     refs.updated.textContent = new Date().toLocaleTimeString();
-    refs.debugStatus.textContent = `EG_DEBUG · mode=${state.mode} · tab=${state.activeTab} · risk=${state.risk.status}`;
+    refs.debugStatus.textContent = `EG_DEBUG · mode=${state.mode} · tab=${state.activeTab} · exposure=${state.exposure.status} · risk=${state.risk.status}`;
 
     renderSignal(refs.signalCard);
     renderMetrics(refs.metricsGrid);
+    renderExposure(refs);
+    renderRisk(refs);
+  }
 
-    if (state.mode === 'error') {
-      refs.graphMount.innerHTML = '<div class="eg-error">Graph unavailable in forced error mode.</div>';
+  function renderExposure(refs) {
+    if (state.exposure.status === 'loading') {
+      refs.graphMount.innerHTML = '<div class="eg-empty">Loading live issuer exposure…</div>';
+      refs.entityDetail.innerHTML = '<p class="eg-meta">Awaiting exposure model.</p>';
+      refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration summary will appear after load.</p>';
+      refs.watchList.innerHTML = '<p class="eg-meta">Watch / activity panel is waiting for data.</p>';
+      return;
+    }
+
+    if (state.exposure.status === 'no_issuer') {
+      refs.graphMount.innerHTML = '<div class="eg-empty">Enter a valid issuer to build a live exposure graph.</div>';
+      refs.entityDetail.innerHTML = '<p class="eg-meta">No issuer selected.</p>';
+      refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration metrics unavailable.</p>';
+      refs.watchList.innerHTML = '<p class="eg-meta">No activity rows without issuer data.</p>';
+      return;
+    }
+
+    if (state.exposure.status === 'error') {
+      refs.graphMount.innerHTML = `<div class="eg-error">${state.exposure.error || 'Exposure data unavailable.'}</div>`;
       refs.entityDetail.innerHTML = '<p class="eg-meta">No selected entity while error is active.</p>';
       refs.concentrationList.innerHTML = '<p class="eg-meta">No concentration data.</p>';
       refs.watchList.innerHTML = '<p class="eg-meta">No watch items.</p>';
-    } else if (state.mode === 'empty') {
-      refs.graphMount.innerHTML = '<div class="eg-empty">No visible counterparties in current static filter.</div>';
-      refs.entityDetail.innerHTML = '<p class="eg-meta">Select a node after data appears.</p>';
-      refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration metrics unavailable.</p>';
-      refs.watchList.innerHTML = '<p class="eg-meta">No activity rows in this empty demo.</p>';
-    } else {
-      renderGraph(refs);
-      renderEntity(refs);
-      refs.concentrationList.innerHTML = `<ul class="eg-list">${state.concentration.map((item) => `<li>${item}</li>`).join('')}</ul>`;
-      refs.watchList.innerHTML = state.watch.map((row) => `<div class="eg-watch-row"><span>${row[0]}</span><strong>${row[1]}</strong></div>`).join('');
+      return;
     }
 
-    renderRisk(refs);
+    if (state.exposure.status === 'empty') {
+      refs.graphMount.innerHTML = '<div class="eg-empty">No trustline exposure detected for this issuer in validated ledger data.</div>';
+      refs.entityDetail.innerHTML = '<p class="eg-meta">No counterparties to inspect.</p>';
+      refs.concentrationList.innerHTML = '<p class="eg-meta">Concentration metrics unavailable because total exposure is zero.</p>';
+      refs.watchList.innerHTML = '<p class="eg-meta">No activity rows in current exposure snapshot.</p>';
+      return;
+    }
+
+    renderGraph(refs);
+    renderEntity(refs);
+
+    const model = state.exposure.model;
+    refs.concentrationList.innerHTML = `
+      <ul class="eg-list">
+        <li>Top 3 share: ${toPct(model.top3Share)}</li>
+        <li>Top 5 share: ${toPct(model.top5Share)}</li>
+        <li>Visible nodes: ${model.nodes.length} (bounded)</li>
+        <li>Total counterparties in snapshot: ${model.lineCount}</li>
+      </ul>`;
+
+    refs.watchList.innerHTML = model.counterparties.slice(0, 5).map((party, index) => {
+      const flag = party.share >= 0.25 ? 'watch high' : party.share >= 0.12 ? 'watch medium' : 'stable';
+      return `<div class="eg-watch-row"><span>#${index + 1} ${party.label}</span><strong>${flag}</strong></div>`;
+    }).join('') || '<p class="eg-meta">No watch rows.</p>';
+  }
+
+  function renderSignal(mount) {
+    const model = state.exposure.model;
+    const topShare = model?.counterparties?.[0]?.share || 0;
+    const concentrationLabel = topShare >= 0.35 ? 'High' : topShare >= 0.2 ? 'Medium' : 'Low';
+
+    mount.innerHTML = `
+      <div class="eg-signal-block"><div class="eg-signal-label">Status</div><span class="eg-pill">${concentrationLabel}</span><p class="eg-meta">issuer concentration from live trustlines</p></div>
+      <div class="eg-signal-block"><div class="eg-signal-label">Top concentration</div><div class="eg-hero-value">${toPct(topShare)}</div><p class="eg-meta">largest visible counterparty share</p></div>
+      <div class="eg-signal-block"><div class="eg-signal-label">Coverage</div><p class="eg-meta">${model ? `${model.counterparties.length} counterparties shown (max ${MAX_VISIBLE_COUNTERPARTIES})` : 'No model loaded'}</p></div>
+      <div class="eg-signal-block"><div class="eg-signal-label">Context</div><p class="eg-meta">Exposure = structure, Risk = issuer controls.</p></div>`;
+  }
+
+  function renderMetrics(mount) {
+    const model = state.exposure.model;
+    const metrics = [
+      ['Total exposure', model ? formatAmount(model.totalExposure) : '—', 'sum of absolute trustline balances'],
+      ['Entities visible', model ? String(model.nodes.length) : '—', 'fixed max node count'],
+      ['Top node share', model ? toPct(model.counterparties?.[0]?.share || 0) : '—', 'largest visible counterparty'],
+      ['Top 5 concentration', model ? toPct(model.top5Share) : '—', 'share captured by top 5 nodes'],
+      ['Render mode', 'Inline SVG', 'no force engine / no loop'],
+    ];
+
+    mount.innerHTML = metrics.map((m) => `<article class="card eg-metric-card"><div class="eg-metric-label">${m[0]}</div><div class="eg-metric-value">${m[1]}</div><div class="eg-metric-sub">${m[2]}</div></article>`).join('');
+  }
+
+  function renderGraph(refs) {
+    const model = state.exposure.model;
+    if (!model) {
+      refs.graphMount.innerHTML = '<div class="eg-empty">No graph data.</div>';
+      return;
+    }
+
+    const nodeById = new Map(model.nodes.map((n) => [n.id, n]));
+    const links = model.nodes.filter((n) => n.id !== 'issuer').map((node) => ['issuer', node.id]);
+    const lines = links.map(([a, b]) => {
+      const n1 = nodeById.get(a);
+      const n2 = nodeById.get(b);
+      return `<line x1="${n1.x}" y1="${n1.y}" x2="${n2.x}" y2="${n2.y}" stroke="rgba(111,99,194,.35)" stroke-width="2" />`;
+    }).join('');
+
+    const nodes = model.nodes.map((n) => {
+      const label = n.id === 'issuer' ? 'Issuer' : n.label;
+      const share = n.id === 'issuer' ? '100%' : toPct(n.share);
+      const selected = n.id === state.selectedNodeId;
+      return `<g class="eg-node" data-eg-node-id="${n.id}" tabindex="0" role="button" aria-label="${label} ${share}">
+        <circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${selected ? 'rgba(111,99,194,.82)' : 'rgba(111,99,194,.5)'}"/>
+        <text x="${n.x}" y="${n.y + n.r + 14}" text-anchor="middle" font-size="11" fill="#4b5563">${label}</text>
+      </g>`;
+    }).join('');
+
+    refs.graphMount.innerHTML = `<svg class="eg-graph-svg" viewBox="0 0 760 388" role="img" aria-label="Exposure graph">${lines}${nodes}</svg>`;
+    refs.graphMount.querySelectorAll('[data-eg-node-id]').forEach((nodeEl) => {
+      const setNode = () => {
+        state.selectedNodeId = nodeEl.dataset.egNodeId;
+        render(refs);
+      };
+      nodeEl.addEventListener('click', setNode);
+      nodeEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setNode();
+        }
+      });
+    });
+  }
+
+  function renderEntity(refs) {
+    const model = state.exposure.model;
+    if (!model) {
+      refs.entityDetail.innerHTML = '<p class="eg-meta">No entity data.</p>';
+      return;
+    }
+
+    const node = model.nodes.find((item) => item.id === state.selectedNodeId) || model.nodes[0];
+    if (node.id === 'issuer') {
+      refs.entityDetail.innerHTML = `<div class="eg-kv"><strong>Issuer</strong><div>${model.issuer}</div><div>Total exposure: ${formatAmount(model.totalExposure)}</div><div>Data source: ${state.exposure.source}</div></div>`;
+      return;
+    }
+
+    refs.entityDetail.innerHTML = `<div class="eg-kv"><strong>${node.label}</strong><div>${node.address}</div><div>Visible share: ${toPct(node.share)}</div><div>Exposure: ${formatAmount(node.exposureValue)} ${node.currency}</div></div>`;
   }
 
   function renderRisk(refs) {
@@ -253,56 +482,6 @@
     };
   }
 
-  function renderSignal(mount) {
-    mount.innerHTML = `
-      <div class="eg-signal-block"><div class="eg-signal-label">Status</div><span class="eg-pill">Medium</span><p class="eg-meta">risk medium · concentration elevated</p></div>
-      <div class="eg-signal-block"><div class="eg-signal-label">Top concentration</div><div class="eg-hero-value">63.8%</div><p class="eg-meta">top 10 visible entities</p></div>
-      <div class="eg-signal-block"><div class="eg-signal-label">Why this matters</div><p class="eg-meta">A few clusters dominate short-window dependency.</p></div>
-      <div class="eg-signal-block"><div class="eg-signal-label">Context</div><p class="eg-meta">Exposure = structure, Risk = issuer controls.</p></div>`;
-  }
-
-  function renderMetrics(mount) {
-    const metrics = [
-      ['Top 10 share', '63.8%', 'concentration threshold crossed'],
-      ['Entities visible', '6', 'bounded for mobile safety'],
-      ['Top cluster', 'Exchange', '31.2% of visible share'],
-      ['Unknown share', '7.1%', 'requires monitoring'],
-      ['Render mode', 'Inline SVG', 'no force engine'],
-    ];
-    mount.innerHTML = metrics.map((m) => `<article class="card eg-metric-card"><div class="eg-metric-label">${m[0]}</div><div class="eg-metric-value">${m[1]}</div><div class="eg-metric-sub">${m[2]}</div></article>`).join('');
-  }
-
-  function renderGraph(refs) {
-    const nodeById = new Map(state.nodes.map((n) => [n.id, n]));
-    const links = [['issuer', 'exchange'], ['issuer', 'market'], ['issuer', 'custody'], ['issuer', 'wallets'], ['issuer', 'unknown']];
-    const lines = links.map(([a, b]) => {
-      const n1 = nodeById.get(a);
-      const n2 = nodeById.get(b);
-      return `<line x1="${n1.x}" y1="${n1.y}" x2="${n2.x}" y2="${n2.y}" stroke="rgba(111,99,194,.35)" stroke-width="2" />`;
-    }).join('');
-    const nodes = state.nodes.map((n) => `<g class="eg-node" data-eg-node-id="${n.id}" tabindex="0" role="button" aria-label="${n.name} ${n.share}"><circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${n.id === state.selectedNodeId ? 'rgba(111,99,194,.78)' : 'rgba(111,99,194,.48)'}"/><text x="${n.x}" y="${n.y + n.r + 14}" text-anchor="middle" font-size="11" fill="#4b5563">${n.name}</text></g>`).join('');
-
-    refs.graphMount.innerHTML = `<svg class="eg-graph-svg" viewBox="0 0 760 388" role="img" aria-label="Exposure graph">${lines}${nodes}</svg>`;
-    refs.graphMount.querySelectorAll('[data-eg-node-id]').forEach((nodeEl) => {
-      const setNode = () => {
-        state.selectedNodeId = nodeEl.dataset.egNodeId;
-        render(refs);
-      };
-      nodeEl.addEventListener('click', setNode);
-      nodeEl.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          setNode();
-        }
-      });
-    });
-  }
-
-  function renderEntity(refs) {
-    const node = state.nodes.find((item) => item.id === state.selectedNodeId) || state.nodes[0];
-    refs.entityDetail.innerHTML = `<div class="eg-kv"><strong>${node.name}</strong><div>Visible share: ${node.share}</div><div>${node.detail}</div></div>`;
-  }
-
   function renderRadar(mount, model) {
     const keys = ['Freeze', 'GlobalFreeze', 'Clawback', 'RequireAuth'];
     const valueByStatus = { Observed: 1, 'Not observed': 0.22, Unknown: 0.55 };
@@ -341,6 +520,16 @@
     if (value === true) return 'Observed';
     if (value === false) return 'Not observed';
     return 'Unknown';
+  }
+
+  function toPct(value) {
+    return `${((value || 0) * 100).toFixed(1)}%`;
+  }
+
+  function formatAmount(value) {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return '0';
+    return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(num);
   }
 
   boot();
