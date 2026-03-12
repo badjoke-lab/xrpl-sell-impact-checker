@@ -24,6 +24,11 @@
     exposure: { status: 'idle', error: null, model: null, source: null },
   };
 
+  const lifecycle = {
+    cleanups: [],
+    refreshController: null,
+  };
+
   function boot() {
     const refs = {
       issuerInput: document.getElementById('egIssuerInput'),
@@ -52,8 +57,8 @@
     refs.issuerInput.value = state.issuer;
     hydratePresets(refs);
 
-    refs.tabs.forEach((tab) => tab.addEventListener('click', () => setActiveTab(refs, tab.dataset.egTabTarget)));
-    refs.debugButtons.forEach((button) => button.addEventListener('click', async () => {
+    refs.tabs.forEach((tab) => addManagedListener(tab, 'click', () => setActiveTab(refs, tab.dataset.egTabTarget)));
+    refs.debugButtons.forEach((button) => addManagedListener(button, 'click', async () => {
       state.mode = button.dataset.egForce;
       if (state.mode === 'ok') {
         await refreshAllData(refs);
@@ -70,14 +75,44 @@
       render(refs);
     };
 
-    refs.refreshBtn?.addEventListener('click', triggerRefresh);
-    refs.issuerInput?.addEventListener('change', triggerRefresh);
-    refs.issuerInput?.addEventListener('keydown', (event) => {
+    addManagedListener(refs.refreshBtn, 'click', triggerRefresh);
+    addManagedListener(refs.issuerInput, 'change', triggerRefresh);
+    addManagedListener(refs.issuerInput, 'keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
         triggerRefresh();
       }
     });
+
+    addManagedListener(refs.presets, 'click', async (event) => {
+      const button = event.target.closest('[data-eg-preset]');
+      if (!button) return;
+      state.mode = 'ok';
+      state.issuer = button.dataset.egPreset;
+      refs.issuerInput.value = state.issuer;
+      syncIssuerToUrl(state.issuer);
+      await refreshAllData(refs);
+      render(refs);
+    });
+
+    addManagedListener(refs.graphMount, 'click', (event) => {
+      const nodeEl = event.target.closest('[data-eg-node-id]');
+      if (!nodeEl) return;
+      state.selectedNodeId = nodeEl.dataset.egNodeId;
+      render(refs);
+    });
+
+    addManagedListener(refs.graphMount, 'keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const nodeEl = event.target.closest('[data-eg-node-id]');
+      if (!nodeEl) return;
+      event.preventDefault();
+      state.selectedNodeId = nodeEl.dataset.egNodeId;
+      render(refs);
+    });
+
+    addManagedListener(window, 'pagehide', cleanupRuntime);
+    addManagedListener(window, 'beforeunload', cleanupRuntime);
 
     refreshAllData(refs).finally(() => render(refs));
   }
@@ -85,14 +120,27 @@
   function hydratePresets(refs) {
     if (!refs.presets) return;
     refs.presets.innerHTML = ISSUER_PRESETS.map((preset) => `<button type="button" class="eg-preset" data-eg-preset="${preset.issuer}">${preset.label}</button>`).join('');
-    refs.presets.querySelectorAll('[data-eg-preset]').forEach((button) => button.addEventListener('click', async () => {
-      state.mode = 'ok';
-      state.issuer = button.dataset.egPreset;
-      refs.issuerInput.value = state.issuer;
-      syncIssuerToUrl(state.issuer);
-      await refreshAllData(refs);
-      render(refs);
-    }));
+  }
+
+  function addManagedListener(target, eventName, handler, options) {
+    if (!target) return;
+    target.addEventListener(eventName, handler, options);
+    lifecycle.cleanups.push(() => target.removeEventListener(eventName, handler, options));
+  }
+
+  function resetRefreshController() {
+    if (lifecycle.refreshController) {
+      lifecycle.refreshController.abort();
+      lifecycle.refreshController = null;
+    }
+  }
+
+  function cleanupRuntime() {
+    resetRefreshController();
+    while (lifecycle.cleanups.length) {
+      const dispose = lifecycle.cleanups.pop();
+      dispose();
+    }
   }
 
   function getIssuerFromUrl() {
@@ -139,33 +187,47 @@
 
   async function refreshAllData(refs) {
     const seq = ++state.refreshSeq;
+    resetRefreshController();
+    lifecycle.refreshController = new AbortController();
+    const { signal } = lifecycle.refreshController;
+
     if (state.mode !== 'ok') {
       applyForcedMode();
+      lifecycle.refreshController = null;
       return;
     }
 
     if (!isValidIssuer(state.issuer)) {
       state.risk = { status: 'invalid', error: 'Enter a valid XRPL issuer address to load risk evidence.', flags: null, accountFlags: null, source: null };
       state.exposure = { status: 'no_issuer', error: 'Enter a valid XRPL issuer address to load exposure.', model: null, source: null };
+      lifecycle.refreshController = null;
       return;
     }
 
-    state.risk = { status: 'loading', error: null, flags: null, accountFlags: null, source: null };
-    state.exposure = { status: 'loading', error: null, model: null, source: null };
+    const previousRisk = state.risk;
+    const previousExposure = state.exposure;
+    state.risk = { status: 'loading', error: null, flags: previousRisk.flags, accountFlags: previousRisk.accountFlags, source: previousRisk.source };
+    state.exposure = { status: 'loading', error: null, model: previousExposure.model, source: previousExposure.source };
     render(refs);
 
     const [riskResult, exposureResult] = await Promise.allSettled([
-      fetchIssuerRisk(state.issuer),
-      fetchIssuerExposure(state.issuer),
+      fetchIssuerRisk(state.issuer, { signal }),
+      fetchIssuerExposure(state.issuer, { signal }),
     ]);
 
-    if (seq !== state.refreshSeq) return;
+    if (seq !== state.refreshSeq || signal.aborted) return;
 
     if (riskResult.status === 'fulfilled') {
       const { flags, accountFlags, source } = riskResult.value;
       state.risk = { status: 'ready', error: null, flags, accountFlags, source };
     } else {
-      state.risk = { status: 'error', error: riskResult.reason?.message || 'Unable to fetch issuer account data right now.', flags: null, accountFlags: null, source: null };
+      const message = riskResult.reason?.message || 'Unable to fetch issuer account data right now.';
+      if (isAbortError(riskResult.reason)) return;
+      if (canUseStaleRisk(previousRisk)) {
+        state.risk = { ...previousRisk, status: 'stale', error: message };
+      } else {
+        state.risk = { status: 'error', error: message, flags: null, accountFlags: null, source: null };
+      }
     }
 
     if (exposureResult.status === 'fulfilled') {
@@ -179,16 +241,37 @@
         }
       }
     } else {
-      state.exposure = { status: 'error', error: exposureResult.reason?.message || 'Unable to fetch issuer exposure.', model: null, source: null };
+      const message = exposureResult.reason?.message || 'Unable to fetch issuer exposure.';
+      if (isAbortError(exposureResult.reason)) return;
+      if (canUseStaleExposure(previousExposure)) {
+        state.exposure = { ...previousExposure, status: 'stale', error: message };
+      } else {
+        state.exposure = { status: 'error', error: message, model: null, source: null };
+      }
     }
+
+    lifecycle.refreshController = null;
   }
 
-  async function fetchIssuerExposure(issuer) {
+  function canUseStaleExposure(snapshot) {
+    return ['ready', 'empty', 'stale'].includes(snapshot?.status) && !!snapshot?.model;
+  }
+
+  function canUseStaleRisk(snapshot) {
+    return ['ready', 'stale'].includes(snapshot?.status) && !!snapshot?.flags;
+  }
+
+  function isAbortError(error) {
+    return error?.name === 'AbortError';
+  }
+
+  async function fetchIssuerExposure(issuer, options = {}) {
     const payload = { method: 'account_lines', params: [{ account: issuer, ledger_index: 'validated', limit: 400 }] };
     const response = await fetch(XRPL_PROXY_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: options.signal,
     });
 
     if (!response.ok) {
@@ -284,12 +367,12 @@
     };
   }
 
-  async function fetchIssuerRisk(issuer) {
+  async function fetchIssuerRisk(issuer, options = {}) {
     let payload = null;
     let source = null;
     for (const endpoint of XRPL_ACCOUNT_INFO_ENDPOINTS) {
       const url = `${endpoint}${encodeURIComponent(issuer)}&ledger_index=validated`;
-      const response = await fetch(url, { headers: { Accept: 'application/json' } });
+      const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: options.signal });
       if (!response.ok) continue;
       const json = await response.json();
       const accountData = extractAccountInfo(json);
@@ -306,6 +389,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ method: 'account_info', params: [{ account: issuer, ledger_index: 'validated' }] }),
+          signal: options.signal,
         });
         if (!rpcRes.ok) continue;
         const rpcJson = await rpcRes.json();
@@ -345,7 +429,8 @@
   }
 
   function render(refs) {
-    refs.status.textContent = `${state.mode.toUpperCase()} / ${state.exposure.status} / ${state.risk.status}`;
+    const partial = isPartialState() ? ' / partial' : '';
+    refs.status.textContent = `${state.mode.toUpperCase()} / ${state.exposure.status} / ${state.risk.status}${partial}`;
     refs.updated.textContent = new Date().toLocaleTimeString();
     refs.debugStatus.textContent = `EG_DEBUG · mode=${state.mode} · tab=${state.activeTab} · exposure=${state.exposure.status} · risk=${state.risk.status}`;
 
@@ -396,13 +481,15 @@
       return;
     }
 
-    renderGraph(refs);
+    const isStale = state.exposure.status === 'stale';
+    renderGraph(refs, { stale: isStale, staleReason: state.exposure.error });
     renderLegend(refs.legendMount);
     renderEntity(refs);
 
     const model = state.exposure.model;
     refs.concentrationList.innerHTML = `
       <ul class="eg-list">
+        ${isStale ? `<li>Stale snapshot: showing previous exposure because the latest refresh failed (${state.exposure.error || 'refresh unavailable'}).</li>` : ''}
         <li>Top 3 share: ${toPct(model.top3Share)}</li>
         <li>Top 5 share: ${toPct(model.top5Share)}</li>
         <li>Visible nodes: ${model.nodes.length} (bounded)</li>
@@ -420,7 +507,7 @@
 
   function getExposureSignal() {
     const model = state.exposure.model;
-    if (state.exposure.status === 'ready' && model) {
+    if ((state.exposure.status === 'ready' || state.exposure.status === 'stale') && model) {
       const top1 = model.counterparties?.[0]?.share || 0;
       const top3 = model.top3Share || 0;
       const visibilityRatio = model.lineCount > 0 ? model.counterparties.length / model.lineCount : 0;
@@ -449,9 +536,10 @@
         lineCount: model.lineCount,
         usableLineCount: model.usableLineCount || 0,
         visibleCount: model.counterparties.length,
+        isStale: state.exposure.status === 'stale',
       };
     }
-    return { status: state.exposure.status, badge: 'limited visibility', score: 0, bounded: true, top1: 0, top3: 0, top5: 0, visibilityRatio: 0, lineCount: 0, usableLineCount: 0, visibleCount: 0 };
+    return { status: state.exposure.status, badge: 'limited visibility', score: 0, bounded: true, top1: 0, top3: 0, top5: 0, visibilityRatio: 0, lineCount: 0, usableLineCount: 0, visibleCount: 0, isStale: false };
   }
 
   function getRiskSignal() {
@@ -466,7 +554,14 @@
       observedCount,
       controlRiskCount,
       hasUnknown: unknownCount > 0,
+      isStale: state.risk.status === 'stale',
     };
+  }
+
+  function isPartialState() {
+    const exposureUsable = ['ready', 'stale'].includes(state.exposure.status);
+    const riskUsable = ['ready', 'stale'].includes(state.risk.status);
+    return exposureUsable !== riskUsable;
   }
 
   function getOverallSummaryModel() {
@@ -484,8 +579,8 @@
       };
     }
 
-    const exposureReady = state.exposure.status === 'ready';
-    const riskReady = state.risk.status === 'ready';
+    const exposureReady = ['ready', 'stale'].includes(state.exposure.status);
+    const riskReady = ['ready', 'stale'].includes(state.risk.status);
     let score = exposure.score + risk.controlRiskCount;
     if (risk.hasUnknown) score -= 1;
     if (!exposureReady || !riskReady) score = 0;
@@ -510,6 +605,10 @@
 
     if (risk.hasUnknown) {
       insights.push(`Risk evidence has ${risk.unknownCount} unknown control checks; treat this as a bounded-confidence read.`);
+    }
+
+    if (exposure.isStale || risk.isStale) {
+      insights.push('Stale snapshot in use: latest refresh failed, so previous successful data is still displayed for continuity.');
     }
 
     if (!exposureReady && riskReady) {
@@ -569,12 +668,13 @@
   function renderSignal(mount) {
     const model = state.exposure.model;
     const topShare = model?.counterparties?.[0]?.share || 0;
-    const concentrationLabel = state.exposure.status === 'ready'
+    const concentrationLabel = ['ready', 'stale'].includes(state.exposure.status)
       ? (topShare >= 0.35 ? 'High' : topShare >= 0.2 ? 'Medium' : 'Low')
       : 'Unknown';
+    const staleSuffix = state.exposure.status === 'stale' ? ' · stale snapshot' : '';
 
     mount.innerHTML = `
-      <div class="eg-signal-block"><div class="eg-signal-label">Status</div><span class="eg-pill">${concentrationLabel}</span><p class="eg-meta">issuer concentration from live trustlines</p></div>
+      <div class="eg-signal-block"><div class="eg-signal-label">Status</div><span class="eg-pill">${concentrationLabel}</span><p class="eg-meta">issuer concentration from live trustlines${staleSuffix}</p></div>
       <div class="eg-signal-block"><div class="eg-signal-label">Top concentration</div><div class="eg-hero-value">${toPct(topShare)}</div><p class="eg-meta">largest visible counterparty share (High ≥35%, Medium ≥20%)</p></div>
       <div class="eg-signal-block"><div class="eg-signal-label">Coverage</div><p class="eg-meta">${model ? `${model.counterparties.length} shown / ${model.usableLineCount} usable / ${model.lineCount} reported` : 'No model loaded yet. Enter an issuer or use a preset.'}</p></div>
       <div class="eg-signal-block"><div class="eg-signal-label">Context</div><p class="eg-meta">Exposure = trustline concentration. Risk = issuer account-control evidence.</p></div>`;
@@ -593,7 +693,7 @@
     mount.innerHTML = metrics.map((m) => `<article class="card eg-metric-card"><div class="eg-metric-label">${m[0]}</div><div class="eg-metric-value">${m[1]}</div><div class="eg-metric-sub">${m[2]}</div></article>`).join('');
   }
 
-  function renderGraph(refs) {
+  function renderGraph(refs, options = {}) {
     const model = state.exposure.model;
     if (!model) {
       refs.graphMount.innerHTML = '<div class="eg-empty">No graph data.</div>';
@@ -619,20 +719,10 @@
       </g>`;
     }).join('');
 
-    refs.graphMount.innerHTML = `<svg class="eg-graph-svg" viewBox="0 0 760 388" role="img" aria-label="Exposure graph">${lines}${nodes}</svg>`;
-    refs.graphMount.querySelectorAll('[data-eg-node-id]').forEach((nodeEl) => {
-      const setNode = () => {
-        state.selectedNodeId = nodeEl.dataset.egNodeId;
-        render(refs);
-      };
-      nodeEl.addEventListener('click', setNode);
-      nodeEl.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          setNode();
-        }
-      });
-    });
+    const staleBanner = options.stale
+      ? `<div class="eg-meta">Stale snapshot: latest refresh failed (${options.staleReason || 'no detail'}). Displaying previous exposure graph.</div>`
+      : '';
+    refs.graphMount.innerHTML = `${staleBanner}<svg class="eg-graph-svg" viewBox="0 0 760 388" role="img" aria-label="Exposure graph">${lines}${nodes}</svg>`;
   }
 
   function renderEntity(refs) {
@@ -667,7 +757,8 @@
     if (state.risk.status === 'invalid') return buildUnknownRiskModel(state.risk.error);
     if (state.mode === 'error' || state.risk.status === 'error') return buildUnknownRiskModel(state.risk.error || 'Risk data unavailable due to a fetch failure.');
     if (state.risk.status === 'loading') return buildUnknownRiskModel('Loading live issuer account flags from XRPL.');
-    if (state.risk.status !== 'ready' || !state.risk.flags) return buildUnknownRiskModel('Risk evidence is unavailable.');
+    if (state.risk.status !== 'ready' && state.risk.status !== 'stale') return buildUnknownRiskModel('Risk evidence is unavailable.');
+    if (!state.risk.flags) return buildUnknownRiskModel('Risk evidence is unavailable.');
 
     const entries = Object.entries(state.risk.flags);
     const observedCount = entries.filter(([, v]) => v === 'Observed').length;
@@ -676,10 +767,11 @@
     return {
       statuses: state.risk.flags,
       summary: [
+        state.risk.status === 'stale' ? `Stale snapshot: latest risk refresh failed (${state.risk.error || 'no detail'}), continuing with prior evidence.` : null,
         `${observedCount} of ${entries.length} issuer-control checks are observed from account flags.`,
         unknownCount ? `${unknownCount} checks are Unknown because source data is incomplete.` : 'All checks were derived from current account flags.',
         `Source: ${state.risk.source || 'XRPL account info endpoint'} · account Flags=${state.risk.accountFlags}`,
-      ],
+      ].filter(Boolean),
       evidence: entries.map(([flag, status]) => ({
         title: flag,
         status,
