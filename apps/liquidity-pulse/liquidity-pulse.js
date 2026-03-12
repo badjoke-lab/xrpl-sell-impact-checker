@@ -5,6 +5,7 @@
   const LIQUIDITY_WINDOW = 12;
   const LIQUIDITY_EMA_ALPHA = 0.3;
   const MAX_FETCH_TIMEOUT_MS = 5000;
+  const RESIZE_DEBOUNCE_MS = 180;
 
   function boot() {
     const refs = {
@@ -67,9 +68,9 @@
       demoMode: loadBool(DEMO_KEY),
       particles: [],
       rafId: null,
-      loopStarted: 0,
-      targetFrameMs: 1000 / 24,
       snapshotTimer: null,
+      resizeTimer: null,
+      destroyed: false,
       activeRequestId: 0,
       latestSnapshot: null,
       liquiditySamples: [],
@@ -80,45 +81,75 @@
         jitterNorm: 0.03,
       },
     };
+    const cleanups = [];
 
     if (refs.liteToggle) refs.liteToggle.checked = state.liteMode;
     if (refs.demoToggle) refs.demoToggle.checked = state.demoMode;
 
     applyLiteMode();
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    const onResize = () => {
+      if (state.resizeTimer) window.clearTimeout(state.resizeTimer);
+      state.resizeTimer = window.setTimeout(() => {
+        state.resizeTimer = null;
+        resizeCanvas();
+        requestRender();
+      }, RESIZE_DEBOUNCE_MS);
+    };
+    window.addEventListener('resize', onResize);
+    cleanups.push(() => {
+      window.removeEventListener('resize', onResize);
+      if (state.resizeTimer) {
+        window.clearTimeout(state.resizeTimer);
+        state.resizeTimer = null;
+      }
+    });
 
-    refs.liteToggle?.addEventListener('change', () => {
+    const onLiteToggle = () => {
       state.liteMode = Boolean(refs.liteToggle.checked);
       saveBool(STORAGE_KEY, state.liteMode);
       applyLiteMode();
+      resizeCanvas();
       restartSnapshotLoop();
+      requestRender();
       setStatus(`Lite mode ${state.liteMode ? 'enabled' : 'disabled'}.`);
-    });
+    };
+    refs.liteToggle?.addEventListener('change', onLiteToggle);
+    cleanups.push(() => refs.liteToggle?.removeEventListener('change', onLiteToggle));
 
-    refs.demoToggle?.addEventListener('change', () => {
+    const onDemoToggle = () => {
       state.demoMode = Boolean(refs.demoToggle.checked);
       saveBool(DEMO_KEY, state.demoMode);
       setStatus(state.demoMode ? 'Demo mode enabled.' : 'Demo mode disabled.');
       void reloadSnapshot({ preferDemo: state.demoMode });
-    });
+    };
+    refs.demoToggle?.addEventListener('change', onDemoToggle);
+    cleanups.push(() => refs.demoToggle?.removeEventListener('change', onDemoToggle));
 
-    refs.retryButton?.addEventListener('click', () => {
+    const onRetry = () => {
       restartSnapshotLoop();
       setStatus('Retrying snapshot fetch…');
       void reloadSnapshot({ forceApi: true });
-    });
+    };
+    refs.retryButton?.addEventListener('click', onRetry);
+    cleanups.push(() => refs.retryButton?.removeEventListener('click', onRetry));
 
-    document.addEventListener('visibilitychange', () => {
+    const onVisibilityChange = () => {
       if (document.hidden) {
-        stopAnimation();
+        cancelPendingRender();
         stopSnapshotLoop();
         return;
       }
       restartSnapshotLoop();
-      if (state.mode === 'demo') startAnimation();
+      requestRender();
       void reloadSnapshot({ silent: true });
-    });
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    cleanups.push(() => document.removeEventListener('visibilitychange', onVisibilityChange));
+
+    const onBeforeUnload = () => cleanup();
+    window.addEventListener('beforeunload', onBeforeUnload);
+    cleanups.push(() => window.removeEventListener('beforeunload', onBeforeUnload));
 
     void init();
 
@@ -155,15 +186,17 @@
         if (node) node.hidden = name !== mode;
       });
       if (mode === 'demo') {
-        startAnimation();
+        requestRender();
         setStatus('Live rendering active.');
       } else if (mode === 'error') {
+        requestRender();
         setStatus('Unable to load data. Showing skeleton with error state.');
       } else if (mode === 'empty') {
+        requestRender();
         setStatus('No liquidity data available.');
       } else {
         setStatus('Loading snapshot…');
-        stopAnimation();
+        requestRender();
       }
     }
 
@@ -299,6 +332,7 @@
       if (refs.trendBars.h1) refs.trendBars.h1.style.height = `${snapshot.trend1h}%`;
       if (refs.trendBars.h6) refs.trendBars.h6.style.height = `${snapshot.trend6h}%`;
       if (refs.trendBars.h24) refs.trendBars.h24.style.height = `${snapshot.trend24h}%`;
+      requestRender();
     }
 
     function resetSnapshotUI() {
@@ -319,13 +353,13 @@
     }
 
     function applyLiteMode() {
-      state.targetFrameMs = state.liteMode ? 1000 / 12 : 1000 / 24;
       seedParticles();
     }
 
     function resizeCanvas() {
       const rect = refs.canvas.getBoundingClientRect();
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const dprCap = state.liteMode ? 1.25 : 1.5;
+      const dpr = Math.min(Math.max(1, window.devicePixelRatio || 1), dprCap);
       refs.canvas.width = Math.max(320, Math.floor(rect.width * dpr));
       refs.canvas.height = Math.max(220, Math.floor(rect.height * dpr));
       seedParticles();
@@ -342,36 +376,27 @@
           x: Math.random(),
           y: Math.random(),
           radius: 1 + Math.random() * (state.liteMode ? 1.8 : 3.2),
-          speed: 0.0008 + Math.random() * 0.0018,
-          drift: (Math.random() - 0.5) * 0.0012,
           phase: Math.random() * Math.PI * 2,
         });
       }
       state.particles = particles;
     }
 
-    function startAnimation() {
-      if (state.rafId || document.hidden) return;
-      state.loopStarted = performance.now();
-      state.rafId = requestAnimationFrame(loop);
+    function requestRender() {
+      if (state.destroyed || document.hidden || state.rafId) return;
+      state.rafId = requestAnimationFrame(() => {
+        state.rafId = null;
+        drawFrame();
+      });
     }
 
-    function stopAnimation() {
+    function cancelPendingRender() {
       if (!state.rafId) return;
       cancelAnimationFrame(state.rafId);
       state.rafId = null;
     }
 
-    function loop(now) {
-      const elapsed = now - state.loopStarted;
-      if (elapsed >= state.targetFrameMs) {
-        drawFrame(elapsed);
-        state.loopStarted = now;
-      }
-      state.rafId = requestAnimationFrame(loop);
-    }
-
-    function drawFrame(elapsedMs) {
+    function drawFrame() {
       if (!ctx) return;
       const w = refs.canvas.width;
       const h = refs.canvas.height;
@@ -391,9 +416,10 @@
       const amp = h * (0.03 + state.visual.amplitudeNorm * (state.liteMode ? 0.08 : 0.13)) * staleSoftener;
       const baseY = h * 0.5;
       const jitterPx = state.visual.jitterNorm * 18;
+      const wavePhase = (state.latestSnapshot?.swaps5m || 0) * 0.05;
       for (let x = 0; x <= w; x += 14) {
-        const jitter = Math.sin((x * 0.06) + elapsedMs * 0.01) * jitterPx;
-        const y = baseY + Math.sin((x + elapsedMs * 0.06) * 0.018) * amp + jitter;
+        const jitter = Math.sin((x * 0.06) + wavePhase) * jitterPx;
+        const y = baseY + Math.sin((x * 0.018) + wavePhase * 0.7) * amp + jitter;
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
@@ -401,10 +427,6 @@
 
       ctx.fillStyle = 'rgba(37, 99, 235, 0.45)';
       state.particles.forEach((particle) => {
-        particle.phase += particle.speed * elapsedMs;
-        particle.y += particle.drift * elapsedMs;
-        if (particle.y < -0.05) particle.y = 1.05;
-        if (particle.y > 1.05) particle.y = -0.05;
         const px = particle.x * w;
         const py = particle.y * h + Math.sin(particle.phase) * (7 + state.visual.jitterNorm * 16);
 
@@ -443,6 +465,19 @@
       };
 
       seedParticles();
+      requestRender();
+    }
+
+    function cleanup() {
+      if (state.destroyed) return;
+      state.destroyed = true;
+      cancelPendingRender();
+      stopSnapshotLoop();
+      if (state.resizeTimer) {
+        window.clearTimeout(state.resizeTimer);
+        state.resizeTimer = null;
+      }
+      cleanups.forEach((fn) => fn());
     }
 
     function logScale(value, scaleMax) {
