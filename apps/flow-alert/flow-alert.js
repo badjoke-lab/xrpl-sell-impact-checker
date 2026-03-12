@@ -1,4 +1,5 @@
 (() => {
+  let appCleanup = null;
   const LITE_KEY = 'xsic.flowAlert.liteMode';
   const DEMO_KEY = 'xsic.flowAlert.demoOnly';
   const PRESET_KEY = 'xsic.flowAlert.targetPreset';
@@ -63,6 +64,7 @@
   }
 
   function boot() {
+    if (typeof appCleanup === 'function') appCleanup();
     const refs = {
       canvasWrap: document.getElementById('flowCanvasWrap'),
       canvas: document.getElementById('flowCanvas'),
@@ -137,7 +139,7 @@
     };
 
     if (!refs.canvas || !refs.canvasWrap) return;
-    init(refs);
+    appCleanup = init(refs);
   }
 
   function init(refs) {
@@ -156,8 +158,36 @@
       pinnedCell: null,
       lastRefreshMs: 0,
       timer: null,
+      resizeTimer: null,
+      hoverRaf: 0,
       isFetching: false,
+      isPageHidden: document.hidden === true,
+      abortController: null,
       detectedEventsCache: {},
+      heatmapLayout: null,
+    };
+
+    const cleanups = [];
+    const addManagedListener = (target, type, handler, options) => {
+      target.addEventListener(type, handler, options);
+      cleanups.push(() => target.removeEventListener(type, handler, options));
+    };
+    const stopPolling = () => {
+      if (state.timer) {
+        clearInterval(state.timer);
+        state.timer = null;
+      }
+    };
+    const abortInFlight = () => {
+      if (state.abortController) {
+        state.abortController.abort();
+        state.abortController = null;
+      }
+    };
+    const startPolling = () => {
+      if (state.isPageHidden) return;
+      stopPolling();
+      state.timer = window.setInterval(() => syncData(refs, state), state.liteMode ? 12_000 : 8_000);
     };
 
     refs.liteToggle.checked = state.liteMode;
@@ -165,47 +195,55 @@
     refs.presetSelect.value = state.preset;
     refs.windowSelect.value = state.window;
 
-    refs.liteToggle.addEventListener('change', () => {
+    const liteToggleHandler = () => {
       state.liteMode = refs.liteToggle.checked;
       saveBool(LITE_KEY, state.liteMode);
       renderCycle();
-    });
+    };
+    addManagedListener(refs.liteToggle, 'change', liteToggleHandler);
 
-    refs.demoToggle.addEventListener('change', () => {
+    const demoToggleHandler = () => {
       state.demoOnly = refs.demoToggle.checked;
       saveBool(DEMO_KEY, state.demoOnly);
       renderCycle(true);
-    });
+    };
+    addManagedListener(refs.demoToggle, 'change', demoToggleHandler);
 
-    refs.presetSelect.addEventListener('change', () => {
+    const presetChangeHandler = () => {
       state.preset = refs.presetSelect.value;
       saveValue(PRESET_KEY, state.preset);
       renderCycle(true);
-    });
+    };
+    addManagedListener(refs.presetSelect, 'change', presetChangeHandler);
 
-    refs.windowSelect.addEventListener('change', () => {
+    const windowChangeHandler = () => {
       state.window = refs.windowSelect.value;
       saveValue(WINDOW_KEY, state.window);
       renderCycle(true);
-    });
+    };
+    addManagedListener(refs.windowSelect, 'change', windowChangeHandler);
 
-    refs.refreshButton?.addEventListener('click', () => renderCycle(true));
+    if (refs.refreshButton) addManagedListener(refs.refreshButton, 'click', () => renderCycle(true));
 
-    refs.retryButton?.addEventListener('click', () => {
-      state.forcedMode = null;
-      renderCycle(true);
-    });
+    if (refs.retryButton) {
+      addManagedListener(refs.retryButton, 'click', () => {
+        state.forcedMode = null;
+        renderCycle(true);
+      });
+    }
 
-    refs.emptyButton?.addEventListener('click', () => {
-      state.preset = 'exchanges';
-      refs.presetSelect.value = 'exchanges';
-      saveValue(PRESET_KEY, state.preset);
-      state.forcedMode = null;
-      renderCycle(true);
-    });
+    if (refs.emptyButton) {
+      addManagedListener(refs.emptyButton, 'click', () => {
+        state.preset = 'exchanges';
+        refs.presetSelect.value = 'exchanges';
+        saveValue(PRESET_KEY, state.preset);
+        state.forcedMode = null;
+        renderCycle(true);
+      });
+    }
 
     refs.debugButtons.forEach((button) => {
-      button.addEventListener('click', () => {
+      addManagedListener(button, 'click', () => {
         const mode = button.dataset.flowForce;
         if (!FORCE_MODES.has(mode)) return;
         state.forcedMode = mode === 'ok' ? null : mode;
@@ -215,18 +253,50 @@
       });
     });
 
-    window.addEventListener('resize', () => renderHeatmap(refs, state));
-    bindCanvasInteraction(refs, state);
+    const resizeHandler = () => {
+      if (state.isPageHidden) return;
+      if (state.resizeTimer) clearTimeout(state.resizeTimer);
+      state.resizeTimer = window.setTimeout(() => {
+        state.resizeTimer = null;
+        renderHeatmap(refs, state);
+      }, 180);
+    };
+    addManagedListener(window, 'resize', resizeHandler);
+
+    const visibilityHandler = () => {
+      state.isPageHidden = document.hidden === true;
+      if (state.isPageHidden) {
+        stopPolling();
+        abortInFlight();
+        refs.tooltip.hidden = true;
+        cancelHoverFrame(state);
+        return;
+      }
+      renderHeatmap(refs, state);
+      startPolling();
+      syncData(refs, state);
+    };
+    addManagedListener(document, 'visibilitychange', visibilityHandler);
+
+    cleanups.push(bindCanvasInteraction(refs, state));
     renderCycle(true);
 
     function renderCycle(immediate = false) {
-      clearInterval(state.timer);
-      state.timer = window.setInterval(() => syncData(refs, state), state.liteMode ? 12_000 : 8_000);
-      if (immediate) syncData(refs, state);
+      startPolling();
+      if (immediate && !state.isPageHidden) syncData(refs, state);
     }
+
+    return () => {
+      stopPolling();
+      abortInFlight();
+      if (state.resizeTimer) clearTimeout(state.resizeTimer);
+      cancelHoverFrame(state);
+      cleanups.forEach((fn) => fn());
+    };
   }
 
   async function syncData(refs, state) {
+    if (state.isPageHidden || state.isFetching) return;
     if (!state.preset) {
       state.mode = 'empty';
       state.payload = null;
@@ -239,6 +309,8 @@
     }
 
     state.isFetching = true;
+    const controller = new AbortController();
+    state.abortController = controller;
     if (!state.payload) {
       state.mode = 'loading';
       renderPanels(refs, state);
@@ -251,17 +323,16 @@
     }
 
     let result;
-    if (state.demoOnly) {
-      result = {
-        flow: makeDemoPayload(state),
-        escrow: makeDemoEscrowPayload(state),
-        history: makeDemoHistoryPayload(state),
-      };
-    } else {
-      result = await fetchLivePayload(state);
-    }
-
     try {
+      if (state.demoOnly) {
+        result = {
+          flow: makeDemoPayload(state),
+          escrow: makeDemoEscrowPayload(state),
+          history: makeDemoHistoryPayload(state),
+        };
+      } else {
+        result = await fetchLivePayload(state, controller.signal);
+      }
       state.payload = result.flow;
       state.escrowPayload = result.escrow;
       state.historyPayload = result.history;
@@ -275,15 +346,20 @@
       renderEscrow(refs, state);
       renderHistory(refs, state);
       renderHistoryStrip(refs, state);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        throw error;
+      }
     } finally {
       state.isFetching = false;
+      if (state.abortController === controller) state.abortController = null;
       renderPanels(refs, state);
       renderHistory(refs, state);
       renderHistoryStrip(refs, state);
     }
   }
 
-  async function fetchLivePayload(state) {
+  async function fetchLivePayload(state, signal) {
     const flowUrl = `/api/xrpl/whale-flow?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}`;
     const escrowWindow = state.window;
     const escrowLimit = state.liteMode || state.window === '24h' || state.window === '7d' ? 5 : 10;
@@ -291,22 +367,23 @@
     const historyUrl = `/api/xrpl/flow-history?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}&limit=24`;
 
     const [flow, escrow] = await Promise.all([
-      fetchFlowPayload(flowUrl, state),
-      fetchEscrowPayload(escrowUrl, escrowWindow),
+      fetchFlowPayload(flowUrl, state, signal),
+      fetchEscrowPayload(escrowUrl, escrowWindow, signal),
     ]);
 
-    const history = await fetchHistoryPayload(historyUrl);
+    const history = await fetchHistoryPayload(historyUrl, signal);
 
     return { flow, escrow, history };
   }
 
-  async function fetchFlowPayload(url, state) {
+  async function fetchFlowPayload(url, state, signal) {
     const startedAt = Date.now();
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       if (!response.ok) throw new Error(`http_${response.status}`);
       return await response.json();
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') throw error;
       return {
         ok: false,
         ts: Date.now(),
@@ -324,12 +401,13 @@
     }
   }
 
-  async function fetchEscrowPayload(url, window) {
+  async function fetchEscrowPayload(url, window, signal) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       if (!response.ok) throw new Error(`http_${response.status}`);
       return await response.json();
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') throw error;
       return {
         ok: false,
         ts: Date.now(),
@@ -345,12 +423,13 @@
       };
     }
   }
-  async function fetchHistoryPayload(url) {
+  async function fetchHistoryPayload(url, signal) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       if (!response.ok) throw new Error(`http_${response.status}`);
       return await response.json();
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') throw error;
       return { ok: false, latest: null, previous: null, recent: [], deltaSummary: { netXrpDelta: null }, historyMeta: { count: 0 } };
     }
   }
@@ -833,16 +912,19 @@
   }
 
   function renderHeatmap(refs, state) {
+    if (state.isPageHidden) return;
     const ctx = refs.canvas.getContext('2d');
     if (!ctx) return;
 
     const width = Math.floor(refs.canvasWrap.clientWidth - 24);
     const height = 320;
-    refs.canvas.width = width * devicePixelRatio;
-    refs.canvas.height = height * devicePixelRatio;
+    const dprCap = state.liteMode ? 1.25 : 1.5;
+    const effectiveDpr = Math.min(window.devicePixelRatio || 1, dprCap);
+    refs.canvas.width = width * effectiveDpr;
+    refs.canvas.height = height * effectiveDpr;
     refs.canvas.style.height = `${height}px`;
     refs.canvas.style.width = `${width}px`;
-    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    ctx.setTransform(effectiveDpr, 0, 0, effectiveDpr, 0, 0);
     ctx.fillStyle = '#f8fafc';
     ctx.fillRect(0, 0, width, height);
 
@@ -856,6 +938,7 @@
     const chartH = height - topPad - 48;
     const cellW = chartW / cols;
     const cellH = chartH / Math.max(1, labels.length);
+    state.heatmapLayout = { leftPad, topPad, chartW, chartH, cols, rows: Math.max(1, labels.length), cellW, cellH };
     const max = Math.max(...state.heatmapCells.map((cell) => cell.value), 1);
 
     state.heatmapCells.forEach((cell) => {
@@ -873,14 +956,7 @@
       ctx.fillText(label, 8, y);
     });
 
-    if (state.hoveredCell || state.pinnedCell) {
-      const cell = state.pinnedCell || state.hoveredCell;
-      const x = leftPad + cell.x * cellW;
-      const y = topPad + cell.y * cellH;
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, y + 1, Math.max(2, cellW - 2), Math.max(2, cellH - 2));
-    }
+    updateHoverOverlay(refs, state);
   }
 
   function renderEvents(refs, state) {
@@ -1070,18 +1146,27 @@
   }
 
   function bindCanvasInteraction(refs, state) {
+    refs.canvasWrap.style.position = refs.canvasWrap.style.position || 'relative';
+    const hoverOverlay = document.createElement('div');
+    hoverOverlay.id = 'flowHoverCell';
+    Object.assign(hoverOverlay.style, {
+      position: 'absolute',
+      border: '2px solid #0f172a',
+      pointerEvents: 'none',
+      display: 'none',
+      zIndex: '2',
+      boxSizing: 'border-box',
+    });
+    refs.canvasWrap.appendChild(hoverOverlay);
+    refs.hoverOverlay = hoverOverlay;
+
     const findCell = (clientX, clientY) => {
       const cells = state.heatmapCells || [];
-      if (!cells.length || !state.payload) return null;
+      if (!cells.length || !state.payload || !state.heatmapLayout) return null;
       const rect = refs.canvas.getBoundingClientRect();
       const x = clientX - rect.left;
       const y = clientY - rect.top;
-      const leftPad = 92;
-      const topPad = 18;
-      const chartW = rect.width - leftPad - 14;
-      const chartH = rect.height - topPad - 48;
-      const cols = Math.max(1, state.payload.heatmap.buckets?.length || 1);
-      const rows = Math.max(1, state.payload.heatmap.labels?.length || 1);
+      const { leftPad, topPad, chartW, chartH, cols, rows } = state.heatmapLayout;
       if (x < leftPad || x > leftPad + chartW || y < topPad || y > topPad + chartH) return null;
       const cx = Math.max(0, Math.min(cols - 1, Math.floor(((x - leftPad) / chartW) * cols)));
       const cy = Math.max(0, Math.min(rows - 1, Math.floor(((y - topPad) / chartH) * rows)));
@@ -1102,19 +1187,28 @@
       refs.tooltip.dataset.fixed = fixed ? '1' : '';
     };
 
+    const queueHoverOverlayUpdate = () => {
+      if (state.isPageHidden || state.hoverRaf) return;
+      state.hoverRaf = window.requestAnimationFrame(() => {
+        state.hoverRaf = 0;
+        updateHoverOverlay(refs, state);
+      });
+    };
+
     const moveHandler = (event) => {
-      if (state.pinnedCell) return;
+      if (state.isPageHidden || state.pinnedCell) return;
       const cell = findCell(event.clientX, event.clientY);
       state.hoveredCell = cell;
       showTooltip(cell, event.clientX, event.clientY);
-      renderHeatmap(refs, state);
+      queueHoverOverlayUpdate();
     };
 
     const leaveHandler = () => {
+      if (state.isPageHidden) return;
       if (state.pinnedCell) return;
       state.hoveredCell = null;
       refs.tooltip.hidden = true;
-      renderHeatmap(refs, state);
+      queueHoverOverlayUpdate();
     };
 
     const clickHandler = (event) => {
@@ -1129,6 +1223,38 @@
       target.addEventListener('mouseleave', leaveHandler);
       target.addEventListener('click', clickHandler);
     });
+
+    return () => {
+      cancelHoverFrame(state);
+      [refs.canvas, refs.canvasWrap].forEach((target) => {
+        target.removeEventListener('mousemove', moveHandler);
+        target.removeEventListener('mouseleave', leaveHandler);
+        target.removeEventListener('click', clickHandler);
+      });
+      refs.hoverOverlay?.remove();
+    };
+  }
+
+  function cancelHoverFrame(state) {
+    if (!state.hoverRaf) return;
+    cancelAnimationFrame(state.hoverRaf);
+    state.hoverRaf = 0;
+  }
+
+  function updateHoverOverlay(refs, state) {
+    const overlay = refs.hoverOverlay;
+    const layout = state.heatmapLayout;
+    const cell = state.pinnedCell || state.hoveredCell;
+    if (!overlay || !layout || !cell || state.mode === 'loading') {
+      if (overlay) overlay.style.display = 'none';
+      return;
+    }
+    const { leftPad, topPad, cellW, cellH } = layout;
+    overlay.style.display = 'block';
+    overlay.style.left = `${leftPad + cell.x * cellW + 1}px`;
+    overlay.style.top = `${topPad + cell.y * cellH + 1}px`;
+    overlay.style.width = `${Math.max(2, cellW - 2)}px`;
+    overlay.style.height = `${Math.max(2, cellH - 2)}px`;
   }
 
   function toggleOverlay(refs, mode) {
