@@ -48,30 +48,7 @@
             data-i18n="header.wallet_not_required"
             hidden
           ></button>
-          <div
-            class="lang-switch"
-            role="group"
-            aria-label="Language"
-            data-i18n-aria-label="language.label"
-          >
-            <span class="lang-switch__label" data-i18n="language.label"></span>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="en"
-              aria-pressed="false"
-            >
-              EN
-            </button>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="ja"
-              aria-pressed="false"
-            >
-              JA
-            </button>
-          </div>
+          
         </div>
         <p class="app__catchcopy" data-i18n="header.tagline"></p>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
@@ -204,7 +181,7 @@
           <div class="actions">
   <div class="action-row" aria-label="Actions">
     <div class="action-row__left">      <button class="secondary-button" type="button" id="reset-inputs" data-i18n="actions.reset">Reset</button>
-      <button class="secondary-button" type="button" id="copy-link" data-i18n="actions.copy_link">Copy link</button>
+      <button class="ghost-button" type="button" id="copy-link" data-i18n="actions.copy_link">Copy link</button>
     </div>
     <div class="action-row__right">
       <button class="primary-button" type="button" data-i18n="actions.estimate">Estimate</button>
@@ -225,15 +202,14 @@
         </section>
 
 <section id="results-section" class="results" aria-label="Results">
-  <nav class="results-tabs" aria-label="Results tabs">
-    <a class="tab" data-tab="summary" href="#summary-block">Summary</a>
-    <a class="tab" data-tab="details" href="#details-block">Details</a>
-<a class="tab" data-tab="debug" href="#debug-panel"  >Debug</a>
-  </nav>
+  <article class="card" aria-labelledby="quick-heading">
+    <div class="card__header"><h2 id="quick-heading">Quick decision</h2></div>
+    <p class="chart__help">Read this first: signal and key outcomes are shown above supporting details.</p>
+  </article>
 
 
         <section class="grid two-column">
-          <article id="summary-block" class="card" aria-labelledby="result-summary" data-pane="summary">
+          <article id="summary-block" class="card" aria-labelledby="result-summary">
             <div class="card__header">
               <h2 id="result-summary" data-i18n="sections.results_summary"></h2>
             </div>
@@ -274,7 +250,12 @@
             <p class="warning-banner" data-result="warning" hidden></p>
           </article>
 
-          <article id="details-block" class="card" aria-labelledby="result-details" data-pane="details">
+          <article class="card" aria-labelledby="explain-heading">
+            <div class="card__header"><h2 id="explain-heading">Explain and route context</h2></div>
+            <p class="chart__help">Route detail, depth, and impact context follow after quick metrics.</p>
+          </article>
+
+          <article id="details-block" class="card" aria-labelledby="result-details">
             <div class="card__header">
               <h2 id="result-details" data-i18n="sections.execution_details"></h2>
             </div>
@@ -356,7 +337,12 @@
 </article>
         </section>
 
-        <details class="card debug-panel" id="debug-panel" hidden data-pane="debug">
+        <article class="card" aria-labelledby="debug-heading">
+          <div class="card__header"><h2 id="debug-heading">Debug (developer only)</h2></div>
+          <p class="chart__help">Collapsed by default so it does not interrupt decision flow.</p>
+        </article>
+
+        <details class="card debug-panel" id="debug-panel" data-pane="debug">
           <summary class="debug-panel__summary">Debug panel</summary>
           <div class="debug-panel__body">
             <div class="debug-panel__actions">
@@ -440,9 +426,7 @@
         </details>
 
         
-</details>
 
-</details>
   </section>
 
 
