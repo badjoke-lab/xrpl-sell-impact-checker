@@ -3989,6 +3989,23 @@ export function initSellImpact() {
       }
     };
 
+    // ---------- lifecycle ----------
+    const localCleanups = [];
+    let cleaned = false;
+    const runCleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      while (localCleanups.length) {
+        const dispose = localCleanups.pop();
+        try { dispose?.(); } catch (_e) {}
+      }
+    };
+    const addManagedListener = (target, eventName, handler, options) => {
+      if (!target) return;
+      target.addEventListener(eventName, handler, options);
+      localCleanups.push(() => target.removeEventListener(eventName, handler, options));
+    };
+
     // ---------- dropdown placement ----------
     try {
       if (list.parentElement !== document.body) document.body.appendChild(list);
@@ -4009,7 +4026,7 @@ export function initSellImpact() {
     const createThrottle = (fn, waitMs) => {
       let last = 0;
       let timer = null;
-      return () => {
+      const throttled = () => {
         const now = Date.now();
         const remain = waitMs - (now - last);
         if (remain <= 0) {
@@ -4030,6 +4047,13 @@ export function initSellImpact() {
           fn();
         }, remain);
       };
+      throttled.cancel = () => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      };
+      return throttled;
     };
 
     const throttledPlace = createThrottle(place, 180);
@@ -4048,8 +4072,9 @@ export function initSellImpact() {
       input.removeAttribute("aria-activedescendant");
     };
 
-    window.addEventListener("scroll", throttledPlace, true);
-    window.addEventListener("resize", throttledPlace, true);
+    addManagedListener(window, "scroll", throttledPlace, true);
+    addManagedListener(window, "resize", throttledPlace, true);
+    localCleanups.push(() => throttledPlace.cancel?.());
 
     // ---------- load presets ----------
     let pool = [];
@@ -4229,10 +4254,10 @@ export function initSellImpact() {
       if (active >= 0) updateActive(active);
     };
 
-    input.addEventListener("input", run);
-    input.addEventListener("focus", run);
+    addManagedListener(input, "input", run);
+    addManagedListener(input, "focus", run);
 
-    input.addEventListener("keydown", (e) => {
+    const keydownHandler = (e) => {
       const isOpen = list.getAttribute("data-open") === "1";
       const items = list.querySelectorAll(".token-suggestion-btn");
       if (!isOpen || !items.length) return;
@@ -4251,14 +4276,18 @@ export function initSellImpact() {
         e.preventDefault();
         close();
       }
-    });
+    };
+    addManagedListener(input, "keydown", keydownHandler);
 
     // outside click closes
-    document.addEventListener("mousedown", (e) => {
+    const outsideClickHandler = (e) => {
       if (e.target === input) return;
       if (list.contains(e.target)) return;
       close();
-    });
+    };
+    addManagedListener(document, "mousedown", outsideClickHandler);
+    addManagedListener(window, "pagehide", runCleanup);
+    addManagedListener(window, "beforeunload", runCleanup);
 
     close();
   };

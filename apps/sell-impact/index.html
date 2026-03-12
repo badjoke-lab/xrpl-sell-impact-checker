@@ -204,7 +204,14 @@
 <section id="results-section" class="results" aria-label="Results">
   <article class="card" aria-labelledby="quick-heading">
     <div class="card__header"><h2 id="quick-heading">Quick decision</h2></div>
-    <p class="chart__help">Read this first: signal and key outcomes are shown above supporting details.</p>
+    <p class="chart__help">Top section answers "what happens now" first. The blocks below explain route and depth context without blocking quick read.</p>
+  </article>
+
+  <article class="card" aria-labelledby="stale-partial-heading">
+    <div class="card__header"><h2 id="stale-partial-heading">Stale / partial note</h2></div>
+    <p class="chart__help">When live fetch is delayed or partial, warnings are shown here while keeping the quick decision cards readable.</p>
+    <p class="warning-banner" data-result="fiat-warning" hidden></p>
+    <p class="warning-banner" data-result="warning" hidden></p>
   </article>
 
 
@@ -234,7 +241,6 @@
                 <p class="value" data-result="receive" data-i18n="common.placeholder"></p>
                 <p class="subvalue" data-result="fiat-rate" data-i18n="results.receive.fiat_pending"></p>
               </div>
-              <p class="warning-banner" data-result="fiat-warning" hidden></p>
               <div class="result-row">
                 <p class="label" data-i18n="results.slippage.label"></p>
                 <p class="value" data-result="slippage" data-i18n="common.placeholder"></p>
@@ -247,7 +253,6 @@
               </div>
             </div>
             <p class="why-line" data-result="why"></p>
-            <p class="warning-banner" data-result="warning" hidden></p>
           </article>
 
           <article class="card" aria-labelledby="explain-heading">
@@ -293,9 +298,14 @@
                 <span data-result="endpoint-details" data-i18n="common.placeholder"></span>
               </li>
             </ul>
-          
+          </article>
 
-<section id="charts-block" class="grid two-column">
+          <article class="card" aria-labelledby="why-route-heading">
+            <div class="card__header"><h2 id="why-route-heading">Why Route / Candidate / Snapshot context</h2></div>
+            <p class="chart__help">Explain section is bounded and lightweight: chosen venue reason, route-quality context, and snapshot-backed depth/impact charts only.</p>
+          </article>
+
+<section id="charts-block" class="grid two-column" aria-label="Main Viz">
           <article class="card" aria-labelledby="graph-depth">
             <div class="card__header">
               <h2 id="graph-depth" data-i18n="sections.depth_curve"></h2>
@@ -334,7 +344,6 @@
             <p class="chart__summary" data-result="impact-summary"></p>
           </article>
         </section>
-</article>
         </section>
 
         <article class="card" aria-labelledby="debug-heading">
