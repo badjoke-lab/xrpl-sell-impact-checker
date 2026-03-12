@@ -1330,8 +1330,8 @@ html, body { background: #ffffff !important; }
 
   /* fixed jump (Inputs/Results) */
   .mobile-jump {
-    position: sticky;
-    top: 0;
+    position: static;
+    top: auto;
     z-index: 20;
     display: flex;
     gap: 10px;
@@ -1463,8 +1463,8 @@ html, body { background: #ffffff !important; }
   z-index: 70;
   border: 1px solid rgba(0,0,0,0.14);
   border-radius: 14px;
-  background: rgba(255,255,255,0.98);
-  backdrop-filter: blur(10px);
+  background: #fff;
+  backdrop-filter: none;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0,0,0,0.10);
 }
