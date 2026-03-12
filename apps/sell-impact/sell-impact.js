@@ -119,14 +119,9 @@
 
 import {
   applyTranslations,
-  bindLanguageSwitcher,
-  getActiveLang,
   getTranslationOrFallback,
   loadDictionary,
-  normalizeLang,
-  resolvePreferredLang,
   setActiveLang,
-  storeLang,
   t,
 } from "/src/i18n/index.js";
 import { normalizeCurrencyInput } from "/shared/normalizeCurrency.js";
@@ -320,12 +315,13 @@ export function initSellImpact() {
   };
 
   const initI18n = async () => {
+    setActiveLang("en");
     try {
-      await loadDictionary(getActiveLang());
+      await loadDictionary("en");
       applyTranslations();
       renderQuickFillSuggestions();
       if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
-        console.info("i18n loaded", getActiveLang());
+        console.info("i18n loaded", "en");
       }
     } catch (error) {
       applyTranslations();
@@ -333,18 +329,11 @@ export function initSellImpact() {
       showI18nError();
     }
 
-    bindLanguageSwitcher({
-      updateUrl: false,
-      onChange: () => {
-        updateImpactThresholdHelp(getImpactThresholdPct());
-        updateMaxSellLabel(getImpactThresholdPct());
-        updateLiquiditySplitLabel(getImpactThresholdPct());
-        setEstimateButtonBusy(Boolean(estimateButton?.disabled));
-        renderQuickFillSuggestions();
-        refreshStatusLine();
-        scheduleShareUrlUpdate({ immediate: true });
-      },
-    });
+    updateImpactThresholdHelp(getImpactThresholdPct());
+    updateMaxSellLabel(getImpactThresholdPct());
+    updateLiquiditySplitLabel(getImpactThresholdPct());
+    setEstimateButtonBusy(Boolean(estimateButton?.disabled));
+    refreshStatusLine();
   };
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -497,11 +486,7 @@ export function initSellImpact() {
     },
   };
 
-  const preferredLang = resolvePreferredLang();
-  if (preferredLang) {
-    setActiveLang(preferredLang);
-    storeLang(preferredLang);
-  }
+  setActiveLang("en");
 
   if (debugPanel) {
     debugPanel.hidden = !isDebugEnabled;
@@ -1586,7 +1571,6 @@ export function initSellImpact() {
     const threshold = sanitizeThreshold(impactThresholdSelect?.value);
     const thinCutoff = sanitizeThinCutoff(thinCutoffInput?.value);
     const fiat = sanitizeFiat(fiatCurrencySelect?.value);
-    const lang = getActiveLang();
     const limitRaw = limitInput?.value;
     const limit =
       limitRaw === "" || limitRaw === null || limitRaw === undefined
@@ -1601,13 +1585,12 @@ export function initSellImpact() {
       threshold,
       thinCutoff,
       fiat,
-      lang,
     };
   };
 
   const buildShareParams = () => {
     const params = new URLSearchParams();
-    const { currency, issuer, amount, limit, threshold, thinCutoff, fiat, lang } =
+    const { currency, issuer, amount, limit, threshold, thinCutoff, fiat } =
       getShareInputState();
     const hasPrimary = Boolean(currency || amount);
     if (!hasPrimary) {
@@ -1638,9 +1621,6 @@ export function initSellImpact() {
     const resolvedFiat = fiat ?? DEFAULT_FIAT;
     if (resolvedFiat) {
       params.set("fiat", resolvedFiat);
-    }
-    if (lang) {
-      params.set("lang", lang);
     }
     return params;
   };
@@ -1686,7 +1666,6 @@ export function initSellImpact() {
       params.get("slippagePercent") ?? params.get("slippage") ?? params.get("threshold");
     const thinCutoffParam = params.get("thinCutoffPercent") ?? params.get("thin");
     const fiatParam = params.get("fiat");
-    const langParam = params.get("lang");
 
     const currencyResult = currencyParam ? normalizeCurrencyInput(currencyParam) : null;
     const currency = currencyResult?.error ? null : currencyResult?.currencyNormalized ?? null;
@@ -1717,12 +1696,6 @@ export function initSellImpact() {
     const fiat = fiatParam ? sanitizeFiat(fiatParam) : null;
     if (fiatParam && !fiat) {
       hadInvalidParam = true;
-    }
-
-    const lang = normalizeLang(langParam);
-    if (langParam && lang) {
-      setActiveLang(lang);
-      storeLang(lang);
     }
 
     let issuer = issuerParam ? sanitizeIssuer(issuerParam) : null;
@@ -4022,6 +3995,9 @@ export function initSellImpact() {
     } catch (_e) {}
 
     const place = () => {
+      if (list.getAttribute("data-open") !== "1") {
+        return;
+      }
       const r = input.getBoundingClientRect();
       list.style.position = "fixed";
       list.style.left = Math.max(8, r.left) + "px";
@@ -4029,6 +4005,34 @@ export function initSellImpact() {
       list.style.width = Math.max(240, r.width) + "px";
       list.style.zIndex = "2147483647";
     };
+
+    const createThrottle = (fn, waitMs) => {
+      let last = 0;
+      let timer = null;
+      return () => {
+        const now = Date.now();
+        const remain = waitMs - (now - last);
+        if (remain <= 0) {
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+          last = now;
+          fn();
+          return;
+        }
+        if (timer) {
+          return;
+        }
+        timer = setTimeout(() => {
+          timer = null;
+          last = Date.now();
+          fn();
+        }, remain);
+      };
+    };
+
+    const throttledPlace = createThrottle(place, 180);
 
     const open = () => {
       place();
@@ -4044,8 +4048,8 @@ export function initSellImpact() {
       input.removeAttribute("aria-activedescendant");
     };
 
-    window.addEventListener("scroll", place, true);
-    window.addEventListener("resize", place, true);
+    window.addEventListener("scroll", throttledPlace, true);
+    window.addEventListener("resize", throttledPlace, true);
 
     // ---------- load presets ----------
     let pool = [];
@@ -4822,170 +4826,16 @@ export function initSellImpact() {
       }
     }catch(_e){}
 
-  /* XSIC-UI T04: results tabs behavior */
+  /* Keep debug discoverable without relying on legacy tabs. */
   (function(){
-    function openIfDetails(el){
-      if(!el) return;
-      if(el.tagName && el.tagName.toLowerCase() === 'details') {
-        el.open = true;
-      }
-    }
-    document.addEventListener('click', function(ev){
-      var a = ev.target && ev.target.closest ? ev.target.closest('a[data-tab-target]') : null;
-      if(!a) return;
-      var sel = a.getAttribute('data-tab-target');
-      if(!sel) return;
-      var target = document.querySelector(sel);
-      if(!target) return;
-      ev.preventDefault();
-      openIfDetails(target);
-      target.scrollIntoView({behavior:'smooth', block:'start'});
-    }, {passive:false});
-  })();
-
-  /* XSIC-UI T04c: tab controller */
-  (function(){
-    var tabs = Array.prototype.slice.call(document.querySelectorAll('.results-tabs .tab[data-tab]'));
-    if(!tabs.length) return;
-
-    var panes = {
-      summary: [document.getElementById('summary-block')],
-      details: [document.getElementById('details-block'), document.getElementById('charts-block')],
-      debug:   [document.getElementById('debug-panel')]
-    };
-
-    function setTab(key){
-      tabs.forEach(function(t){
-        var on = (t.getAttribute('data-tab') === key);
-        t.setAttribute('aria-selected', on ? 'true' : 'false');
-      });
-
-      Object.keys(panes).forEach(function(k){
-        panes[k].forEach(function(el){
-          if(!el) return;
-          if(k === key) el.removeAttribute('hidden');
-          else el.setAttribute('hidden','hidden');
-        });
-      });
-
-      // keep URL hash in sync (optional, but useful)
-      try { history.replaceState(null, '', '#'+key); } catch(_e){}
-    }
-
-    // default: summary
-    var initial = (location.hash || '').replace('#','');
-    if(!panes[initial]) initial = 'summary';
-    setTab(initial);
-
-    tabs.forEach(function(t){
-      t.addEventListener('click', function(ev){
-        ev.preventDefault();
-        setTab(t.getAttribute('data-tab'));
-      });
-    });
-
-    // expose for error hook (T08)
-    window.__xsicSetTab = setTab;
-  })();
-  /* XSIC-UI T04e: ensure pane ids by headings */
-  (function(){
-    function ensureCardIdByHeading(headingId, cardId){
-      var h = document.getElementById(headingId);
-      if(!h) return null;
-      var card = h.closest("article.card") || h.closest(".card");
-      if(card && !card.id) card.id = cardId;
-      if(card && card.id !== cardId) card.id = cardId; // force
-      return card;
-    }
-
-    // Summary / Details panes
-    ensureCardIdByHeading("result-summary", "summary-block");
-    ensureCardIdByHeading("result-details", "details-block");
-
-    // Charts pane (already exists, but keep robust)
-    if(!document.getElementById("charts-block")){
-      var depthH = document.getElementById("graph-depth");
-      if(depthH){
-        var sec = depthH.closest("section.grid") || depthH.closest("section");
-        if(sec) sec.id = "charts-block";
-      }
-    }
-
-    // Debug pane (details#debug-panel should already exist)
-    var dbg = document.getElementById("debug-panel");
-    if(dbg && dbg.tagName && dbg.tagName.toLowerCase() === "details"){
-      // ok
-    }
-
-    // If tab controller exists, re-run selection once IDs are ensured
-    if(typeof window.__xsicSetTab === "function"){
-      try { window.__xsicSetTab("summary"); } catch(_e){}
-    }
-  })();
-
-  /* XSIC-UI T04f: tab controller */
-  (function(){
-    function setTab(tab){
-      var rs = document.getElementById("results-section");
-      if(!rs) return;
-      rs.setAttribute("data-active-tab", tab);
-      document.querySelectorAll(".results-tabs .tab").forEach(function(b){
-        b.classList.toggle("is-active", b.getAttribute("data-tab") === tab);
-      });
-    }
-    // expose for other hooks
-    window.__xsicSetTab = setTab;
-
-    document.addEventListener("click", function(ev){
-      var btn = ev.target && ev.target.closest ? ev.target.closest(".results-tabs .tab") : null;
-      if(!btn) return;
-      ev.preventDefault();
-      setTab(btn.getAttribute("data-tab") || "summary");
-    }, {passive:false});
-
-    // default
-    setTab("summary");
-  })();
-
-  /* XSIC-UI T08: auto-open debug on error */
-  (function(){
-    // Hook updateDebugPanel to auto-open debug pane when error exists
-    if (typeof window.updateDebugPanel !== "function") {
-      // updateDebugPanel is in module scope in this file, so also try global name
-    }
-    try {
-      // find the function in current scope via global exposure at bottom (if any)
-      // If not exposed, we still can detect via existing debugPanel element + debugState updates.
-    } catch(e){}
-
     function openDebugPane(){
       var dbg = document.getElementById("debug-panel");
       if (!dbg) return;
-      // ensure visible and opened
       dbg.hidden = false;
       dbg.setAttribute("open","open");
-      // switch tab if tab controller exists
-      if (typeof window.__xsicSetTab === "function") {
-        window.__xsicSetTab("debug");
-      } else {
-        var rs = document.getElementById("results-section");
-        if (rs) rs.setAttribute("data-active-tab", "debug");
-      }
+      try { dbg.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch(_e) {}
     }
 
-    // Monkey-patch updateDebugPanel if it exists in global (some builds expose it)
-    if (typeof window.updateDebugPanel === "function") {
-      var _udp = window.updateDebugPanel;
-      window.updateDebugPanel = function(updates){
-        var r = _udp.apply(this, arguments);
-        try {
-          if (updates && updates.error) openDebugPane();
-        } catch(e){}
-        return r;
-      };
-    }
-
-    // Fallback: observe debug error text node updates
     document.addEventListener("DOMContentLoaded", function(){
       var de = document.querySelector('[data-debug="error"]');
       if (!de) return;
