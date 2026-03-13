@@ -1,5 +1,49 @@
 {
   "latest": {
+    "ts": 1773392323198,
+    "preset": "exchanges",
+    "window": "7d",
+    "source": "xrpl:rpc",
+    "stale": true,
+    "staleReason": "sampled",
+    "summary": {
+      "inflowXrp": 728473.730742,
+      "outflowXrp": 0,
+      "netXrp": 728473.730742,
+      "inflowUsd": null,
+      "outflowUsd": null,
+      "netUsd": null
+    },
+    "metrics": {
+      "paymentsScanned": 727,
+      "ledgersScanned": 21,
+      "matchedEvents": 1,
+      "rpcCalls": 71
+    },
+    "latestEvent": {
+      "time": 1773392323198,
+      "label": "Bitstamp",
+      "dir": "IN",
+      "amountXrp": 504340,
+      "reason": "to exchange address (Bitstamp) → potential sell pressure"
+    },
+    "escrow": {
+      "nextAmountXrp": null,
+      "recentCount": 0,
+      "stats": {
+        "sumXrp": 0,
+        "count": 0,
+        "avgXrp": 0,
+        "maxXrp": 0
+      }
+    },
+    "debugSummary": {
+      "strategy": "7d_trend_none",
+      "degradeLevel": "none",
+      "warningCount": 15
+    }
+  },
+  "previous": {
     "ts": 1773388615617,
     "preset": "exchanges",
     "window": "7d",
@@ -35,50 +79,6 @@
       "strategy": "7d_trend_none",
       "degradeLevel": "none",
       "warningCount": 15
-    }
-  },
-  "previous": {
-    "ts": 1773385966836,
-    "preset": "exchanges",
-    "window": "7d",
-    "source": "xrpl:rpc",
-    "stale": true,
-    "staleReason": "sampled",
-    "summary": {
-      "inflowXrp": 20900,
-      "outflowXrp": 946749.321702,
-      "netXrp": -925849.321702,
-      "inflowUsd": null,
-      "outflowUsd": null,
-      "netUsd": null
-    },
-    "metrics": {
-      "paymentsScanned": 441,
-      "ledgersScanned": 26,
-      "matchedEvents": 1,
-      "rpcCalls": 70
-    },
-    "latestEvent": {
-      "time": 1773385966836,
-      "label": "Bybit",
-      "dir": "OUT",
-      "amountXrp": 946749.321702,
-      "reason": "from exchange address (Bybit) → potential withdrawal"
-    },
-    "escrow": {
-      "nextAmountXrp": null,
-      "recentCount": 0,
-      "stats": {
-        "sumXrp": 0,
-        "count": 0,
-        "avgXrp": 0,
-        "maxXrp": 0
-      }
-    },
-    "debugSummary": {
-      "strategy": "7d_trend_none",
-      "degradeLevel": "none",
-      "warningCount": 10
     }
   },
   "recent": [
@@ -4659,20 +4659,64 @@
         "degradeLevel": "none",
         "warningCount": 15
       }
+    },
+    {
+      "ts": 1773392323198,
+      "preset": "exchanges",
+      "window": "7d",
+      "source": "xrpl:rpc",
+      "stale": true,
+      "staleReason": "sampled",
+      "summary": {
+        "inflowXrp": 728473.730742,
+        "outflowXrp": 0,
+        "netXrp": 728473.730742,
+        "inflowUsd": null,
+        "outflowUsd": null,
+        "netUsd": null
+      },
+      "metrics": {
+        "paymentsScanned": 727,
+        "ledgersScanned": 21,
+        "matchedEvents": 1,
+        "rpcCalls": 71
+      },
+      "latestEvent": {
+        "time": 1773392323198,
+        "label": "Bitstamp",
+        "dir": "IN",
+        "amountXrp": 504340,
+        "reason": "to exchange address (Bitstamp) → potential sell pressure"
+      },
+      "escrow": {
+        "nextAmountXrp": null,
+        "recentCount": 0,
+        "stats": {
+          "sumXrp": 0,
+          "count": 0,
+          "avgXrp": 0,
+          "maxXrp": 0
+        }
+      },
+      "debugSummary": {
+        "strategy": "7d_trend_none",
+        "degradeLevel": "none",
+        "warningCount": 15
+      }
     }
   ],
   "deltaSummary": {
-    "inflowXrpDelta": -18900,
-    "outflowXrpDelta": -946749.321702,
-    "netXrpDelta": 927849.321702,
-    "matchedEventsDelta": -1
+    "inflowXrpDelta": 726473.730742,
+    "outflowXrpDelta": 0,
+    "netXrpDelta": 726473.730742,
+    "matchedEventsDelta": 1
   },
   "historyMeta": {
-    "count": 120,
+    "count": 121,
     "oldestTs": 1772846512948,
-    "newestTs": 1773388615617,
+    "newestTs": 1773392323198,
     "preset": "exchanges",
     "window": "7d",
-    "updatedAt": "2026-03-13T07:56:55.649Z"
+    "updatedAt": "2026-03-13T08:58:43.271Z"
   }
 }
