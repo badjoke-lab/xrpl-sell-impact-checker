@@ -62,7 +62,7 @@
         </section>
 
         <section class="card">
-          <div data-snapshot="staleNote" id="lpStaleBanner" class="flow-note" hidden>
+          <div data-snapshot="stateNote" id="lpStaleBanner" class="flow-note" hidden>
             Data may be delayed. Latest known liquidity snapshot is retained while refresh continues.
           </div>
         </section>
@@ -70,8 +70,9 @@
         <section id="lpSnapshot" class="card flow-signal-card">
           <div class="flow-signal-block">
             <div class="flow-signal-label">Status</div>
-            <span class="flow-pill">LIQUIDITY</span>
+            <span class="flow-pill" data-snapshot="stateBadge">LOADING</span>
             <div class="flow-meta" id="lpStatus">Status: waiting for initialization…</div>
+            <div class="flow-meta" data-snapshot="stateHelper">Waiting for initial snapshot.</div>
           </div>
           <div class="flow-signal-block">
             <div class="flow-signal-label">Pool</div>

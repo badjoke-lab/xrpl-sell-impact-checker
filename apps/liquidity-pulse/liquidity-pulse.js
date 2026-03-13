@@ -6,6 +6,47 @@
   const LIQUIDITY_EMA_ALPHA = 0.3;
   const MAX_FETCH_TIMEOUT_MS = 5000;
   const RESIZE_DEBOUNCE_MS = 180;
+  const STATE_PRIORITY = ['error', 'empty', 'loading', 'degraded', 'partial', 'stale', 'demo', 'ok'];
+  const STATE_COPY = {
+    loading: { badge: 'LOADING', status: 'Loading snapshot…', helper: 'Fetching the latest liquidity snapshot.', note: null },
+    ok: { badge: 'OK', status: 'Live snapshot is fresh.', helper: 'All core metrics are available from live source.', note: null },
+    stale: {
+      badge: 'STALE',
+      status: 'Snapshot is stale but display remains available.',
+      helper: 'Latest known values are retained until refresh succeeds.',
+      note: 'Data may be delayed. Latest known liquidity snapshot is retained while refresh continues.',
+    },
+    partial: {
+      badge: 'PARTIAL',
+      status: 'Partial snapshot shown.',
+      helper: 'Some metrics are unavailable and shown as —.',
+      note: 'Partial snapshot shown. Some metrics are unavailable.',
+    },
+    degraded: {
+      badge: 'DEGRADED',
+      status: 'Fallback visualization is active.',
+      helper: 'Live source degraded; showing alternate output until recovery.',
+      note: 'Live source unavailable; showing fallback snapshot.',
+    },
+    empty: {
+      badge: 'EMPTY',
+      status: 'No liquidity data available.',
+      helper: 'Try Retry or switch mode to demo for deterministic output.',
+      note: null,
+    },
+    error: {
+      badge: 'ERROR',
+      status: 'Unable to load liquidity snapshot.',
+      helper: 'Main fetch failed. Retry or switch to Demo mode.',
+      note: null,
+    },
+    demo: {
+      badge: 'DEMO',
+      status: 'Demo source is active.',
+      helper: 'Live fetch is bypassed; demo data is rendered intentionally.',
+      note: 'Demo fallback is active.',
+    },
+  };
 
   function boot() {
     const refs = {
@@ -30,7 +71,9 @@
         swaps5m: document.querySelector('[data-snapshot="swaps5m"]'),
         deviationBps: document.querySelector('[data-snapshot="deviationBps"]'),
         source: document.querySelector('[data-snapshot="source"]'),
-        staleNote: document.querySelector('[data-snapshot="staleNote"]'),
+        stateNote: document.querySelector('[data-snapshot="stateNote"]'),
+        stateBadge: document.querySelector('[data-snapshot="stateBadge"]'),
+        stateHelper: document.querySelector('[data-snapshot="stateHelper"]'),
       },
       trendBars: {
         h1: document.querySelector('[data-trend="1h"]'),
@@ -82,6 +125,17 @@
       },
     };
     const cleanups = [];
+
+    const setStateUI = (viewState) => {
+      const copy = STATE_COPY[viewState] || STATE_COPY.loading;
+      safeText(refs.snapshotFields.stateBadge, copy.badge);
+      safeText(refs.snapshotFields.stateHelper, copy.helper);
+      setStatus(copy.status);
+      if (refs.snapshotFields.stateNote) {
+        refs.snapshotFields.stateNote.hidden = !copy.note;
+        if (copy.note) safeText(refs.snapshotFields.stateNote, copy.note);
+      }
+    };
 
     if (refs.liteToggle) refs.liteToggle.checked = state.liteMode;
     if (refs.demoToggle) refs.demoToggle.checked = state.demoMode;
@@ -154,8 +208,7 @@
     void init();
 
     async function init() {
-      setMode('loading');
-      setStatus('Initializing…');
+      applyViewState('loading');
       await reloadSnapshot();
       startSnapshotLoop();
     }
@@ -185,24 +238,18 @@
       Object.entries(refs.overlays).forEach(([name, node]) => {
         if (node) node.hidden = name !== mode;
       });
-      if (mode === 'demo') {
-        requestRender();
-        setStatus('Live rendering active.');
-      } else if (mode === 'error') {
-        requestRender();
-        setStatus('Unable to load data. Showing skeleton with error state.');
-      } else if (mode === 'empty') {
-        requestRender();
-        setStatus('No liquidity data available.');
-      } else {
-        setStatus('Loading snapshot…');
-        requestRender();
-      }
+      requestRender();
+    }
+
+    function applyViewState(viewState) {
+      const mode = (viewState === 'loading' || viewState === 'error' || viewState === 'empty') ? viewState : 'ok';
+      setMode(mode);
+      setStateUI(viewState);
     }
 
     async function reloadSnapshot({ preferDemo = false, forceApi = false, silent = false } = {}) {
       const requestId = ++state.activeRequestId;
-      if (!silent) setMode('loading');
+      if (!silent) applyViewState('loading');
 
       try {
         const snapshot = (!preferDemo || forceApi) ? await fetchSnapshot() : await loadDummySnapshot();
@@ -210,13 +257,13 @@
 
         if (!snapshot) {
           resetSnapshotUI();
-          setMode('empty');
+          applyViewState('empty');
           return;
         }
 
         renderSnapshot(snapshot);
         updateVisualState(snapshot);
-        setMode('demo');
+        applyViewState(resolveViewState(snapshot, { forcedDemo: preferDemo && !forceApi }));
       } catch {
         if (requestId !== state.activeRequestId) return;
 
@@ -225,7 +272,7 @@
             const demoSnapshot = await loadDummySnapshot();
             renderSnapshot(demoSnapshot);
             updateVisualState(demoSnapshot);
-            setMode('demo');
+            applyViewState(resolveViewState(demoSnapshot, { degradedFallback: true }));
             return;
           } catch {
             // fall through
@@ -233,8 +280,29 @@
         }
 
         resetSnapshotUI();
-        setMode('error');
+        applyViewState('error');
       }
+    }
+
+    function resolveViewState(snapshot, { forcedDemo = false, degradedFallback = false } = {}) {
+      const flags = {
+        loading: false,
+        ok: false,
+        stale: Boolean(snapshot?.stale),
+        partial: isPartialSnapshot(snapshot),
+        degraded: Boolean(degradedFallback),
+        empty: false,
+        error: false,
+        demo: forcedDemo || snapshot?.source === 'demo',
+      };
+      if (!flags.stale && !flags.partial && !flags.degraded && !flags.demo) flags.ok = true;
+      return STATE_PRIORITY.find((name) => flags[name]) || 'ok';
+    }
+
+    function isPartialSnapshot(snapshot) {
+      const values = [snapshot?.price, snapshot?.liquidityUsd, snapshot?.swaps5m, snapshot?.deviationBps];
+      const available = values.filter((value) => value !== null && value !== undefined).length;
+      return available > 0 && available < values.length;
     }
 
     async function fetchSnapshot() {
@@ -325,9 +393,8 @@
       safeText(refs.snapshotFields.liquidityUsd, snapshot.liquidityUsd === null ? '—' : `$${Math.round(snapshot.liquidityUsd).toLocaleString()}`);
       safeText(refs.snapshotFields.swaps5m, snapshot.swaps5m === null ? '—' : String(snapshot.swaps5m));
       safeText(refs.snapshotFields.deviationBps, snapshot.deviationBps === null ? '—' : `${snapshot.deviationBps} bps`);
-      const sourceLabel = snapshot.source === 'demo' ? 'Demo' : `API${snapshot.stale ? ': stale' : ': live'}`;
+      const sourceLabel = snapshot.source === 'demo' ? 'demo' : `live${snapshot.stale ? ' / stale' : ' / fresh'}`;
       safeText(refs.snapshotFields.source, sourceLabel);
-      if (refs.snapshotFields.staleNote) refs.snapshotFields.staleNote.hidden = !snapshot.stale;
 
       if (refs.trendBars.h1) refs.trendBars.h1.style.height = `${snapshot.trend1h}%`;
       if (refs.trendBars.h6) refs.trendBars.h6.style.height = `${snapshot.trend6h}%`;
@@ -337,7 +404,7 @@
 
     function resetSnapshotUI() {
       Object.entries(refs.snapshotFields).forEach(([key, node]) => {
-        if (key === 'staleNote') {
+        if (key === 'stateNote') {
           if (node) node.hidden = true;
           return;
         }
