@@ -2,22 +2,6 @@ const CACHE_CONTROL = 'no-store';
 const ALLOWED_TOP = new Set([10, 20, 50]);
 const ALLOWED_INTERVAL = new Set([5, 10]);
 const ALLOWED_METRIC = new Set(['volume', 'share']);
-const MINUTES_PER_DAY = 24 * 60;
-
-const PAGE_META = {
-  id: 'day-flow',
-  provider: 'twitch',
-  market: 'twitch-only',
-  language: 'en',
-  controls: {
-    day: ['today', 'yesterday', 'date'],
-    top: [10, 20, 50],
-    metric: ['volume', 'share'],
-    interval: [5, 10],
-    others: 'required',
-    focus: 'minute-window',
-  },
-};
 
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -57,7 +41,7 @@ function parseControls(url) {
   const metric = (url.searchParams.get('metric') || 'volume').toLowerCase();
 
   const focusStart = Math.max(0, parseIntParam(url.searchParams.get('focus_start'), 0));
-  const focusEnd = Math.min(MINUTES_PER_DAY, Math.max(focusStart, parseIntParam(url.searchParams.get('focus_end'), MINUTES_PER_DAY)));
+  const focusEnd = Math.max(focusStart, parseIntParam(url.searchParams.get('focus_end'), 24 * 60));
 
   return {
     day: parsedDay.day,
@@ -130,38 +114,6 @@ async function queryRows(db, controls) {
       `,
       bind: [controls.dayKey, controls.interval],
     },
-    {
-      sql: `
-        SELECT
-          (CAST(strftime('%H', ts) AS INTEGER) * 60)
-          + ((CAST(strftime('%M', ts) AS INTEGER) / ?2) * ?2) AS bucket_minute,
-          channel_id,
-          MAX(channel_name) as channel_name,
-          AVG(viewers) as viewers,
-          SUM(activity) as activity
-        FROM twitch_snapshots
-        WHERE date(ts) = ?1
-        GROUP BY bucket_minute, channel_id
-        ORDER BY bucket_minute ASC
-      `,
-      bind: [controls.dayKey, controls.interval],
-    },
-    {
-      sql: `
-        SELECT
-          (CAST(strftime('%H', captured_at) AS INTEGER) * 60)
-          + ((CAST(strftime('%M', captured_at) AS INTEGER) / ?2) * ?2) AS bucket_minute,
-          channel_id,
-          MAX(channel_name) as channel_name,
-          AVG(viewers) as viewers,
-          SUM(activity) as activity
-        FROM twitch_snapshot_rollup
-        WHERE date(captured_at) = ?1
-        GROUP BY bucket_minute, channel_id
-        ORDER BY bucket_minute ASC
-      `,
-      bind: [controls.dayKey, controls.interval],
-    },
   ];
 
   const errors = [];
@@ -186,7 +138,6 @@ function buildDayFlow(rows, controls, sourceMeta) {
   if (!focused.length) {
     return {
       state: 'empty',
-      page: PAGE_META,
       source: sourceMeta,
       controls,
       summary: {
@@ -243,7 +194,6 @@ function buildDayFlow(rows, controls, sourceMeta) {
         viewers,
         activity,
         share: bucket.totalViewers > 0 ? viewers / bucket.totalViewers : 0,
-        value: controls.metric === 'share' ? (bucket.totalViewers > 0 ? viewers / bucket.totalViewers : 0) : viewers,
         isOthers: false,
       });
     }
@@ -261,7 +211,6 @@ function buildDayFlow(rows, controls, sourceMeta) {
       viewers: othersViewers,
       activity: othersActivity,
       share: bucket.totalViewers > 0 ? othersViewers / bucket.totalViewers : 0,
-      value: controls.metric === 'share' ? (bucket.totalViewers > 0 ? othersViewers / bucket.totalViewers : 0) : othersViewers,
       isOthers: true,
     });
 
@@ -281,8 +230,7 @@ function buildDayFlow(rows, controls, sourceMeta) {
   const totalActivity = buckets.reduce((sum, bucket) => sum + bucket.totalActivity, 0);
 
   return {
-    state: sourceMeta.mode === 'real' ? (controls.day === 'today' ? 'live' : 'complete') : 'demo',
-    page: PAGE_META,
+    state: sourceMeta.mode === 'real' ? 'complete' : 'demo',
     source: sourceMeta,
     controls,
     summary: {
@@ -343,15 +291,14 @@ export async function onRequestGet(context) {
   const queried = await queryRows(db, controls);
 
   if (!queried.rows.length) {
-    const isQueryError = Array.isArray(queried.errors) && queried.errors.length > 0;
     const fallback = buildDayFlow(buildDemoRows(controls), controls, {
       mode: 'demo',
       provider: 'twitch',
-      reason: isQueryError ? 'd1_query_failed' : 'no_real_rows',
+      reason: queried.errors?.length ? 'd1_query_failed' : 'no_real_rows',
       errors: queried.errors || [],
       asOf: new Date().toISOString(),
     });
-    fallback.state = isQueryError ? 'error' : 'demo';
+    fallback.state = queried.errors?.length ? 'partial' : 'demo';
     fallback.meta = { realRows: 0 };
     return json(fallback);
   }
