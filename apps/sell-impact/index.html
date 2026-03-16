@@ -10,19 +10,19 @@
       content="Estimate sell impact and receive amounts before you trade."
     />
     <link rel="stylesheet" href="/styles.css" />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/sell-impact/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/sell-impact/">
-  <meta property="og:site_name" content="XSIC">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta property="og:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta name="twitter:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <link rel="icon" href="/favicon.png">
-  <link rel="apple-touch-icon" href="/favicon.png">
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/sell-impact/" />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/sell-impact/" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Sell Impact — XSIC" />
+    <meta property="og:description" content="Estimate sell impact and receive amounts before you trade." />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sell Impact — XSIC" />
+    <meta name="twitter:description" content="Estimate sell impact and receive amounts before you trade." />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-0D84H0D66W"></script>
   <script>
@@ -210,6 +210,7 @@
   <article class="card" aria-labelledby="stale-partial-heading">
     <div class="card__header"><h2 id="stale-partial-heading">Stale / partial note</h2></div>
     <p class="chart__help">When live fetch is delayed or partial, warnings are shown here while keeping the quick decision cards readable.</p>
+    <p class="flow-note flow-note--quiet">State guide: stale/partial keeps the latest readable snapshot, empty means no executable route, and error means impact estimation is currently unavailable.</p>
     <p class="warning-banner" data-result="fiat-warning" hidden></p>
     <p class="warning-banner" data-result="warning" hidden></p>
   </article>
@@ -352,7 +353,7 @@
         </article>
 
         <details class="card debug-panel" id="debug-panel" data-pane="debug">
-          <summary class="debug-panel__summary">Debug panel</summary>
+          <summary class="debug-panel__summary">Debug (collapsed, release readiness)</summary>
           <div class="debug-panel__body">
             <div class="debug-panel__actions">
               <button class="secondary-button" type="button" id="debug-copy">Copy debug</button>

@@ -3,11 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/flow-alert/">
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/flow-alert/" />
     <title>Flow Alert — XSIC</title>
     <meta name="description" content="Visualize exchange/whale in/out flows as actionable signals." />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/flow-alert/" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Flow Alert — XSIC" />
+    <meta property="og:description" content="Visualize exchange/whale in/out flows as actionable signals." />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Flow Alert — XSIC" />
+    <meta name="twitter:description" content="Visualize exchange/whale in/out flows as actionable signals." />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
   </head>
   <body data-nav-key="apps">
     <div class="app page console-page flow-alert-page">
@@ -57,6 +68,7 @@
             <div class="flow-status-inline">Updated: <span data-flow-meta="refresh">—</span></div>
           </div>
           <div id="flowStaleNote" class="flow-note" hidden>Stale or sampled payload: keeping latest snapshot while refresh continues.</div>
+          <p class="flow-note flow-note--quiet">State guide: stale/partial keeps last readable snapshot, empty means no labeled detections, and error means live fetch failed.</p>
         </section>
 
         <section class="card flow-signal-card">
@@ -189,7 +201,7 @@
 
         <section class="card flow-debug-card">
           <details>
-            <summary>Debug (collapsed)</summary>
+            <summary>Debug (collapsed, release readiness)</summary>
             <div class="flow-debug-buttons">
               <button type="button" class="flow-button" data-flow-force="loading">Force Loading</button>
               <button type="button" class="flow-button" data-flow-force="ok">Force OK</button>

@@ -3,14 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/liquidity-pulse/">
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/liquidity-pulse/" />
     <title>Liquidity Pulse — XSIC</title>
     <meta
       name="description"
       content="Visualize XRPL AMM and DEX liquidity pulse in near real-time with lightweight state-aware UI."
     />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/liquidity-pulse/" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Liquidity Pulse — XSIC" />
+    <meta property="og:description" content="Visualize XRPL AMM and DEX liquidity pulse in near real-time with lightweight state-aware UI." />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Liquidity Pulse — XSIC" />
+    <meta name="twitter:description" content="Visualize XRPL AMM and DEX liquidity pulse in near real-time with lightweight state-aware UI." />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
   </head>
   <body data-nav-key="apps">
     <div class="app page console-page flow-alert-page liquidity-pulse-page">
@@ -66,6 +77,9 @@
           <div data-snapshot="stateNote" id="lpStaleBanner" class="flow-note" hidden>
             Data may be delayed. Latest known liquidity snapshot is retained while refresh continues.
           </div>
+          <p class="flow-note flow-note--quiet">
+            State guide: stale/partial keeps the latest readable snapshot, empty means no eligible data, and error means live rendering is unavailable.
+          </p>
         </section>
 
         <section id="lpSnapshot" class="card flow-signal-card">
@@ -182,7 +196,7 @@
 
         <section class="card flow-debug-card">
           <details>
-            <summary>Debug (collapsed)</summary>
+            <summary>Debug (collapsed, release readiness)</summary>
             <p class="flow-debug-status">DOM compatibility shell is active for existing liquidity-pulse.js selectors.</p>
             <p class="flow-debug-status flow-debug-mono">IDs retained: #lpActions #lpCanvasWrap #lpSnapshot #lpTrends #lpStatus</p>
           </details>
