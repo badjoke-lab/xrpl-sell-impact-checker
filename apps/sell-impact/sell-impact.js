@@ -408,6 +408,20 @@ export function initSellImpact() {
   const resultUsedVenueSummary = document.querySelector('[data-result="used-venue-summary"]');
   const resultUsedVenueDetails = document.querySelector('[data-result="used-venue-details"]');
   const resultUsedVenueNote = document.querySelector('[data-result="used-venue-note"]');
+  const resultPairLabel = document.querySelector('[data-result="pair-label"]');
+  const resultPairMeta = document.querySelector('[data-result="pair-meta"]');
+  const resultMixClob = document.querySelector('[data-result="mix-clob"]');
+  const resultMixAmm = document.querySelector('[data-result="mix-amm"]');
+  const resultMixSummary = document.querySelector('[data-result="mix-summary"]');
+  const resultMixClobBar = document.querySelector('[data-result="mix-clob-bar"]');
+  const resultMixAmmBar = document.querySelector('[data-result="mix-amm-bar"]');
+  const resultRiskBook = document.querySelector('[data-result="risk-book"]');
+  const resultRiskBridge = document.querySelector('[data-result="risk-bridge"]');
+  const resultRiskBookBar = document.querySelector('[data-result="risk-book-bar"]');
+  const resultRiskBridgeBar = document.querySelector('[data-result="risk-bridge-bar"]');
+  const snapshotNotesList = document.querySelector('[data-result="snapshot-notes"]');
+  const sideSelect = document.querySelector("#trade-side-select");
+  const modeButtons = Array.from(document.querySelectorAll(".mode-chip"));
   const impactChart = document.querySelector("#impact-chart");
   const depthChart = document.querySelector("#depth-chart");
   const impactChartNote = document.querySelector('[data-result="impact-note"]');
@@ -1782,6 +1796,17 @@ export function initSellImpact() {
     setResultText(resultUsedVenueSummary, placeholder);
     setResultText(resultUsedVenueDetails, placeholder);
     setResultText(resultUsedVenueNote, "");
+    setResultText(resultPairLabel, "XRP → …");
+    setResultText(resultPairMeta, "Issuer context updates from token input.");
+    setResultText(resultMixClob, placeholder);
+    setResultText(resultMixAmm, placeholder);
+    setResultText(resultMixSummary, "Explain data appears after estimate.");
+    setResultText(resultRiskBook, placeholder);
+    setResultText(resultRiskBridge, placeholder);
+    setBarPercent(resultMixClobBar, 0);
+    setBarPercent(resultMixAmmBar, 0);
+    setBarPercent(resultRiskBookBar, 0);
+    setBarPercent(resultRiskBridgeBar, 0);
     setResultText(resultFiatRate, t("results.receive.fiat_pending"));
     setFiatWarning(null);
     lastReceiveXrp = 0;
@@ -3320,6 +3345,21 @@ export function initSellImpact() {
         ? t("results.why_line_amm")
         : t("results.why_line", { count: simulation.topConsumedOffersCount })
     );
+    if (snapshotNotesList) {
+      snapshotNotesList.innerHTML = "";
+      const notes = [
+        `Fill rate ${formatPercent(simulation.fillRatePct)} keeps current decision cards usable.`,
+        isPartialFill
+          ? "Partial-safe state: selected path remains readable while alternatives may lag."
+          : "Selected route remains primary; alternatives are support context only.",
+        `Current venue ${venue} with slippage ${resolvedSlippage === null ? "n/a" : formatPercent(resolvedSlippage)}.`
+      ];
+      notes.forEach((note) => {
+        const li = document.createElement("li");
+        li.textContent = note;
+        snapshotNotesList.appendChild(li);
+      });
+    }
   };
 
   const updateExecutionDetails = ({
@@ -3373,12 +3413,47 @@ export function initSellImpact() {
     }
   };
 
+  const simulationHasPartialFill = (simulation) =>
+    Boolean(
+      simulation &&
+      Number.isFinite(simulation.filledToken) &&
+      Number.isFinite(simulation.requestedToken) &&
+      simulation.filledToken > 0 &&
+      simulation.filledToken < simulation.requestedToken
+    );
+
   const setUsedVenue = (venue) => {
     const placeholder = getTranslationOrFallback("common.placeholder", "…");
     const value = venue || placeholder;
     setResultText(resultUsedVenueSummary, value);
     setResultText(resultUsedVenueDetails, value);
     setResultText(resultUsedVenueNote, "");
+  };
+
+
+  const setBarPercent = (element, pct) => {
+    if (!element) return;
+    const clamped = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
+    element.style.setProperty("--w", `${clamped}%`);
+  };
+
+  const updatePairShell = () => {
+    const currency = normalizeCurrencyCode(currencyInput?.value || "") || "…";
+    const side = sideSelect?.value === "buy" ? "Buy" : "Sell";
+    setResultText(resultPairLabel, `XRP → ${currency}`);
+    const issuer = (issuerInput?.value || "").trim();
+    setResultText(resultPairMeta, issuer ? `${side} side · issuer ${issuer.slice(0, 8)}…` : `${side} side · issuer required for non-XRP`);
+  };
+
+  const updateExplainModeState = (mode = "explain") => {
+    modeButtons.forEach((button) => {
+      const active = button.dataset.mode === mode;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    document.body.classList.toggle("is-quick", mode === "quick");
+    document.body.classList.toggle("is-explain", mode !== "quick");
+    setResultText(resultMixSummary, mode === "quick" ? "Quick mode keeps mix as lightweight summary." : "Explain mode shows bounded route mix context.");
   };
 
   const updateLiquidityBreakdown = ({
@@ -3395,6 +3470,14 @@ export function initSellImpact() {
       setResultText(resultLiquiditySplit, t("details.liquidity_split_not_applicable"));
       setResultText(resultAmmReserves, t("details.amm_not_applicable"));
       setResultText(resultAmmFee, t("details.amm_not_applicable"));
+      setResultText(resultMixClob, t("common.not_available"));
+      setResultText(resultMixAmm, t("common.not_available"));
+      setResultText(resultRiskBook, t("common.not_available"));
+      setResultText(resultRiskBridge, t("common.not_available"));
+      setBarPercent(resultMixClobBar, 0);
+      setBarPercent(resultMixAmmBar, 0);
+      setBarPercent(resultRiskBookBar, 0);
+      setBarPercent(resultRiskBridgeBar, 0);
       return;
     }
 
@@ -3424,6 +3507,16 @@ export function initSellImpact() {
           }),
         })
       );
+      setResultText(resultMixClob, formatPercent(clobSharePct, { minimumFractionDigits: 0, maximumFractionDigits: 1 }));
+      setResultText(resultMixAmm, formatPercent(ammSharePct, { minimumFractionDigits: 0, maximumFractionDigits: 1 }));
+      setBarPercent(resultMixClobBar, clobSharePct);
+      setBarPercent(resultMixAmmBar, ammSharePct);
+      const bookRisk = Math.min(100, Math.max(0, 30 + (simulationHasPartialFill(lastDisplaySimulation) ? 25 : 0) + (100 - clobSharePct) * 0.25));
+      const bridgeRisk = Math.min(100, Math.max(0, ammSharePct * 0.9));
+      setResultText(resultRiskBook, bookRisk >= 70 ? "high" : bookRisk >= 45 ? "medium" : "low");
+      setResultText(resultRiskBridge, bridgeRisk >= 70 ? "high" : bridgeRisk >= 45 ? "watch" : "low");
+      setBarPercent(resultRiskBookBar, bookRisk);
+      setBarPercent(resultRiskBridgeBar, bridgeRisk);
     }
 
     if (!lastAmmAvailable || !lastAmmReserves) {
@@ -3757,6 +3850,16 @@ export function initSellImpact() {
   bindFieldClear(issuerInput, "issuer");
   bindFieldClear(amountInput, "amount");
   bindFieldClear(limitInput, "limit");
+  currencyInput?.addEventListener("input", updatePairShell);
+  issuerInput?.addEventListener("input", updatePairShell);
+  sideSelect?.addEventListener("change", updatePairShell);
+  modeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      updateExplainModeState(button.dataset.mode || "explain");
+    });
+  });
+  updatePairShell();
+  updateExplainModeState("explain");
   updateMaxSellLabel(getImpactThresholdPct());
   updateImpactThresholdHelp(getImpactThresholdPct());
   updateLiquiditySplitLabel(getImpactThresholdPct());
@@ -3824,6 +3927,7 @@ export function initSellImpact() {
     showShareToast(null);
     setExampleStatus("");
     resetResults();
+    updatePairShell();
     setStatus("status.waiting");
     clearShareParams();
   };
