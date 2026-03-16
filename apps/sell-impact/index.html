@@ -61,34 +61,56 @@
         <section class="card controls-card" id="inputs-section" aria-labelledby="inputs-heading">
           <h3 id="inputs-heading" class="section-title">Controls</h3>
           <div class="controls-grid">
+            <label class="field">
+              <span class="field__label">Side</span>
+              <select id="trade-side-select">
+                <option value="sell" selected>Sell</option>
+                <option value="buy">Buy</option>
+              </select>
+            </label>
+
+            <article class="pair-shell" aria-live="polite">
+              <p class="field__label field__label--subtle">Pair</p>
+              <p class="pair-shell__value" data-result="pair-label">XRP → …</p>
+              <p class="pair-shell__meta" data-result="pair-meta">Issuer context updates from token input.</p>
+            </article>
+
             <label class="field field--suggestions">
-              <span class="field__label" data-i18n="fields.currency.label"></span>
+              <span class="field__label">Pair · token</span>
               <input id="currency-input" type="text" data-i18n-placeholder="fields.currency.placeholder" aria-describedby="currency-error" autocomplete="off" />
               <ul id="token-suggestions" class="suggestions" role="listbox" hidden></ul>
               <p class="field__error" id="currency-error" data-error-for="currency" hidden></p>
             </label>
 
             <label class="field">
-              <span class="field__label" data-i18n="fields.issuer.label"></span>
+              <span class="field__label">Pair · issuer</span>
               <input id="issuer-input" type="text" data-i18n-placeholder="fields.issuer.placeholder" aria-describedby="issuer-help issuer-error" />
               <p class="field__help" id="issuer-help" data-i18n="fields.issuer.helper"></p>
               <p class="field__error" id="issuer-error" data-error-for="issuer" hidden></p>
             </label>
 
             <label class="field">
-              <span class="field__label" data-i18n="fields.amount.label"></span>
+              <span class="field__label">Amount</span>
               <input id="sell-amount-input" type="number" min="0" step="any" data-i18n-placeholder="fields.amount.placeholder" aria-describedby="amount-error" />
               <p class="field__error" id="amount-error" data-error-for="amount" hidden></p>
             </label>
 
-            <label class="field">
+            <div class="field">
+              <span class="field__label">Mode</span>
+              <div class="mode-group" role="group" aria-label="Estimation mode">
+                <button type="button" class="mode-chip" id="mode-quick" data-mode="quick" aria-pressed="false">Quick</button>
+                <button type="button" class="mode-chip is-active" id="mode-explain" data-mode="explain" aria-pressed="true">Explain</button>
+              </div>
+            </div>
+
+            <label class="field field--compact">
               <span class="field__label" data-i18n="fields.orderbook_limit.label"></span>
               <input id="limit-input" type="number" min="1" step="1" value="50" data-i18n-placeholder="fields.orderbook_limit.placeholder" aria-describedby="limit-error limit-note" />
               <p class="field__error" id="limit-error" data-error-for="limit" hidden></p>
               <p class="field__note" id="limit-note" hidden></p>
             </label>
 
-            <label class="field">
+            <label class="field field--compact">
               <span class="field__label" data-i18n="fields.impact_threshold.label"></span>
               <select id="impact-threshold-select" aria-describedby="impact-threshold-help">
                 <option value="1" data-i18n="fields.impact_threshold.option_1"></option>
@@ -100,13 +122,13 @@
               <p class="field__help" id="impact-threshold-help" data-i18n="fields.impact_threshold.helper"></p>
             </label>
 
-            <label class="field">
+            <label class="field field--compact">
               <span class="field__label" data-i18n="fields.thin_cutoff.label"></span>
               <input id="thin-cutoff-input" type="number" min="0" max="100" step="1" value="20" data-i18n-placeholder="fields.thin_cutoff.placeholder" aria-describedby="thin-cutoff-help" />
               <p class="field__help" id="thin-cutoff-help" data-i18n="fields.thin_cutoff.helper"></p>
             </label>
 
-            <label class="field">
+            <label class="field field--compact">
               <span class="field__label" data-i18n="fields.fiat_currency.label"></span>
               <select id="fiat-currency-select" aria-describedby="fiat-currency-help">
                 <option value="USD" data-i18n="fields.fiat_currency.option_usd" selected></option>
@@ -118,7 +140,6 @@
 
           <div class="control-actions">
             <button class="secondary-button" type="button" id="reset-inputs" data-i18n="actions.reset">Reset</button>
-            <button class="ghost-button" type="button" id="copy-link" data-i18n="actions.copy_link">Copy link</button>
             <button class="primary-button" type="button" data-i18n="actions.estimate">Estimate</button>
           </div>
 
@@ -127,6 +148,7 @@
             <p class="status status--notice" id="example-status" hidden></p>
             <p class="status status--notice" id="share-load-note" data-i18n="status.loaded_from_link" hidden></p>
             <p class="status status--success" id="share-toast" aria-live="polite" hidden></p>
+            <p class="status status--subtle"><button class="ghost-button ghost-button--inline" type="button" id="copy-link" data-i18n="actions.copy_link">Copy link</button></p>
             <p class="status-endpoint" hidden></p>
           </div>
 
@@ -180,12 +202,12 @@
           <div class="section-head">
             <div>
               <h3 class="section-title">Main Viz</h3>
-              <p class="section-note">Lightweight depth and impact snapshots for current decision support.</p>
+              <p class="section-note">Depth / Thinness and Execution Mix for current sizing quality.</p>
             </div>
           </div>
           <div class="mainviz-grid">
             <article class="viz-card">
-              <h4 class="viz-title" data-i18n="sections.depth_curve"></h4>
+              <h4 class="viz-title">Depth / Thinness</h4>
               <p class="chart__help" data-i18n="graphs.depth.helper"></p>
               <div class="chart" data-chart="depth">
                 <svg id="depth-chart" class="chart__svg" viewBox="0 0 320 200" preserveAspectRatio="none" data-i18n-aria-label="graphs.depth.aria_label" role="img"></svg>
@@ -194,49 +216,85 @@
               <p class="chart__summary" data-result="depth-summary"></p>
             </article>
             <article class="viz-card">
-              <h4 class="viz-title" data-i18n="sections.impact_curve"></h4>
-              <p class="chart__help" data-i18n="graphs.impact.helper"></p>
-              <div class="chart" data-chart="impact">
-                <svg id="impact-chart" class="chart__svg" viewBox="0 0 320 200" preserveAspectRatio="none" data-i18n-aria-label="graphs.impact.aria_label" role="img"></svg>
+              <h4 class="viz-title">Execution Mix</h4>
+              <p class="section-note">Selected route share split between CLOB and AMM paths (bounded explain view).</p>
+              <div class="mix-bars" aria-live="polite">
+                <div class="mix-row">
+                  <div class="mix-row__head"><span>CLOB leg</span><span data-result="mix-clob">—</span></div>
+                  <div class="bar"><span data-result="mix-clob-bar" style="--w:0%"></span></div>
+                </div>
+                <div class="mix-row">
+                  <div class="mix-row__head"><span>AMM / bridge assist</span><span data-result="mix-amm">—</span></div>
+                  <div class="bar"><span class="warn" data-result="mix-amm-bar" style="--w:0%"></span></div>
+                </div>
+                <p class="chart__summary" data-result="mix-summary">Explain data appears after estimate.</p>
               </div>
-              <p class="chart__note" data-result="impact-note" hidden></p>
-              <p class="chart__summary" data-result="impact-summary"></p>
+              <details data-mobile-details="1">
+                <summary>Impact trend (detail)</summary>
+                <p class="chart__help" data-i18n="graphs.impact.helper"></p>
+                <div class="chart" data-chart="impact">
+                  <svg id="impact-chart" class="chart__svg" viewBox="0 0 320 200" preserveAspectRatio="none" data-i18n-aria-label="graphs.impact.aria_label" role="img"></svg>
+                </div>
+                <p class="chart__note" data-result="impact-note" hidden></p>
+                <p class="chart__summary" data-result="impact-summary"></p>
+              </details>
             </article>
           </div>
         </section>
 
         <section class="card why-card">
-          <h3 class="section-title">Why Route</h3>
-          <p class="why-line" data-result="why"></p>
-          <ul class="list">
-            <li><span data-i18n="details.used_venue"></span>: <span data-result="used-venue-details" data-i18n="common.placeholder"></span></li>
-            <li><span data-result="liquidity-split-label" data-i18n="common.placeholder"></span>: <span data-result="liquidity-split" data-i18n="common.placeholder"></span></li>
-            <li><span data-i18n="details.amm_reserves"></span>: <span data-result="amm-reserves" data-i18n="common.placeholder"></span></li>
-            <li><span data-i18n="details.amm_fee"></span>: <span data-result="amm-fee" data-i18n="common.placeholder"></span></li>
-          </ul>
+          <div class="section-head">
+            <div>
+              <h3 class="section-title">Why Route?</h3>
+              <p class="section-note">Pathfinding + bottleneck view with a short right-column explanation.</p>
+            </div>
+          </div>
+          <div class="why-layout">
+            <div class="why-panel">
+              <div class="route-svg-wrap">
+                <svg class="route-svg" viewBox="0 0 720 220" role="img" aria-label="Selected route path">
+                  <circle cx="72" cy="110" r="22"></circle><circle cx="252" cy="74" r="14"></circle><circle cx="252" cy="146" r="14"></circle><circle cx="460" cy="74" r="14"></circle><circle cx="460" cy="146" r="14"></circle><circle cx="646" cy="110" r="22"></circle>
+                  <path d="M94 104 C138 88 182 80 236 74"></path><path class="path path--alt" d="M94 116 C148 130 186 138 236 146"></path><path d="M266 74 C338 74 382 74 446 74"></path><path class="path path--alt" d="M266 146 C338 146 382 146 446 146"></path><path d="M474 74 C546 74 590 86 624 104"></path><path class="path path--tail" d="M474 146 C542 146 588 132 624 116"></path>
+                </svg>
+              </div>
+              <div class="bottleneck-map">
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Book refill risk</strong><span data-result="risk-book">—</span></div><div class="bar"><span data-result="risk-book-bar" style="--w:0%"></span></div></div>
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Bridge dependence</strong><span data-result="risk-bridge">—</span></div><div class="bar"><span class="warn" data-result="risk-bridge-bar" style="--w:0%"></span></div></div>
+              </div>
+            </div>
+            <aside class="why-panel">
+              <p class="why-line" data-result="why"></p>
+              <ul class="list why-list">
+                <li><span data-i18n="details.used_venue"></span>: <span data-result="used-venue-details" data-i18n="common.placeholder"></span></li>
+                <li><span data-result="liquidity-split-label" data-i18n="common.placeholder"></span>: <span data-result="liquidity-split" data-i18n="common.placeholder"></span></li>
+                <li><span data-i18n="details.amm_reserves"></span>: <span data-result="amm-reserves" data-i18n="common.placeholder"></span></li>
+                <li><span data-i18n="details.amm_fee"></span>: <span data-result="amm-fee" data-i18n="common.placeholder"></span></li>
+              </ul>
+            </aside>
+          </div>
         </section>
 
         <section class="card candidates-card">
           <h3 class="section-title">Candidate Routes</h3>
-          <div class="candidate-grid">
-            <article class="candidate-item"><p class="candidate-title">Route A · Selected</p><p class="candidate-copy" data-result="used-venue-summary" data-i18n="common.placeholder"></p></article>
-            <article class="candidate-item"><p class="candidate-title">Route B · Comparison</p><p class="candidate-copy" data-result="endpoint-details" data-i18n="common.placeholder"></p></article>
-            <article class="candidate-item"><p class="candidate-title">Route C · Guardrail</p><p class="candidate-copy" data-result="max-sell-note"></p></article>
+          <div class="candidate-grid candidate-grid--rich">
+            <article class="candidate-item candidate-item--selected"><p class="candidate-title">Route A · Selected</p><p class="route-value" data-result="receive"></p><p class="candidate-copy" data-result="used-venue-summary"></p><p class="candidate-copy">Reason: balanced output/impact confidence.</p></article>
+            <article class="candidate-item"><p class="candidate-title">Route B · Alternative</p><p class="route-value" data-result="slippage"></p><p class="candidate-copy" data-result="endpoint-details"></p><p class="candidate-copy">Reason not selected: thinner tail risk under load.</p></article>
+            <article class="candidate-item"><p class="candidate-title">Route C · Fallback</p><p class="route-value" data-result="max-sell-value"></p><p class="candidate-copy" data-result="max-sell-note"></p><p class="candidate-copy">Fallback only when selected path quality drops.</p></article>
           </div>
         </section>
 
         <section class="card snapshot-card">
           <h3 class="section-title">Snapshot Strips</h3>
           <div class="snapshot-grid">
-            <article class="snapshot-strip"><p class="snapshot-title">Depth context</p><p class="snapshot-value" data-result="depth-summary"></p></article>
-            <article class="snapshot-strip"><p class="snapshot-title">Impact context</p><p class="snapshot-value" data-result="impact-summary"></p></article>
-            <article class="snapshot-strip"><p class="snapshot-title">Endpoint</p><p class="snapshot-value" data-result="endpoint-details" data-i18n="common.placeholder"></p></article>
+            <article class="snapshot-strip"><p class="snapshot-title">Estimated output drift</p><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Estimated output drift"><path d="M8 56 L40 52 L72 47 L104 44 L136 40 L168 38 L200 35 L232 31 L264 29 L296 26"></path></svg><p class="snapshot-value" data-result="depth-summary"></p></article>
+            <article class="snapshot-strip"><p class="snapshot-title">Impact trend</p><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Impact trend"><path d="M8 24 L40 28 L72 33 L104 36 L136 39 L168 43 L200 45 L232 49 L264 53 L296 58"></path></svg><p class="snapshot-value" data-result="impact-summary"></p></article>
+            <article class="snapshot-strip"><p class="snapshot-title">Route source</p><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Route source trend"><path d="M8 58 L40 58 L72 56 L104 52 L136 48 L168 44 L200 39 L232 36 L264 32 L296 30"></path></svg><p class="snapshot-value" data-result="endpoint-details" data-i18n="common.placeholder"></p></article>
           </div>
           <h4 class="snapshot-notes-title">Snapshot Notes</h4>
-          <ul class="list snapshot-notes-list">
-            <li>Use candidate comparison as bounded support, not as the primary hero signal.</li>
-            <li>If stale or partial appears, top decision cards remain readable while details catch up.</li>
-            <li>Current endpoint and route context are shown above for operational checks.</li>
+          <ul class="list snapshot-notes-list" data-result="snapshot-notes">
+            <li>Latest snapshot keeps top decision cards readable while explain details catch up.</li>
+            <li>Selected route remains primary; alternatives are bounded support only.</li>
+            <li>Endpoint and route context above are for operator checks, not the hero signal.</li>
           </ul>
         </section>
 
