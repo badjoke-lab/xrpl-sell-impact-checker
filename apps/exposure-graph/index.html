@@ -3,12 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/exposure-graph/">
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/exposure-graph/" />
     <title>Exposure Graph — XSIC</title>
     <meta name="description" content="Read issuer exposure concentration and issuer-control risk in one static shell." />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/exposure-graph/" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Exposure Graph — XSIC" />
+    <meta property="og:description" content="Read issuer exposure concentration and issuer-control risk in one static shell." />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Exposure Graph — XSIC" />
+    <meta name="twitter:description" content="Read issuer exposure concentration and issuer-control risk in one static shell." />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/apps/exposure-graph/exposure-graph.css" />
     <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
   </head>
   <body data-nav-key="apps">
     <div class="app page console-page exposure-graph-page">
@@ -52,6 +63,7 @@
             <div class="eg-status-inline">Updated: <strong id="egUpdatedText">—</strong></div>
           </div>
           <div class="eg-presets" id="egPresets" aria-label="Issuer presets"></div>
+          <p class="flow-note flow-note--quiet">State guide: stale/partial keeps last readable snapshot, empty means no trustline visibility, and invalid/no_issuer/error means risk status is unknown until input/data recovers.</p>
         </section>
 
         <section class="card eg-help-card">
@@ -133,7 +145,7 @@
 
         <section class="card eg-debug-card">
           <details>
-            <summary>Debug / force mode</summary>
+            <summary>Debug (collapsed, release readiness)</summary>
             <div class="eg-debug-buttons">
               <button type="button" class="eg-button eg-button--ghost" data-eg-force="ok">Force ok</button>
               <button type="button" class="eg-button eg-button--ghost" data-eg-force="empty">Force empty</button>
