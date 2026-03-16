@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sell Impact UI Mock — XSIC</title>
+    <meta
+      name="description"
+      content="Standalone Sell Impact UI mock aligned to the current XSIC white-shell design language used by Flow Alert, Liquidity Pulse, and Exposure Graph."
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #fcfcfd;
+        --surface: #ffffff;
+        --surface-soft: #fafafa;
+        --surface-strong: #f4f4f5;
+        --border: #e5e7eb;
+        --border-strong: #d4d4d8;
+        --text: #111827;
+        --text-soft: #6b7280;
+        --text-faint: #9ca3af;
+        --primary: #6f63c2;
+        --primary-strong: #5d52b7;
+        --primary-soft: rgba(111, 99, 194, 0.12);
+        --primary-muted: rgba(111, 99, 194, 0.18);
+        --primary-line: rgba(111, 99, 194, 0.34);
+        --good: #047857;
+        --good-soft: rgba(4, 120, 87, 0.12);
+        --warn: #b45309;
+        --warn-soft: rgba(180, 83, 9, 0.14);
+        --danger: #b91c1c;
+        --danger-soft: rgba(185, 28, 28, 0.12);
+        --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 30px rgba(15, 23, 42, 0.04);
+        --shadow-card-hover: 0 10px 40px rgba(15, 23, 42, 0.08);
+        --radius-card: 18px;
+        --radius-control: 12px;
+        --content-max: 1200px;
+        --mono: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        min-width: 360px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+        line-height: 1.5;
+      }
+
+      .app {
+        width: min(100%, var(--content-max));
+        margin: 0 auto;
+        min-height: 100vh;
+        padding: 24px 20px 64px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .app__header {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .app__header-top {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .brand-link {
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .app__brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .app__logo {
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+        border-radius: 8px;
+        background:
+          linear-gradient(135deg, rgba(111,99,194,0.92), rgba(93,82,183,0.72));
+        position: relative;
+        overflow: hidden;
+      }
+      .app__logo::before,
+      .app__logo::after {
+        content: "";
+        position: absolute;
+        inset: auto;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.9);
+      }
+      .app__logo::before {
+        width: 16px;
+        height: 3px;
+        left: 6px;
+        top: 8px;
+        transform: rotate(-12deg);
+      }
+      .app__logo::after {
+        width: 18px;
+        height: 3px;
+        left: 5px;
+        top: 16px;
+        opacity: 0.75;
+      }
+
+      .app__title {
+        margin: 0;
+        font-size: clamp(1rem, 1.8vw, 1.16rem);
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        font-weight: 650;
+        white-space: nowrap;
+      }
+
+      .global-nav {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .global-nav a {
+        color: var(--text-soft);
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.2;
+        padding: 2px 0;
+      }
+
+      .global-nav a:hover { color: var(--text); }
+      .global-nav a.is-active {
+        color: var(--primary-strong);
+        border-bottom: 2px solid var(--primary-strong);
+      }
+
+      .page__content {
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero-head {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .eyebrow {
+        margin: 0;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+
+      .page-title {
+        margin: 0;
+        font-size: clamp(1.5rem, 5vw, 2.1rem);
+        line-height: 1.02;
+        letter-spacing: -0.05em;
+        font-weight: 770;
+      }
+
+      .page-subtitle {
+        margin: 0;
+        max-width: 760px;
+        color: var(--text-soft);
+        font-size: 14px;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-card);
+      }
+      .card:hover { box-shadow: var(--shadow-card-hover); }
+
+      .controls-card { padding: 12px 14px; }
+      .controls-grid {
+        display: grid;
+        grid-template-columns: minmax(118px, .65fr) minmax(200px, 1.15fr) minmax(120px, .75fr) minmax(144px, .7fr) auto auto auto;
+        gap: 8px 12px;
+        align-items: end;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 10px;
+        color: var(--text-faint);
+        letter-spacing: 0.02em;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .field input,
+      .field select,
+      .button,
+      .mode-chip {
+        height: 38px;
+        border-radius: var(--radius-control);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        font-size: 14px;
+        padding: 0 12px;
+        outline: none;
+      }
+
+      .field input:focus,
+      .field select:focus,
+      .button:focus,
+      .mode-chip:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px rgba(111, 99, 194, 0.12);
+      }
+
+      .mode-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .mode-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        background: var(--surface-soft);
+      }
+      .mode-chip.is-active {
+        background: var(--primary-soft);
+        border-color: rgba(111, 99, 194, 0.24);
+        color: var(--primary-strong);
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .button--primary {
+        background: var(--text);
+        border-color: var(--text);
+        color: #fff;
+      }
+      .button--ghost { background: var(--surface-soft); }
+
+      .status-inline {
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        font-size: 11px;
+        color: var(--text-soft);
+        font-family: var(--mono);
+      }
+      .status-inline strong {
+        margin-left: 6px;
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .note-card {
+        padding: 12px 14px;
+        display: grid;
+        gap: 10px;
+      }
+      .flow-note {
+        color: var(--warn);
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-size: 12px;
+      }
+      .flow-note--quiet {
+        color: #475569;
+        background: #f8fafc;
+        border-color: #cbd5e1;
+      }
+
+      .signal-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .signal-card {
+        padding: 16px;
+        display: grid;
+        gap: 8px;
+        align-content: start;
+        min-height: 132px;
+      }
+      .signal-label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        font-weight: 700;
+      }
+      .pill {
+        width: fit-content;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        padding: 0 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        border: 1px solid transparent;
+      }
+      .pill--good { color: var(--good); background: var(--good-soft); border-color: rgba(4,120,87,.16); }
+      .pill--warn { color: var(--warn); background: var(--warn-soft); border-color: rgba(180,83,9,.16); }
+      .pill--danger { color: var(--danger); background: var(--danger-soft); border-color: rgba(185,28,28,.16); }
+      .pill--primary { color: var(--primary-strong); background: var(--primary-soft); border-color: rgba(111,99,194,.14); }
+
+      .hero-value,
+      .metric-value,
+      .mono-line,
+      .snapshot-value,
+      .route-value,
+      .route-subvalue {
+        font-family: var(--mono);
+      }
+      .hero-value {
+        font-size: clamp(28px, 4vw, 38px);
+        line-height: 1;
+        letter-spacing: -0.06em;
+        font-weight: 780;
+      }
+      .copy,
+      .meta,
+      .subcopy,
+      .mono-line {
+        font-size: 13px;
+        color: var(--text-soft);
+      }
+      .copy { color: var(--text); }
+
+      .badge-row,
+      .meta-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--surface-soft);
+        font-size: 12px;
+        color: var(--text);
+      }
+
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .metric-card {
+        padding: 16px;
+        min-height: 96px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .metric-label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        font-weight: 700;
+      }
+      .metric-value {
+        font-size: clamp(1rem, 1.9vw, 1.45rem);
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+        font-weight: 760;
+      }
+      .metric-sub { font-size: 12px; color: var(--text-soft); }
+      .metric-card--highlight {
+        border-color: rgba(111, 99, 194, 0.22);
+        background: linear-gradient(180deg, rgba(111, 99, 194, 0.04), rgba(111, 99, 194, 0.01));
+      }
+
+      .section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      .section-title {
+        margin: 0;
+        font-size: 19px;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+        font-weight: 740;
+      }
+      .section-note {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: var(--text-soft);
+        max-width: 760px;
+      }
+
+      .mainviz-card,
+      .why-card,
+      .candidates-card,
+      .snapshot-card,
+      .debug-card {
+        padding: 18px 20px;
+      }
+
+      .mainviz-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.58fr) minmax(320px, .92fr);
+        gap: 16px;
+      }
+      .viz-panel,
+      .viz-side,
+      .why-panel,
+      .candidate-card,
+      .snapshot-strip,
+      .snapshot-note-card {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(250,250,250,.65), rgba(255,255,255,.98));
+      }
+      .viz-panel {
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+      }
+      .depth-shell {
+        border: 1px dashed rgba(111, 99, 194, 0.22);
+        border-radius: 14px;
+        padding: 14px;
+        background:
+          radial-gradient(circle at 50% 50%, rgba(111, 99, 194, 0.08), transparent 40%),
+          linear-gradient(180deg, rgba(250, 250, 250, 0.95), rgba(255,255,255,0.98));
+      }
+      .depth-stage {
+        display: grid;
+        gap: 14px;
+      }
+      .depth-caption {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: var(--text-soft);
+      }
+      .depth-bands {
+        display: grid;
+        gap: 10px;
+      }
+      .depth-row {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr) 54px;
+        gap: 12px;
+        align-items: center;
+      }
+      .depth-name {
+        font-size: 13px;
+        font-weight: 650;
+      }
+      .depth-track {
+        position: relative;
+        height: 16px;
+        border-radius: 999px;
+        background: #eef2ff;
+        overflow: hidden;
+        border: 1px solid #e4e7f4;
+      }
+      .depth-fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        border-radius: inherit;
+        background: linear-gradient(90deg, rgba(111,99,194,.24), rgba(111,99,194,.86));
+        width: var(--w, 50%);
+      }
+      .depth-fill.depth-fill--warn {
+        background: linear-gradient(90deg, rgba(180,83,9,.22), rgba(180,83,9,.82));
+      }
+      .depth-fill.depth-fill--danger {
+        background: linear-gradient(90deg, rgba(185,28,28,.22), rgba(185,28,28,.82));
+      }
+      .depth-value {
+        font-size: 12px;
+        color: var(--text-soft);
+        text-align: right;
+        font-family: var(--mono);
+      }
+
+      .mix-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+        background: var(--surface);
+        display: grid;
+        gap: 12px;
+      }
+      .mix-track {
+        position: relative;
+        height: 18px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #eef2f7;
+        border: 1px solid #e7eaf3;
+        display: grid;
+        grid-template-columns: 54% 29% 17%;
+      }
+      .mix-segment { height: 100%; }
+      .mix-segment--book { background: rgba(111, 99, 194, 0.92); }
+      .mix-segment--amm { background: rgba(111, 99, 194, 0.46); }
+      .mix-segment--bridge { background: rgba(180, 83, 9, 0.72); }
+      .mix-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 12px;
+        font-size: 12px;
+        color: var(--text-soft);
+      }
+      .mix-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .mix-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        display: inline-block;
+      }
+
+      .viz-side {
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+        align-content: start;
+      }
+      .side-title {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+      }
+      .side-copy {
+        margin: 0;
+        font-size: 14px;
+        color: var(--text-soft);
+      }
+      .bottleneck-list,
+      .why-list,
+      .snapshot-note-list {
+        margin: 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--text-soft);
+      }
+      .confidence-box {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+        background: var(--surface);
+        display: grid;
+        gap: 8px;
+      }
+      .confidence-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+      }
+      .confidence-track {
+        height: 10px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #eef2f7;
+        border: 1px solid #e7eaf3;
+      }
+      .confidence-fill {
+        width: 76%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, rgba(4,120,87,.5), rgba(4,120,87,.9));
+      }
+
+      .why-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.18fr) minmax(300px, .82fr);
+        gap: 16px;
+      }
+      .why-panel {
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+      }
+      .route-svg-wrap {
+        border: 1px dashed rgba(111,99,194,.24);
+        border-radius: 14px;
+        padding: 12px;
+        background: linear-gradient(180deg, rgba(250,250,250,.82), rgba(255,255,255,.98));
+      }
+      svg.route-svg {
+        width: 100%;
+        height: 260px;
+        display: block;
+      }
+      .route-caption {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: var(--text-soft);
+        margin-top: 10px;
+      }
+      .bottleneck-map {
+        display: grid;
+        gap: 10px;
+      }
+      .bottleneck-row {
+        display: grid;
+        gap: 6px;
+      }
+      .bottleneck-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 13px;
+      }
+      .bottleneck-head strong { font-size: 13px; }
+      .bar {
+        position: relative;
+        height: 10px;
+        border-radius: 999px;
+        background: #eef2f7;
+        border: 1px solid #e7eaf3;
+        overflow: hidden;
+      }
+      .bar > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, rgba(111,99,194,.3), rgba(111,99,194,.82));
+        width: var(--w, 40%);
+      }
+      .bar > span.warn {
+        background: linear-gradient(90deg, rgba(180,83,9,.28), rgba(180,83,9,.82));
+      }
+      .bar > span.danger {
+        background: linear-gradient(90deg, rgba(185,28,28,.28), rgba(185,28,28,.82));
+      }
+
+      .candidates-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .candidate-card {
+        padding: 16px;
+        display: grid;
+        gap: 10px;
+      }
+      .candidate-card.is-selected {
+        border-color: rgba(111,99,194,.28);
+        background: linear-gradient(180deg, rgba(111,99,194,.05), rgba(255,255,255,.98));
+      }
+      .candidate-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .candidate-title {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+      }
+      .candidate-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .route-label {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        font-weight: 700;
+      }
+      .route-value {
+        font-size: 14px;
+        line-height: 1.2;
+        font-weight: 700;
+      }
+      .route-subvalue {
+        font-size: 12px;
+        color: var(--text-soft);
+      }
+      .route-track {
+        height: 8px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #eef2f7;
+        border: 1px solid #e7eaf3;
+      }
+      .route-track > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, rgba(111,99,194,.26), rgba(111,99,194,.85));
+        width: var(--w, 50%);
+      }
+
+      .snapshot-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .snapshot-strip {
+        padding: 16px;
+        display: grid;
+        gap: 10px;
+      }
+      .snapshot-title {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+      }
+      .sparkline {
+        width: 100%;
+        height: 82px;
+        display: block;
+      }
+      .snapshot-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: var(--text-soft);
+      }
+
+      .snapshot-notes-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .snapshot-note-card {
+        padding: 16px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .debug-card details { display: grid; gap: 12px; }
+      .debug-card summary {
+        cursor: pointer;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .debug-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .debug-status {
+        margin: 0;
+        font-size: 13px;
+        color: var(--text-soft);
+      }
+      .debug-status.mono { font-family: var(--mono); }
+
+      .footer {
+        border-top: 1px solid var(--border);
+        padding-top: 16px;
+        color: var(--text-soft);
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      [data-mode-only="explain"] { display: block; }
+      body.is-quick [data-mode-only="explain"] { display: none; }
+      body.is-quick .mode-chip[data-mode="quick"],
+      body.is-explain .mode-chip[data-mode="explain"] { 
+        background: var(--primary-soft);
+        border-color: rgba(111, 99, 194, 0.24);
+        color: var(--primary-strong);
+      }
+      body.is-quick .mode-chip[data-mode="explain"],
+      body.is-explain .mode-chip[data-mode="quick"] {
+        background: var(--surface-soft);
+        color: var(--text);
+      }
+
+      @media (max-width: 1199px) {
+        .controls-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .signal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .metrics-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .mainviz-layout,
+        .why-layout,
+        .candidates-grid,
+        .snapshot-grid,
+        .snapshot-notes-grid { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 899px) {
+        .app { padding: 20px 16px 48px; }
+        .app__title { white-space: normal; }
+        .controls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .signal-grid { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 639px) {
+        .controls-grid,
+        .metrics-grid { grid-template-columns: 1fr; }
+        .global-nav { gap: 12px; }
+        .depth-row { grid-template-columns: 1fr; gap: 6px; }
+        .depth-value { text-align: left; }
+        .candidate-grid,
+        .snapshot-notes-grid { grid-template-columns: 1fr; }
+        .footer { flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body class="is-explain">
+    <div class="app page console-page sell-impact-page">
+      <header class="app__header global-header">
+        <div class="app__header-top">
+          <a href="../index.html" class="brand-link" aria-label="XSIC home">
+            <div class="app__brand">
+              <span class="app__logo" aria-hidden="true"></span>
+              <h1 class="app__title">XRPL Signal &amp; Insight Console — XSIC</h1>
+            </div>
+          </a>
+          <nav class="global-nav" aria-label="Global">
+            <a href="#">Home</a>
+            <a href="#" class="is-active">Apps</a>
+            <a href="#">Docs</a>
+            <a href="#">Donate</a>
+          </nav>
+        </div>
+      </header>
+
+      <main class="page__content">
+        <section class="hero-head">
+          <p class="eyebrow">Execution quality / route reasoning</p>
+          <h2 class="page-title">Sell Impact</h2>
+          <p class="page-subtitle">
+            Estimate receive, impact, depth stress, and route quality before execution. This page is decision-first: the top answers what happens now, and the lower sections explain why.
+          </p>
+        </section>
+
+        <section class="card controls-card">
+          <div class="controls-grid">
+            <label class="field">
+              Side
+              <select>
+                <option selected>Sell</option>
+                <option>Buy</option>
+              </select>
+            </label>
+            <label class="field">
+              Pair
+              <select>
+                <option selected>XRP → RLUSD</option>
+                <option>XRP → USDC</option>
+                <option>RLUSD → XRP</option>
+              </select>
+            </label>
+            <label class="field">
+              Amount
+              <input value="150,000 XRP" />
+            </label>
+            <div class="field">
+              Mode
+              <div class="mode-group">
+                <button class="mode-chip" data-mode="quick" type="button">Quick</button>
+                <button class="mode-chip is-active" data-mode="explain" type="button">Explain</button>
+              </div>
+            </div>
+            <button class="button button--ghost" type="button" id="resetBtn">Reset</button>
+            <button class="button button--primary" type="button" id="estimateBtn">Estimate</button>
+            <div class="status-inline">Status: <strong>LOADED · EXPLAIN</strong></div>
+          </div>
+          <div class="meta-chip-row" style="margin-top: 10px;">
+            <span class="meta-chip">snapshot: 2026-03-16 19:34:12</span>
+            <span class="meta-chip">pair: XRP / RLUSD</span>
+            <span class="meta-chip">source: cached + live explain</span>
+            <span class="meta-chip">state: partial-safe</span>
+          </div>
+        </section>
+
+        <section class="card note-card">
+          <div class="flow-note">Partial explain snapshot shown. Quick estimate is usable; route-comparison details may lag behind the latest book edge.</div>
+          <div class="flow-note flow-note--quiet">State guide: stale / partial keeps the latest readable estimate, empty means no executable route was found, and error means estimation is currently unavailable.</div>
+        </section>
+
+        <section class="signal-grid">
+          <article class="card signal-card">
+            <div class="signal-label">Estimated receive</div>
+            <div class="hero-value">149,238.41</div>
+            <div class="copy">RLUSD estimated output at the current bounded snapshot.</div>
+            <div class="badge-row">
+              <span class="pill pill--good">Tradable</span>
+              <span class="pill pill--primary">Stable read</span>
+            </div>
+          </article>
+          <article class="card signal-card">
+            <div class="signal-label">Price impact</div>
+            <div class="hero-value">1.42%</div>
+            <div class="copy">The route stays usable, but depth turns visibly thinner past the top book layer.</div>
+            <div class="badge-row">
+              <span class="pill pill--warn">Thin beyond touch</span>
+              <span class="pill pill--primary">Watch size</span>
+            </div>
+          </article>
+          <article class="card signal-card">
+            <div class="signal-label">Execution quality</div>
+            <div class="hero-value">B</div>
+            <div class="copy">Healthy enough for this size, but route sensitivity rises if the book side refreshes late.</div>
+            <div class="badge-row">
+              <span class="pill pill--good">Book-led</span>
+              <span class="pill pill--warn">Bridge tail risk</span>
+            </div>
+          </article>
+          <article class="card signal-card">
+            <div class="signal-label">Context</div>
+            <div class="copy">Sell XRP into RLUSD using explain mode with bounded candidate comparison.</div>
+            <div class="meta">route type: hybrid book + AMM + bridge assist</div>
+            <div class="badge-row">
+              <span class="meta-chip">mode: explain</span>
+              <span class="meta-chip">routes: 3 visible</span>
+            </div>
+          </article>
+        </section>
+
+        <section class="metrics-grid">
+          <article class="card metric-card metric-card--highlight">
+            <div class="metric-label">Touch price</div>
+            <div class="metric-value">0.9946</div>
+            <div class="metric-sub">RLUSD / XRP reference</div>
+          </article>
+          <article class="card metric-card">
+            <div class="metric-label">Book share</div>
+            <div class="metric-value">54%</div>
+            <div class="metric-sub">primary execution venue</div>
+          </article>
+          <article class="card metric-card">
+            <div class="metric-label">AMM share</div>
+            <div class="metric-value">29%</div>
+            <div class="metric-sub">supports mid-band depth</div>
+          </article>
+          <article class="card metric-card">
+            <div class="metric-label">Bridge share</div>
+            <div class="metric-value">17%</div>
+            <div class="metric-sub">fallback only</div>
+          </article>
+          <article class="card metric-card">
+            <div class="metric-label">Book max</div>
+            <div class="metric-value">102k</div>
+            <div class="metric-sub">top bounded visible size</div>
+          </article>
+          <article class="card metric-card">
+            <div class="metric-label">AMM max</div>
+            <div class="metric-value">58k</div>
+            <div class="metric-sub">usable band depth</div>
+          </article>
+          <article class="card metric-card">
+            <div class="metric-label">Updated</div>
+            <div class="metric-value">19s</div>
+            <div class="metric-sub">live explain pass</div>
+          </article>
+        </section>
+
+        <section class="card mainviz-card">
+          <div class="section-head">
+            <div>
+              <h3 class="section-title">Execution overview</h3>
+              <p class="section-note">Decision-first combined visualizer for current depth / thinness and the actual execution mix. This is a snapshot view, not a long timeline.</p>
+            </div>
+            <span class="meta-chip">depth + mix</span>
+          </div>
+
+          <div class="mainviz-layout">
+            <div class="viz-panel">
+              <div class="depth-shell">
+                <div class="depth-stage">
+                  <div>
+                    <div class="signal-label">Market depth / thinness</div>
+                    <div class="section-note" style="margin-top: 6px;">The selected size reaches into the first thin outer band. The book edge still leads, but refill risk starts to matter.</div>
+                  </div>
+                  <div class="depth-bands">
+                    <div class="depth-row">
+                      <div class="depth-name">Touch band</div>
+                      <div class="depth-track"><span class="depth-fill" style="--w:92%"></span></div>
+                      <div class="depth-value">dense</div>
+                    </div>
+                    <div class="depth-row">
+                      <div class="depth-name">Inner book</div>
+                      <div class="depth-track"><span class="depth-fill" style="--w:76%"></span></div>
+                      <div class="depth-value">healthy</div>
+                    </div>
+                    <div class="depth-row">
+                      <div class="depth-name">AMM support</div>
+                      <div class="depth-track"><span class="depth-fill depth-fill--warn" style="--w:58%"></span></div>
+                      <div class="depth-value">assistive</div>
+                    </div>
+                    <div class="depth-row">
+                      <div class="depth-name">Bridge tail</div>
+                      <div class="depth-track"><span class="depth-fill depth-fill--danger" style="--w:26%"></span></div>
+                      <div class="depth-value">thin</div>
+                    </div>
+                  </div>
+                  <div class="depth-caption">
+                    <span>selected size: 150k XRP</span>
+                    <span>outer bands thin faster than top touch</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mix-card">
+                <div class="signal-label">Execution mix</div>
+                <div class="mix-track" aria-hidden="true">
+                  <span class="mix-segment mix-segment--book"></span>
+                  <span class="mix-segment mix-segment--amm"></span>
+                  <span class="mix-segment mix-segment--bridge"></span>
+                </div>
+                <div class="mix-legend">
+                  <span><i class="mix-dot" style="background: rgba(111,99,194,.92);"></i> Book 54%</span>
+                  <span><i class="mix-dot" style="background: rgba(111,99,194,.46);"></i> AMM 29%</span>
+                  <span><i class="mix-dot" style="background: rgba(180,83,9,.72);"></i> Bridge 17%</span>
+                </div>
+              </div>
+            </div>
+
+            <aside class="viz-side">
+              <div>
+                <div class="signal-label">Why this snapshot matters</div>
+                <h4 class="side-title">Book depth is still winning, but not by enough to ignore the tail</h4>
+                <p class="side-copy">The chosen route is not the cheapest only because of the top price. It wins because it stays balanced across output, impact, and fallback safety at the current size.</p>
+              </div>
+              <ul class="bottleneck-list">
+                <li>The best raw output route loses once bridge dependence rises above the safe tail threshold.</li>
+                <li>AMM help is meaningful in the middle band, but not strong enough to carry the full size alone.</li>
+                <li>Book refill risk remains moderate rather than critical, so the selected hybrid path still wins.</li>
+              </ul>
+              <div class="confidence-box">
+                <div class="confidence-head">
+                  <strong>Route confidence</strong>
+                  <span class="pill pill--primary">76 / 100</span>
+                </div>
+                <div class="confidence-track"><div class="confidence-fill"></div></div>
+                <div class="meta">fallback: usable · tail risk: moderate · failure mode: bridge dominance if top book disappears</div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="card why-card" data-mode-only="explain">
+          <div class="section-head">
+            <div>
+              <h3 class="section-title">Why Route?</h3>
+              <p class="section-note">Explain mode deepens the answer without blocking the Quick result. The selected route wins because it keeps output and impact balanced while avoiding an over-thin bridge tail.</p>
+            </div>
+            <span class="meta-chip">selected path reasoning</span>
+          </div>
+
+          <div class="why-layout">
+            <div class="why-panel">
+              <div class="route-svg-wrap">
+                <svg class="route-svg" viewBox="0 0 720 260" role="img" aria-label="Static selected route diagram">
+                  <defs>
+                    <linearGradient id="pathA" x1="0" x2="1">
+                      <stop offset="0%" stop-color="rgba(111,99,194,0.9)" />
+                      <stop offset="100%" stop-color="rgba(111,99,194,0.45)" />
+                    </linearGradient>
+                    <linearGradient id="pathB" x1="0" x2="1">
+                      <stop offset="0%" stop-color="rgba(180,83,9,0.9)" />
+                      <stop offset="100%" stop-color="rgba(180,83,9,0.4)" />
+                    </linearGradient>
+                  </defs>
+                  <g>
+                    <circle cx="86" cy="130" r="26" fill="rgba(111,99,194,0.92)" />
+                    <circle cx="270" cy="88" r="18" fill="rgba(111,99,194,0.20)" stroke="rgba(111,99,194,0.34)" />
+                    <circle cx="270" cy="172" r="18" fill="rgba(111,99,194,0.20)" stroke="rgba(111,99,194,0.34)" />
+                    <circle cx="462" cy="92" r="18" fill="rgba(111,99,194,0.20)" stroke="rgba(111,99,194,0.34)" />
+                    <circle cx="462" cy="170" r="18" fill="rgba(180,83,9,0.18)" stroke="rgba(180,83,9,0.34)" />
+                    <circle cx="634" cy="130" r="26" fill="rgba(4,120,87,0.9)" />
+
+                    <path d="M112 124 C160 106 198 96 246 90" fill="none" stroke="url(#pathA)" stroke-width="12" stroke-linecap="round" />
+                    <path d="M112 138 C160 154 198 166 246 170" fill="none" stroke="rgba(111,99,194,0.38)" stroke-width="8" stroke-linecap="round" />
+                    <path d="M288 88 C352 88 392 90 444 92" fill="none" stroke="url(#pathA)" stroke-width="10" stroke-linecap="round" />
+                    <path d="M288 172 C352 170 392 168 444 168" fill="none" stroke="url(#pathB)" stroke-width="7" stroke-linecap="round" />
+                    <path d="M478 92 C540 92 576 108 608 122" fill="none" stroke="url(#pathA)" stroke-width="10" stroke-linecap="round" />
+                    <path d="M478 170 C530 170 562 156 606 138" fill="none" stroke="url(#pathB)" stroke-width="6" stroke-linecap="round" stroke-dasharray="6 7" />
+
+                    <text x="86" y="136" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">XRP</text>
+                    <text x="270" y="94" text-anchor="middle" font-size="11" font-weight="800" fill="#5d52b7">Book</text>
+                    <text x="270" y="178" text-anchor="middle" font-size="11" font-weight="800" fill="#5d52b7">AMM</text>
+                    <text x="462" y="98" text-anchor="middle" font-size="11" font-weight="800" fill="#5d52b7">Book exit</text>
+                    <text x="462" y="176" text-anchor="middle" font-size="11" font-weight="800" fill="#b45309">Bridge</text>
+                    <text x="634" y="136" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">RLUSD</text>
+                  </g>
+                </svg>
+                <div class="route-caption">
+                  <span>thicker = larger share</span>
+                  <span>dashed = fallback tail only</span>
+                </div>
+              </div>
+            </div>
+            <aside class="why-panel">
+              <div>
+                <div class="signal-label">Why this path</div>
+                <h4 class="side-title">The selected route wins on balanced execution, not on a single best leg</h4>
+                <p class="side-copy">It gives slightly less raw output than the aggressive bridge-heavy alternative, but it avoids the thin tail that would make the estimate fragile.</p>
+              </div>
+              <div class="bottleneck-map">
+                <div class="bottleneck-row">
+                  <div class="bottleneck-head"><strong>Book refill risk</strong><span class="route-subvalue">medium</span></div>
+                  <div class="bar"><span style="--w:58%"></span></div>
+                </div>
+                <div class="bottleneck-row">
+                  <div class="bottleneck-head"><strong>AMM drift</strong><span class="route-subvalue">low</span></div>
+                  <div class="bar"><span style="--w:34%"></span></div>
+                </div>
+                <div class="bottleneck-row">
+                  <div class="bottleneck-head"><strong>Bridge dependence</strong><span class="route-subvalue">watch</span></div>
+                  <div class="bar"><span class="warn" style="--w:62%"></span></div>
+                </div>
+                <div class="bottleneck-row">
+                  <div class="bottleneck-head"><strong>Insufficient depth</strong><span class="route-subvalue">contained</span></div>
+                  <div class="bar"><span class="danger" style="--w:28%"></span></div>
+                </div>
+              </div>
+              <ul class="why-list">
+                <li>Book-led front leg keeps the first impact step tighter than the AMM-led route.</li>
+                <li>AMM support reduces over-reliance on a single orderbook pocket.</li>
+                <li>Bridge is used as a bounded tail instead of becoming the main dependency.</li>
+              </ul>
+            </aside>
+          </div>
+        </section>
+
+        <section class="card candidates-card" data-mode-only="explain">
+          <div class="section-head">
+            <div>
+              <h3 class="section-title">Candidate routes</h3>
+              <p class="section-note">Maximum 3 visible. Selected route is emphasized first; alternatives stay readable but visually lighter.</p>
+            </div>
+            <span class="meta-chip">selected + alternatives</span>
+          </div>
+          <div class="candidates-grid">
+            <article class="candidate-card is-selected">
+              <div class="candidate-head">
+                <h4 class="candidate-title">Route A · Selected</h4>
+                <span class="pill pill--primary">Selected</span>
+              </div>
+              <div class="candidate-grid">
+                <div>
+                  <div class="route-label">Est. output</div>
+                  <div class="route-value">149,238.41</div>
+                </div>
+                <div>
+                  <div class="route-label">Impact</div>
+                  <div class="route-value">1.42%</div>
+                </div>
+                <div>
+                  <div class="route-label">Bottleneck</div>
+                  <div class="route-subvalue">Bridge tail watch</div>
+                </div>
+                <div>
+                  <div class="route-label">Why chosen</div>
+                  <div class="route-subvalue">best balanced confidence</div>
+                </div>
+              </div>
+              <div class="route-track"><span style="--w:76%"></span></div>
+            </article>
+            <article class="candidate-card">
+              <div class="candidate-head">
+                <h4 class="candidate-title">Route B · Alternative</h4>
+                <span class="pill pill--warn">Alternative</span>
+              </div>
+              <div class="candidate-grid">
+                <div>
+                  <div class="route-label">Est. output</div>
+                  <div class="route-value">149,412.18</div>
+                </div>
+                <div>
+                  <div class="route-label">Impact</div>
+                  <div class="route-value">1.88%</div>
+                </div>
+                <div>
+                  <div class="route-label">Bottleneck</div>
+                  <div class="route-subvalue">bridge-led tail</div>
+                </div>
+                <div>
+                  <div class="route-label">Why not</div>
+                  <div class="route-subvalue">fragile if bridge slips</div>
+                </div>
+              </div>
+              <div class="route-track"><span style="--w:61%"></span></div>
+            </article>
+            <article class="candidate-card">
+              <div class="candidate-head">
+                <h4 class="candidate-title">Route C · Fallback</h4>
+                <span class="pill pill--danger">Fallback</span>
+              </div>
+              <div class="candidate-grid">
+                <div>
+                  <div class="route-label">Est. output</div>
+                  <div class="route-value">148,702.09</div>
+                </div>
+                <div>
+                  <div class="route-label">Impact</div>
+                  <div class="route-value">2.31%</div>
+                </div>
+                <div>
+                  <div class="route-label">Bottleneck</div>
+                  <div class="route-subvalue">insufficient book depth</div>
+                </div>
+                <div>
+                  <div class="route-label">Why not</div>
+                  <div class="route-subvalue">output and confidence both weaker</div>
+                </div>
+              </div>
+              <div class="route-track"><span style="--w:42%"></span></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="card snapshot-card" data-mode-only="explain">
+          <div class="section-head">
+            <div>
+              <h3 class="section-title">Snapshot strips</h3>
+              <p class="section-note">Three lightweight strips only. No long heavy timeline: just enough local drift to explain why the current decision quality changed.</p>
+            </div>
+            <span class="meta-chip">nearby snapshot context</span>
+          </div>
+          <div class="snapshot-grid">
+            <article class="snapshot-strip">
+              <h4 class="snapshot-title">Estimated output drift</h4>
+              <svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Estimated output drift sparkline">
+                <path d="M8 56 L40 50 L72 46 L104 44 L136 40 L168 36 L200 39 L232 34 L264 30 L296 28" fill="none" stroke="rgba(111,99,194,0.88)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                <circle cx="296" cy="28" r="4" fill="rgba(111,99,194,0.92)"></circle>
+              </svg>
+              <div class="snapshot-footer"><span>latest better than previous</span><span class="snapshot-value">+0.11%</span></div>
+            </article>
+            <article class="snapshot-strip">
+              <h4 class="snapshot-title">Impact score trend</h4>
+              <svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Impact score trend sparkline">
+                <path d="M8 24 L40 28 L72 32 L104 30 L136 38 L168 42 L200 46 L232 48 L264 52 L296 56" fill="none" stroke="rgba(180,83,9,0.9)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                <circle cx="296" cy="56" r="4" fill="rgba(180,83,9,0.92)"></circle>
+              </svg>
+              <div class="snapshot-footer"><span>thinness rising outward</span><span class="snapshot-value">watch</span></div>
+            </article>
+            <article class="snapshot-strip">
+              <h4 class="snapshot-title">Bridge share trend</h4>
+              <svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Bridge share trend sparkline">
+                <path d="M8 58 L40 58 L72 56 L104 54 L136 51 L168 48 L200 44 L232 38 L264 34 L296 30" fill="none" stroke="rgba(4,120,87,0.9)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                <circle cx="296" cy="30" r="4" fill="rgba(4,120,87,0.92)"></circle>
+              </svg>
+              <div class="snapshot-footer"><span>bridge share climbing but bounded</span><span class="snapshot-value">17% latest</span></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="card snapshot-card" data-mode-only="explain">
+          <div class="section-head">
+            <div>
+              <h3 class="section-title">Snapshot notes</h3>
+              <p class="section-note">Short text support only. This section explains the latest snapshot state, the previous delta, and why the route changed without replacing the visualizers.</p>
+            </div>
+          </div>
+          <div class="snapshot-notes-grid">
+            <article class="snapshot-note-card">
+              <div class="signal-label">Latest snapshot state</div>
+              <ul class="snapshot-note-list">
+                <li>Book touch stayed tight enough for the first slice.</li>
+                <li>AMM support remained usable in the middle band.</li>
+                <li>Bridge only became meaningful near the tail.</li>
+              </ul>
+            </article>
+            <article class="snapshot-note-card">
+              <div class="signal-label">Previous delta / operator note</div>
+              <ul class="snapshot-note-list">
+                <li>Compared with the previous snapshot, output improved slightly while impact stayed within the same quality tier.</li>
+                <li>Route A remained selected because Route B lost confidence faster than it gained raw output.</li>
+                <li>Operator note: keep Explain bounded; do not let the bridge narrative dominate the hero layer.</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="card debug-card">
+          <details>
+            <summary>Debug (collapsed, release readiness)</summary>
+            <div class="debug-buttons">
+              <button type="button" class="button button--ghost">Force Quick</button>
+              <button type="button" class="button button--ghost">Force Explain</button>
+              <button type="button" class="button button--ghost">Force Partial</button>
+              <button type="button" class="button button--ghost">Force Empty</button>
+              <button type="button" class="button button--ghost">Force Error</button>
+            </div>
+            <p class="debug-status">Status: static mock only. Sell Impact shell aligned to current XSIC app direction.</p>
+            <p class="debug-status mono">SELL_DEBUG · chosen venue book-led hybrid · shares 0.54 / 0.29 / 0.17 · reason balanced confidence · source cached+live explain</p>
+          </details>
+        </section>
+
+        <footer class="footer">
+          <span>XSIC mock · Sell Impact redesign direction</span>
+          <span>Aligned to white-shell app family: Flow Alert / Liquidity Pulse / Exposure Graph</span>
+        </footer>
+      </main>
+    </div>
+
+    <script>
+      (() => {
+        const body = document.body;
+        const modeButtons = Array.from(document.querySelectorAll('.mode-chip'));
+        const resetBtn = document.getElementById('resetBtn');
+        const estimateBtn = document.getElementById('estimateBtn');
+
+        function setMode(mode) {
+          body.classList.toggle('is-quick', mode === 'quick');
+          body.classList.toggle('is-explain', mode !== 'quick');
+          modeButtons.forEach((button) => {
+            const active = button.dataset.mode === mode;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+          });
+        }
+
+        modeButtons.forEach((button) => {
+          button.addEventListener('click', () => setMode(button.dataset.mode || 'explain'));
+        });
+
+        resetBtn.addEventListener('click', () => setMode('explain'));
+        estimateBtn.addEventListener('click', () => {
+          estimateBtn.textContent = 'Estimated';
+          setTimeout(() => { estimateBtn.textContent = 'Estimate'; }, 800);
+        });
+      })();
+    </script>
+  </body>
+</html>
