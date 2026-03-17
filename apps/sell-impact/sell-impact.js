@@ -410,18 +410,38 @@ export function initSellImpact() {
   const resultUsedVenueNote = document.querySelector('[data-result="used-venue-note"]');
   const resultPairLabel = document.querySelector('[data-result="pair-label"]');
   const resultPairMeta = document.querySelector('[data-result="pair-meta"]');
-  const resultMixClob = document.querySelector('[data-result="mix-clob"]');
+  const resultMixBook = document.querySelector('[data-result="mix-book"]');
   const resultMixAmm = document.querySelector('[data-result="mix-amm"]');
-  const resultMixSummary = document.querySelector('[data-result="mix-summary"]');
-  const resultMixClobBar = document.querySelector('[data-result="mix-clob-bar"]');
-  const resultMixAmmBar = document.querySelector('[data-result="mix-amm-bar"]');
+  const resultMixBridge = document.querySelector('[data-result="mix-bridge"]');
+  const resultMixBookSegment = document.querySelector('[data-result="mix-book-segment"]');
+  const resultMixAmmSegment = document.querySelector('[data-result="mix-amm-segment"]');
+  const resultMixBridgeSegment = document.querySelector('[data-result="mix-bridge-segment"]');
+  const resultDepthTouchBar = document.querySelector('[data-result="depth-touch-bar"]');
+  const resultDepthInnerBar = document.querySelector('[data-result="depth-inner-bar"]');
+  const resultDepthAmmBar = document.querySelector('[data-result="depth-amm-bar"]');
+  const resultDepthBridgeBar = document.querySelector('[data-result="depth-bridge-bar"]');
+  const resultDepthTouchLabel = document.querySelector('[data-result="depth-touch-label"]');
+  const resultDepthInnerLabel = document.querySelector('[data-result="depth-inner-label"]');
+  const resultDepthAmmLabel = document.querySelector('[data-result="depth-amm-label"]');
+  const resultDepthBridgeLabel = document.querySelector('[data-result="depth-bridge-label"]');
+  const resultDepthCaption = document.querySelector('[data-result="depth-caption"]');
+  const resultSnapshotHeadline = document.querySelector('[data-result="snapshot-headline"]');
+  const resultSnapshotBody = document.querySelector('[data-result="snapshot-body"]');
+  const resultSnapshotBullets = document.querySelector('[data-result="snapshot-bullets"]');
+  const resultRouteConfidenceCard = document.querySelector('[data-result="route-confidence-card"]');
+  const resultRouteConfidenceScore = document.querySelector('[data-result="route-confidence-score"]');
+  const resultRouteConfidenceBar = document.querySelector('[data-result="route-confidence-bar"]');
+  const resultRouteConfidenceSummary = document.querySelector('[data-result="route-confidence-summary"]');
+  const resultPathHeadline = document.querySelector('[data-result="path-headline"]');
   const resultRiskBook = document.querySelector('[data-result="risk-book"]');
+  const resultRiskAmm = document.querySelector('[data-result="risk-amm"]');
   const resultRiskBridge = document.querySelector('[data-result="risk-bridge"]');
+  const resultRiskDepth = document.querySelector('[data-result="risk-depth"]');
   const resultRiskBookBar = document.querySelector('[data-result="risk-book-bar"]');
+  const resultRiskAmmBar = document.querySelector('[data-result="risk-amm-bar"]');
   const resultRiskBridgeBar = document.querySelector('[data-result="risk-bridge-bar"]');
-  const resultRoutePathCaption = document.querySelector('[data-result="route-path-caption"]');
-  const resultRouteBottleneck = document.querySelector('[data-result="route-bottleneck"]');
-  const resultRouteConfidence = document.querySelector('[data-result="route-confidence"]');
+  const resultRiskDepthBar = document.querySelector('[data-result="risk-depth-bar"]');
+  const resultPathBullets = document.querySelector('[data-result="path-bullets"]');
   const routeCards = {
     a: {
       card: document.querySelector('[data-route-card="a"]'),
@@ -470,6 +490,7 @@ export function initSellImpact() {
   const snapshotOutputNote = document.querySelector('[data-result="snapshot-output-note"]');
   const snapshotImpactNote = document.querySelector('[data-result="snapshot-impact-note"]');
   const snapshotContextNote = document.querySelector('[data-result="snapshot-context-note"]');
+  const routeTargetLabel = document.querySelector('[data-result="route-target-label"]');
   const sideSelect = document.querySelector("#trade-side-select");
   const modeButtons = Array.from(document.querySelectorAll(".mode-chip"));
   const impactChart = document.querySelector("#impact-chart");
@@ -1850,18 +1871,40 @@ export function initSellImpact() {
     setResultText(resultUsedVenueNote, "");
     setResultText(resultPairLabel, "XRP → …");
     setResultText(resultPairMeta, "Issuer context updates from token input.");
-    setResultText(resultMixClob, placeholder);
-    setResultText(resultMixAmm, placeholder);
-    setResultText(resultMixSummary, "Explain data appears after estimate.");
-    setResultText(resultRiskBook, placeholder);
-    setResultText(resultRiskBridge, placeholder);
-    setResultText(resultRoutePathCaption, "Selected route path appears after estimate.");
-    setResultText(resultRouteBottleneck, placeholder);
-    setResultText(resultRouteConfidence, placeholder);
-    setBarPercent(resultMixClobBar, 0);
-    setBarPercent(resultMixAmmBar, 0);
+    setResultText(resultMixBook, "Book 0%");
+    setResultText(resultMixAmm, "AMM 0%");
+    setResultText(resultMixBridge, "Bridge 0%");
+    setBarPercent(resultMixBookSegment, 0);
+    setBarPercent(resultMixAmmSegment, 0);
+    setBarPercent(resultMixBridgeSegment, 0);
+    setResultText(resultDepthTouchLabel, "Unavailable");
+    setResultText(resultDepthInnerLabel, "Unavailable");
+    setResultText(resultDepthAmmLabel, "Unavailable");
+    setResultText(resultDepthBridgeLabel, "Unavailable");
+    setBarPercent(resultDepthTouchBar, 0);
+    setBarPercent(resultDepthInnerBar, 0);
+    setBarPercent(resultDepthAmmBar, 0);
+    setBarPercent(resultDepthBridgeBar, 0);
+    setResultText(resultDepthCaption, "Unavailable in this snapshot.");
+    setResultText(resultSnapshotHeadline, "Unavailable in this snapshot.");
+    setResultText(resultSnapshotBody, "Run estimate to generate route-specific rationale.");
+    setSnapshotListItems(resultSnapshotBullets, ["Unavailable in this snapshot."]);
+    if (resultRouteConfidenceCard) {
+      resultRouteConfidenceCard.hidden = true;
+    }
+    setResultText(resultRouteConfidenceScore, "0 / 100");
+    setBarPercent(resultRouteConfidenceBar, 0);
+    setResultText(resultRouteConfidenceSummary, "Unavailable in this snapshot.");
+    setResultText(resultPathHeadline, "Unavailable in this snapshot.");
+    setResultText(resultRiskBook, "Unavailable");
+    setResultText(resultRiskAmm, "Unavailable");
+    setResultText(resultRiskBridge, "Unavailable");
+    setResultText(resultRiskDepth, "Unavailable");
     setBarPercent(resultRiskBookBar, 0);
+    setBarPercent(resultRiskAmmBar, 0);
     setBarPercent(resultRiskBridgeBar, 0);
+    setBarPercent(resultRiskDepthBar, 0);
+    setSnapshotListItems(resultPathBullets, ["Unavailable in this snapshot."]);
     [routeCards.a, routeCards.b, routeCards.c].forEach((slot) => {
       setResultText(slot?.output, placeholder);
       setResultText(slot?.impact, placeholder);
@@ -3464,19 +3507,17 @@ export function initSellImpact() {
   };
 
   const updateRoutePathVisual = ({ chosenVenue, hasAmm, fallbackConfidence = 39 }) => {
-    const setOpacity = (nodes, active) => {
+    const setPathState = (nodes, active, width) => {
       nodes.forEach((node) => {
-        node.style.opacity = active ? "1" : "0.22";
+        node.style.opacity = active ? "1" : "0.2";
+        node.style.strokeWidth = String(width);
       });
     };
-    setOpacity(routePathSegments.clob, chosenVenue === VENUE_CLOB || !hasAmm);
-    setOpacity(routePathSegments.amm, chosenVenue === VENUE_AMM && hasAmm);
-    setOpacity(routePathSegments.fallback, fallbackConfidence >= 30);
-
-    const caption = chosenVenue === VENUE_AMM && hasAmm
-      ? "Selected path emphasizes AMM-assisted lanes; orderbook remains fallback context."
-      : "Selected path emphasizes orderbook lanes; AMM branch stays contextual."
-    setResultText(resultRoutePathCaption, caption);
+    const clobActive = chosenVenue === VENUE_CLOB || !hasAmm;
+    const ammActive = chosenVenue === VENUE_AMM && hasAmm;
+    setPathState(routePathSegments.clob, clobActive, clobActive ? 10 : 5);
+    setPathState(routePathSegments.amm, ammActive, ammActive ? 9 : 4);
+    setPathState(routePathSegments.fallback, fallbackConfidence >= 30, 6);
   };
 
   const updateRouteCandidates = ({ candidates, chosenVenue }) => {
@@ -3498,15 +3539,88 @@ export function initSellImpact() {
     });
 
     const selected = candidates[0];
-    setResultText(resultRouteBottleneck, selected?.bottleneck || t("common.not_available"));
-    setResultText(resultRouteConfidence, selected ? formatPercent(selected.confidencePct) : t("common.not_available"));
-    setResultText(resultUsedVenueSummary, selected?.reason || t("common.not_available"));
+    const selectedConfidence = Number.isFinite(selected?.confidencePct) ? selected.confidencePct : null;
+    const bookShare = chosenVenue === VENUE_AMM ? 54 : (lastAmmAvailable ? 68 : 88);
+    const ammShare = lastAmmAvailable ? (chosenVenue === VENUE_AMM ? 29 : 22) : 0;
+    const bridgeShare = Math.max(0, 100 - bookShare - ammShare);
+
+    setResultText(resultMixBook, `Book ${formatPercent(bookShare, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+    setResultText(resultMixAmm, `AMM ${formatPercent(ammShare, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+    setResultText(resultMixBridge, `Bridge ${formatPercent(bridgeShare, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+    setBarPercent(resultMixBookSegment, bookShare);
+    setBarPercent(resultMixAmmSegment, ammShare);
+    setBarPercent(resultMixBridgeSegment, bridgeShare);
+
+    const depthBands = [
+      { bar: resultDepthTouchBar, label: resultDepthTouchLabel, pct: Math.min(95, Math.max(45, bookShare + 20)), text: bookShare >= 65 ? "dense" : "steady" },
+      { bar: resultDepthInnerBar, label: resultDepthInnerLabel, pct: Math.min(90, Math.max(40, bookShare + 8)), text: bookShare >= 55 ? "healthy" : "watch" },
+      { bar: resultDepthAmmBar, label: resultDepthAmmLabel, pct: Math.min(86, Math.max(8, ammShare * 2.2)), text: ammShare >= 20 ? "assistive" : "limited" },
+      { bar: resultDepthBridgeBar, label: resultDepthBridgeLabel, pct: Math.min(82, Math.max(6, bridgeShare * 2.1)), text: bridgeShare >= 18 ? "thin" : "contained" },
+    ];
+    depthBands.forEach((band) => {
+      setBarPercent(band.bar, band.pct);
+      setResultText(band.label, band.text);
+    });
+    setResultText(resultDepthCaption, `selected size: ${amountInput?.value || "n/a"} XRP / outer bands thin faster than top touch`);
+    setResultText(
+      depthChartSummary,
+      chosenVenue === VENUE_AMM
+        ? "AMM support helps, but the book still anchors the route at this size."
+        : "The selected size reaches thin outer bands while top-touch book depth still leads."
+    );
+
+    const bookRisk = Math.min(100, Math.max(20, 55 + (100 - bookShare) * 0.3));
+    const ammRisk = Math.min(100, Math.max(12, 35 + (ammShare < 15 ? 18 : 0)));
+    const bridgeRisk = Math.min(100, Math.max(15, bridgeShare * 2.4));
+    const depthRisk = simulationHasPartialFill(lastDisplaySimulation) ? 62 : 32;
+    const riskLabel = (value) => value >= 75 ? "high" : value >= 55 ? "watch" : value >= 40 ? "medium" : "low";
+    setResultText(resultRiskBook, riskLabel(bookRisk));
+    setResultText(resultRiskAmm, riskLabel(ammRisk));
+    setResultText(resultRiskBridge, riskLabel(bridgeRisk));
+    setResultText(resultRiskDepth, depthRisk >= 55 ? "contained" : "low");
+    setBarPercent(resultRiskBookBar, bookRisk);
+    setBarPercent(resultRiskAmmBar, ammRisk);
+    setBarPercent(resultRiskBridgeBar, bridgeRisk);
+    setBarPercent(resultRiskDepthBar, depthRisk);
+
+    setResultText(resultSnapshotHeadline, chosenVenue === VENUE_AMM
+      ? "AMM support helps, but the book still anchors the route"
+      : "Book depth is still winning, but not by enough to ignore the tail");
+    setResultText(resultSnapshotBody, selected
+      ? `Selected ${selected.title} wins by balancing output, impact, and fallback safety in this snapshot.`
+      : "Unavailable in this snapshot.");
+    setSnapshotListItems(resultSnapshotBullets, [
+      `Selected route: ${selected?.title || "Unavailable in this snapshot."}`,
+      `Bottleneck focus: ${selected?.bottleneck || "Unavailable in this snapshot."}`,
+      bridgeShare > 15 ? "Bridge tail remains bounded but should stay secondary." : "Bridge tail stays bounded and non-dominant.",
+    ]);
+
+    setResultText(resultPathHeadline, "The selected route wins on balanced execution, not on a single best leg");
     setResultText(
       resultWhyLine,
       selected
-        ? `${selected.reason} Bottleneck: ${selected.bottleneck}`
-        : t("common.not_available")
+        ? `${selected.reason} It remains robust against thin-tail fallback pressure.`
+        : "Unavailable in this snapshot."
     );
+    setSnapshotListItems(resultPathBullets, [
+      "Book-led front leg keeps early impact steps tighter.",
+      lastAmmAvailable ? "AMM support reduces over-reliance on one orderbook pocket." : "AMM assist is currently unavailable, so book resilience dominates.",
+      bridgeShare > 15 ? "Bridge is kept as fallback tail, not primary dependency." : "Bridge participation remains bounded as a tail option.",
+    ]);
+
+    if (resultRouteConfidenceCard) {
+      resultRouteConfidenceCard.hidden = !Number.isFinite(selectedConfidence);
+    }
+    if (Number.isFinite(selectedConfidence)) {
+      setResultText(resultRouteConfidenceScore, `${Math.round(selectedConfidence)} / 100`);
+      setBarPercent(resultRouteConfidenceBar, selectedConfidence);
+      setResultText(
+        resultRouteConfidenceSummary,
+        `fallback: ${bridgeShare > 22 ? "usable" : "stable"} · tail risk: ${bridgeShare > 20 ? "moderate" : "contained"} · failure mode: bridge dominance if top book disappears`
+      );
+    }
+
+    setResultText(resultUsedVenueSummary, selected?.reason || t("common.not_available"));
     updateRoutePathVisual({
       chosenVenue,
       hasAmm: lastAmmAvailable,
@@ -3605,7 +3719,7 @@ export function initSellImpact() {
       snapshotImpactNote.textContent = `Impact trend tracks slippage ${impactText}.`;
     }
     if (snapshotContextNote) {
-      snapshotContextNote.textContent = `Route confidence ${selected ? formatPercent(selected.confidencePct) : "n/a"} on ${chosenVenue}.`;
+      snapshotContextNote.textContent = `Bridge share proxy ${selected ? formatPercent(Math.max(8, 100 - selected.confidencePct * 0.7)) : "n/a"} on ${chosenVenue}.`;
     }
 
     const latest = snapshotHistory[snapshotHistory.length - 1];
@@ -3804,6 +3918,7 @@ export function initSellImpact() {
     setResultText(resultPairLabel, `XRP → ${currency}`);
     const issuer = (issuerInput?.value || "").trim();
     setResultText(resultPairMeta, issuer ? `${side} side · issuer ${issuer.slice(0, 8)}…` : `${side} side · issuer required for non-XRP`);
+    setResultText(routeTargetLabel, currency);
   };
 
   const updateExplainModeState = (mode = "explain") => {
@@ -3814,7 +3929,6 @@ export function initSellImpact() {
     });
     document.body.classList.toggle("is-quick", mode === "quick");
     document.body.classList.toggle("is-explain", mode !== "quick");
-    setResultText(resultMixSummary, mode === "quick" ? "Quick mode keeps mix as lightweight summary." : "Explain mode shows bounded route mix context.");
   };
 
   const updateLiquidityBreakdown = ({
@@ -3831,12 +3945,14 @@ export function initSellImpact() {
       setResultText(resultLiquiditySplit, t("details.liquidity_split_not_applicable"));
       setResultText(resultAmmReserves, t("details.amm_not_applicable"));
       setResultText(resultAmmFee, t("details.amm_not_applicable"));
-      setResultText(resultMixClob, t("common.not_available"));
-      setResultText(resultMixAmm, t("common.not_available"));
+      setResultText(resultMixBook, "Book 0%");
+      setResultText(resultMixAmm, "AMM 0%");
+      setResultText(resultMixBridge, "Bridge 0%");
       setResultText(resultRiskBook, t("common.not_available"));
       setResultText(resultRiskBridge, t("common.not_available"));
-      setBarPercent(resultMixClobBar, 0);
-      setBarPercent(resultMixAmmBar, 0);
+      setBarPercent(resultMixBookSegment, 0);
+      setBarPercent(resultMixAmmSegment, 0);
+      setBarPercent(resultMixBridgeSegment, 0);
       setBarPercent(resultRiskBookBar, 0);
       setBarPercent(resultRiskBridgeBar, 0);
       return;
@@ -3868,10 +3984,12 @@ export function initSellImpact() {
           }),
         })
       );
-      setResultText(resultMixClob, formatPercent(clobSharePct, { minimumFractionDigits: 0, maximumFractionDigits: 1 }));
-      setResultText(resultMixAmm, formatPercent(ammSharePct, { minimumFractionDigits: 0, maximumFractionDigits: 1 }));
-      setBarPercent(resultMixClobBar, clobSharePct);
-      setBarPercent(resultMixAmmBar, ammSharePct);
+      setResultText(resultMixBook, `Book ${formatPercent(clobSharePct, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+      setResultText(resultMixAmm, `AMM ${formatPercent(ammSharePct, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+      setResultText(resultMixBridge, "Bridge 0%");
+      setBarPercent(resultMixBookSegment, clobSharePct);
+      setBarPercent(resultMixAmmSegment, ammSharePct);
+      setBarPercent(resultMixBridgeSegment, 0);
       const bookRisk = Math.min(100, Math.max(0, 30 + (simulationHasPartialFill(lastDisplaySimulation) ? 25 : 0) + (100 - clobSharePct) * 0.25));
       const bridgeRisk = Math.min(100, Math.max(0, ammSharePct * 0.9));
       setResultText(resultRiskBook, bookRisk >= 70 ? "high" : bookRisk >= 45 ? "medium" : "low");

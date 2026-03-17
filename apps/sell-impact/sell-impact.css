@@ -531,10 +531,9 @@
         overflow: hidden;
         background: #eef2f7;
         border: 1px solid #e7eaf3;
-        display: grid;
-        grid-template-columns: 54% 29% 17%;
+        display: flex;
       }
-      .mix-segment { height: 100%; }
+      .mix-segment { height: 100%; width: var(--w, 0%); }
       .mix-segment--book { background: rgba(111, 99, 194, 0.92); }
       .mix-segment--amm { background: rgba(111, 99, 194, 0.46); }
       .mix-segment--bridge { background: rgba(180, 83, 9, 0.72); }
@@ -606,7 +605,7 @@
         border: 1px solid #e7eaf3;
       }
       .confidence-fill {
-        width: 76%;
+        width: var(--w, 0%);
         height: 100%;
         border-radius: inherit;
         background: linear-gradient(90deg, rgba(4,120,87,.5), rgba(4,120,87,.9));
@@ -633,6 +632,29 @@
         height: 260px;
         display: block;
       }
+      .route-svg circle {
+        fill: rgba(111,99,194,0.2);
+        stroke: rgba(93,82,183,0.82);
+        stroke-width: 2;
+      }
+      .route-svg circle:first-child,
+      .route-svg circle:last-child {
+        fill: #111827;
+        stroke: #111827;
+      }
+      .route-svg path {
+        fill: none;
+        stroke-linecap: round;
+        stroke: rgba(111,99,194,.85);
+        stroke-width: 8;
+        transition: opacity .2s ease;
+      }
+      .route-svg .path--alt { stroke: rgba(111,99,194,.48); }
+      .route-svg .path--tail {
+        stroke: rgba(180,83,9,.72);
+        stroke-dasharray: 7 7;
+      }
+
       .route-caption {
         display: flex;
         justify-content: space-between;

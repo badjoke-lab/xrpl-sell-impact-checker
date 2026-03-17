@@ -141,29 +141,66 @@
         </section>
 
         <section class="card mainviz-card" data-mode-only="explain">
-          <div class="section-head"><div><h3 class="section-title">Execution overview</h3><p class="section-note">Depth / thinness + execution mix.</p></div></div>
+          <div class="section-head"><div><h3 class="section-title">Execution overview</h3><p class="section-note">Decision-first snapshot: depth posture, execution mix, reasoning, and confidence.</p></div></div>
           <div class="mainviz-layout">
-            <article class="card viz-card">
-              <h4 class="viz-title">Depth / Thinness</h4>
-              <div class="chart"><svg id="depth-chart" class="chart__svg" viewBox="0 0 320 200" preserveAspectRatio="none" role="img" aria-label="Depth chart"></svg></div>
-              <p class="section-note" data-result="depth-note" hidden></p>
-              <p class="section-note" data-result="depth-summary">Waiting for estimate.</p>
-            </article>
-            <article class="card viz-card">
-              <h4 class="viz-title">Execution Mix</h4>
-              <div class="bottleneck-map">
-                <div class="bottleneck-row"><div class="bottleneck-head"><strong>CLOB leg</strong><span data-result="mix-clob">—</span></div><div class="bar"><span data-result="mix-clob-bar" style="--w:0%"></span></div></div>
-                <div class="bottleneck-row"><div class="bottleneck-head"><strong>AMM / bridge assist</strong><span data-result="mix-amm">—</span></div><div class="bar"><span class="warn" data-result="mix-amm-bar" style="--w:0%"></span></div></div>
+            <div class="viz-panel">
+              <div class="depth-shell">
+                <div class="depth-stage">
+                  <div>
+                    <div class="signal-label">Market depth / thinness</div>
+                    <div class="section-note" data-result="depth-summary">Unavailable in this snapshot.</div>
+                  </div>
+                  <div class="depth-bands">
+                    <div class="depth-row"><div class="depth-name">Touch band</div><div class="depth-track"><span class="depth-fill" data-result="depth-touch-bar" style="--w:0%"></span></div><div class="depth-value" data-result="depth-touch-label">Unavailable</div></div>
+                    <div class="depth-row"><div class="depth-name">Inner book</div><div class="depth-track"><span class="depth-fill" data-result="depth-inner-bar" style="--w:0%"></span></div><div class="depth-value" data-result="depth-inner-label">Unavailable</div></div>
+                    <div class="depth-row"><div class="depth-name">AMM support</div><div class="depth-track"><span class="depth-fill depth-fill--warn" data-result="depth-amm-bar" style="--w:0%"></span></div><div class="depth-value" data-result="depth-amm-label">Unavailable</div></div>
+                    <div class="depth-row"><div class="depth-name">Bridge tail</div><div class="depth-track"><span class="depth-fill depth-fill--danger" data-result="depth-bridge-bar" style="--w:0%"></span></div><div class="depth-value" data-result="depth-bridge-label">Unavailable</div></div>
+                  </div>
+                  <div class="depth-caption" data-result="depth-caption">Unavailable in this snapshot.</div>
+                </div>
               </div>
-              <p class="section-note" data-result="mix-summary">Explain data appears after estimate.</p>
-              <details data-mobile-details="1">
-                <summary>Impact trend (detail)</summary>
-                <div class="chart"><svg id="impact-chart" class="chart__svg" viewBox="0 0 320 200" preserveAspectRatio="none" role="img" aria-label="Impact chart"></svg></div>
-                <p class="section-note" data-result="impact-note" hidden></p>
-                <p class="section-note" data-result="impact-summary">Waiting for estimate.</p>
-              </details>
-            </article>
+
+              <div class="mix-card">
+                <div class="signal-label">Execution mix</div>
+                <div class="mix-track" aria-hidden="true">
+                  <span class="mix-segment mix-segment--book" data-result="mix-book-segment" style="width:0%"></span>
+                  <span class="mix-segment mix-segment--amm" data-result="mix-amm-segment" style="width:0%"></span>
+                  <span class="mix-segment mix-segment--bridge" data-result="mix-bridge-segment" style="width:0%"></span>
+                </div>
+                <div class="mix-legend">
+                  <span><i class="mix-dot" style="background: rgba(111,99,194,.92);"></i><span data-result="mix-book">Book 0%</span></span>
+                  <span><i class="mix-dot" style="background: rgba(111,99,194,.46);"></i><span data-result="mix-amm">AMM 0%</span></span>
+                  <span><i class="mix-dot" style="background: rgba(180,83,9,.72);"></i><span data-result="mix-bridge">Bridge 0%</span></span>
+                </div>
+              </div>
+            </div>
+            <aside class="viz-side">
+              <div>
+                <div class="signal-label">Why this snapshot matters</div>
+                <h4 class="side-title" data-result="snapshot-headline">Unavailable in this snapshot.</h4>
+                <p class="side-copy" data-result="snapshot-body">Run estimate to generate route-specific rationale.</p>
+              </div>
+              <ul class="bottleneck-list" data-result="snapshot-bullets">
+                <li>Unavailable in this snapshot.</li>
+              </ul>
+              <div class="confidence-box" data-result="route-confidence-card" hidden>
+                <div class="confidence-head">
+                  <strong>Route confidence</strong>
+                  <span class="pill pill--primary" data-result="route-confidence-score">0 / 100</span>
+                </div>
+                <div class="confidence-track"><div class="confidence-fill" data-result="route-confidence-bar" style="--w:0%"></div></div>
+                <div class="meta" data-result="route-confidence-summary">Unavailable in this snapshot.</div>
+              </div>
+            </aside>
           </div>
+          <details data-mobile-details="1">
+            <summary>Debug charts (detail)</summary>
+            <div class="chart"><svg id="depth-chart" class="chart__svg" viewBox="0 0 320 200" preserveAspectRatio="none" role="img" aria-label="Depth chart"></svg></div>
+            <p class="section-note" data-result="depth-note" hidden></p>
+            <div class="chart"><svg id="impact-chart" class="chart__svg" viewBox="0 0 320 200" preserveAspectRatio="none" role="img" aria-label="Impact chart"></svg></div>
+            <p class="section-note" data-result="impact-note" hidden></p>
+            <p class="section-note" data-result="impact-summary" hidden>Unavailable in this snapshot.</p>
+          </details>
         </section>
 
         <section class="card why-card" data-mode-only="explain">
@@ -171,27 +208,33 @@
           <div class="why-layout">
             <div class="why-panel">
               <div class="route-svg-wrap">
+                <span class="meta-chip">selected path reasoning</span>
                 <svg class="route-svg" viewBox="0 0 720 220" role="img" aria-label="Selected route path">
                   <circle cx="72" cy="110" r="22"></circle><circle cx="252" cy="74" r="14"></circle><circle cx="252" cy="146" r="14"></circle><circle cx="460" cy="74" r="14"></circle><circle cx="460" cy="146" r="14"></circle><circle cx="646" cy="110" r="22"></circle>
                   <path data-route-segment="clob" d="M94 104 C138 88 182 80 236 74"></path><path data-route-segment="amm" class="path path--alt" d="M94 116 C148 130 186 138 236 146"></path><path data-route-segment="clob" d="M266 74 C338 74 382 74 446 74"></path><path data-route-segment="amm" class="path path--alt" d="M266 146 C338 146 382 146 446 146"></path><path data-route-segment="clob" d="M474 74 C546 74 590 86 624 104"></path><path data-route-segment="fallback" class="path path--tail" d="M474 146 C542 146 588 132 624 116"></path>
+                  <text x="72" y="114" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">XRP</text>
+                  <text x="252" y="78" text-anchor="middle" font-size="11" font-weight="700" fill="#4c1d95">Book</text>
+                  <text x="252" y="150" text-anchor="middle" font-size="11" font-weight="700" fill="#4c1d95">AMM</text>
+                  <text x="460" y="78" text-anchor="middle" font-size="11" font-weight="700" fill="#4c1d95">Book</text>
+                  <text x="460" y="150" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">Bridge</text>
+                  <text x="646" y="114" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" data-result="route-target-label">Token</text>
                 </svg>
-                <p class="section-note" data-result="route-path-caption">Selected route path appears after estimate.</p>
-              </div>
-              <div class="bottleneck-map">
-                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Book refill risk</strong><span data-result="risk-book">—</span></div><div class="bar"><span data-result="risk-book-bar" style="--w:0%"></span></div></div>
-                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Bridge dependence</strong><span data-result="risk-bridge">—</span></div><div class="bar"><span class="warn" data-result="risk-bridge-bar" style="--w:0%"></span></div></div>
+                <div class="route-caption"><span>thicker = larger share</span><span>dashed = fallback tail only</span></div>
               </div>
             </div>
             <aside class="why-panel">
-              <p class="copy" data-result="why">—</p>
-              <ul class="why-list">
-                <li>Used venue: <span data-result="used-venue-details">—</span></li>
-                <li>Current bottleneck: <span data-result="route-bottleneck">—</span></li>
-                <li>Route confidence: <span data-result="route-confidence">—</span></li>
-                <li><span data-result="liquidity-split-label">Liquidity split</span>: <span data-result="liquidity-split">—</span></li>
-                <li>AMM reserves: <span data-result="amm-reserves">—</span></li>
-                <li>AMM fee: <span data-result="amm-fee">—</span></li>
-              </ul>
+              <div>
+                <div class="signal-label">Why this path</div>
+                <h4 class="side-title" data-result="path-headline">Unavailable in this snapshot.</h4>
+                <p class="side-copy" data-result="why">Unavailable in this snapshot.</p>
+              </div>
+              <div class="bottleneck-map">
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Book refill risk</strong><span data-result="risk-book">Unavailable</span></div><div class="bar"><span data-result="risk-book-bar" style="--w:0%"></span></div></div>
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>AMM drift</strong><span data-result="risk-amm">Unavailable</span></div><div class="bar"><span data-result="risk-amm-bar" style="--w:0%"></span></div></div>
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Bridge dependence</strong><span data-result="risk-bridge">Unavailable</span></div><div class="bar"><span class="warn" data-result="risk-bridge-bar" style="--w:0%"></span></div></div>
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Insufficient depth</strong><span data-result="risk-depth">Unavailable</span></div><div class="bar"><span class="danger" data-result="risk-depth-bar" style="--w:0%"></span></div></div>
+              </div>
+              <ul class="why-list" data-result="path-bullets"><li>Unavailable in this snapshot.</li></ul>
             </aside>
           </div>
         </section>
@@ -199,9 +242,9 @@
         <section class="card candidates-card" data-mode-only="explain">
           <div class="section-head"><div><h3 class="section-title">Candidate routes</h3></div></div>
           <div class="candidates-grid">
-            <article class="card candidate-card is-selected" data-route-card="a"><div class="candidate-head"><h4 class="candidate-title" data-result="candidate-a-title">Route A · Selected</h4><span class="pill pill--primary" data-result="candidate-a-role">Selected</span></div><div class="candidate-grid"><div><div class="route-label">Est. output</div><div class="route-value" data-result="candidate-a-output">—</div></div><div><div class="route-label">Impact</div><div class="route-value" data-result="candidate-a-impact">—</div></div><div><div class="route-label">Bottleneck</div><div class="route-subvalue" data-result="candidate-a-bottleneck">—</div></div><div><div class="route-label">Reason</div><div class="route-subvalue" data-result="candidate-a-reason">—</div></div></div><div class="route-track"><span data-result="candidate-a-confidence-bar" style="--w:0%"></span></div><div class="route-subvalue" data-result="candidate-a-confidence">—</div></article>
-            <article class="card candidate-card" data-route-card="b"><div class="candidate-head"><h4 class="candidate-title" data-result="candidate-b-title">Route B · Alternative</h4><span class="pill pill--warn" data-result="candidate-b-role">Alternative</span></div><div class="candidate-grid"><div><div class="route-label">Est. output</div><div class="route-value" data-result="candidate-b-output">—</div></div><div><div class="route-label">Impact</div><div class="route-value" data-result="candidate-b-impact">—</div></div><div><div class="route-label">Bottleneck</div><div class="route-subvalue" data-result="candidate-b-bottleneck">—</div></div><div><div class="route-label">Reason</div><div class="route-subvalue" data-result="candidate-b-reason">—</div></div></div><div class="route-track"><span data-result="candidate-b-confidence-bar" style="--w:0%"></span></div><div class="route-subvalue" data-result="candidate-b-confidence">—</div></article>
-            <article class="card candidate-card" data-route-card="c"><div class="candidate-head"><h4 class="candidate-title" data-result="candidate-c-title">Route C · Fallback</h4><span class="pill pill--danger" data-result="candidate-c-role">Fallback</span></div><div class="candidate-grid"><div><div class="route-label">Est. output</div><div class="route-value" data-result="candidate-c-output">—</div></div><div><div class="route-label">Impact</div><div class="route-value" data-result="candidate-c-impact">—</div></div><div><div class="route-label">Bottleneck</div><div class="route-subvalue" data-result="candidate-c-bottleneck">—</div></div><div><div class="route-label">Reason</div><div class="route-subvalue" data-result="candidate-c-reason">—</div></div></div><div class="route-track"><span data-result="candidate-c-confidence-bar" style="--w:0%"></span></div><div class="route-subvalue" data-result="candidate-c-confidence">—</div></article>
+            <article class="card candidate-card is-selected" data-route-card="a"><div class="candidate-head"><h4 class="candidate-title" data-result="candidate-a-title">Route A · Selected</h4><span class="pill pill--primary" data-result="candidate-a-role">Selected</span></div><div class="candidate-grid"><div><div class="route-label">Est. output</div><div class="route-value" data-result="candidate-a-output">Unavailable</div></div><div><div class="route-label">Impact</div><div class="route-value" data-result="candidate-a-impact">Unavailable</div></div><div><div class="route-label">Bottleneck</div><div class="route-subvalue" data-result="candidate-a-bottleneck">Unavailable</div></div><div><div class="route-label" data-result="candidate-a-reason-label">Why chosen</div><div class="route-subvalue" data-result="candidate-a-reason">Unavailable in this snapshot.</div></div></div><div class="route-track"><span data-result="candidate-a-confidence-bar" style="--w:0%"></span></div><div class="route-subvalue" data-result="candidate-a-confidence">Unavailable</div></article>
+            <article class="card candidate-card" data-route-card="b"><div class="candidate-head"><h4 class="candidate-title" data-result="candidate-b-title">Route B · Alternative</h4><span class="pill pill--warn" data-result="candidate-b-role">Alternative</span></div><div class="candidate-grid"><div><div class="route-label">Est. output</div><div class="route-value" data-result="candidate-b-output">Unavailable</div></div><div><div class="route-label">Impact</div><div class="route-value" data-result="candidate-b-impact">Unavailable</div></div><div><div class="route-label">Bottleneck</div><div class="route-subvalue" data-result="candidate-b-bottleneck">Unavailable</div></div><div><div class="route-label" data-result="candidate-b-reason-label">Why not</div><div class="route-subvalue" data-result="candidate-b-reason">Unavailable in this snapshot.</div></div></div><div class="route-track"><span data-result="candidate-b-confidence-bar" style="--w:0%"></span></div><div class="route-subvalue" data-result="candidate-b-confidence">Unavailable</div></article>
+            <article class="card candidate-card" data-route-card="c"><div class="candidate-head"><h4 class="candidate-title" data-result="candidate-c-title">Route C · Fallback</h4><span class="pill pill--danger" data-result="candidate-c-role">Fallback</span></div><div class="candidate-grid"><div><div class="route-label">Est. output</div><div class="route-value" data-result="candidate-c-output">Unavailable</div></div><div><div class="route-label">Impact</div><div class="route-value" data-result="candidate-c-impact">Unavailable</div></div><div><div class="route-label">Bottleneck</div><div class="route-subvalue" data-result="candidate-c-bottleneck">Unavailable</div></div><div><div class="route-label" data-result="candidate-c-reason-label">Why not</div><div class="route-subvalue" data-result="candidate-c-reason">Unavailable in this snapshot.</div></div></div><div class="route-track"><span data-result="candidate-c-confidence-bar" style="--w:0%"></span></div><div class="route-subvalue" data-result="candidate-c-confidence">Unavailable</div></article>
           </div>
         </section>
 
@@ -210,7 +253,7 @@
           <div class="snapshot-grid">
             <article class="card snapshot-strip"><h4 class="snapshot-title">Estimated output drift</h4><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Estimated output drift"><path data-result="snapshot-strip-output" d="M8 56 L296 56" fill="none" stroke="rgba(111,99,194,0.88)" stroke-width="3" /></svg><div class="snapshot-footer"><span data-result="snapshot-output-note">Waiting for snapshot updates.</span><span class="snapshot-value" data-result="depth-summary">—</span></div></article>
             <article class="card snapshot-strip"><h4 class="snapshot-title">Impact score trend</h4><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Impact score trend"><path data-result="snapshot-strip-impact" d="M8 56 L296 56" fill="none" stroke="rgba(180,83,9,0.9)" stroke-width="3" /></svg><div class="snapshot-footer"><span data-result="snapshot-impact-note">Waiting for slippage context.</span><span class="snapshot-value" data-result="impact-summary">—</span></div></article>
-            <article class="card snapshot-strip"><h4 class="snapshot-title">Route confidence context</h4><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Route confidence context"><path data-result="snapshot-strip-context" d="M8 56 L296 56" fill="none" stroke="rgba(4,120,87,0.9)" stroke-width="3" /></svg><div class="snapshot-footer"><span data-result="snapshot-context-note">Waiting for route selection context.</span><span class="snapshot-value" data-result="endpoint-details">—</span></div></article>
+            <article class="card snapshot-strip"><h4 class="snapshot-title">Bridge share trend</h4><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Bridge share trend"><path data-result="snapshot-strip-context" d="M8 56 L296 56" fill="none" stroke="rgba(4,120,87,0.9)" stroke-width="3" /></svg><div class="snapshot-footer"><span data-result="snapshot-context-note">Waiting for route selection context.</span><span class="snapshot-value" data-result="endpoint-details">Unavailable</span></div></article>
           </div>
         </section>
 
