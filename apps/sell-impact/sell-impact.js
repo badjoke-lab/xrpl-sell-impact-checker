@@ -3799,7 +3799,12 @@ export function initSellImpact() {
   };
 
   const updatePairShell = () => {
-    const currency = normalizeCurrencyCode(currencyInput?.value || "") || "…";
+    const rawCurrency =
+      currencyInput?.dataset?.currencyRaw || currencyInput?.value || "";
+    const normalizedCurrency = normalizeCurrencyInput(rawCurrency);
+    const currency =
+      formatCurrencyForDisplay(normalizedCurrency.currencyInput || rawCurrency) ||
+      "…";
     const side = sideSelect?.value === "buy" ? "Buy" : "Sell";
     setResultText(resultPairLabel, `XRP → ${currency}`);
     const issuer = (issuerInput?.value || "").trim();
