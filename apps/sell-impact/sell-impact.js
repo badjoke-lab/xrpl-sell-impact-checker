@@ -419,6 +419,49 @@ export function initSellImpact() {
   const resultRiskBridge = document.querySelector('[data-result="risk-bridge"]');
   const resultRiskBookBar = document.querySelector('[data-result="risk-book-bar"]');
   const resultRiskBridgeBar = document.querySelector('[data-result="risk-bridge-bar"]');
+  const resultRoutePathCaption = document.querySelector('[data-result="route-path-caption"]');
+  const resultRouteBottleneck = document.querySelector('[data-result="route-bottleneck"]');
+  const resultRouteConfidence = document.querySelector('[data-result="route-confidence"]');
+  const routeCards = {
+    a: {
+      card: document.querySelector('[data-route-card="a"]'),
+      title: document.querySelector('[data-result="candidate-a-title"]'),
+      role: document.querySelector('[data-result="candidate-a-role"]'),
+      output: document.querySelector('[data-result="candidate-a-output"]'),
+      impact: document.querySelector('[data-result="candidate-a-impact"]'),
+      bottleneck: document.querySelector('[data-result="candidate-a-bottleneck"]'),
+      reason: document.querySelector('[data-result="candidate-a-reason"]'),
+      confidence: document.querySelector('[data-result="candidate-a-confidence"]'),
+      confidenceBar: document.querySelector('[data-result="candidate-a-confidence-bar"]'),
+    },
+    b: {
+      card: document.querySelector('[data-route-card="b"]'),
+      title: document.querySelector('[data-result="candidate-b-title"]'),
+      role: document.querySelector('[data-result="candidate-b-role"]'),
+      output: document.querySelector('[data-result="candidate-b-output"]'),
+      impact: document.querySelector('[data-result="candidate-b-impact"]'),
+      bottleneck: document.querySelector('[data-result="candidate-b-bottleneck"]'),
+      reason: document.querySelector('[data-result="candidate-b-reason"]'),
+      confidence: document.querySelector('[data-result="candidate-b-confidence"]'),
+      confidenceBar: document.querySelector('[data-result="candidate-b-confidence-bar"]'),
+    },
+    c: {
+      card: document.querySelector('[data-route-card="c"]'),
+      title: document.querySelector('[data-result="candidate-c-title"]'),
+      role: document.querySelector('[data-result="candidate-c-role"]'),
+      output: document.querySelector('[data-result="candidate-c-output"]'),
+      impact: document.querySelector('[data-result="candidate-c-impact"]'),
+      bottleneck: document.querySelector('[data-result="candidate-c-bottleneck"]'),
+      reason: document.querySelector('[data-result="candidate-c-reason"]'),
+      confidence: document.querySelector('[data-result="candidate-c-confidence"]'),
+      confidenceBar: document.querySelector('[data-result="candidate-c-confidence-bar"]'),
+    },
+  };
+  const routePathSegments = {
+    clob: Array.from(document.querySelectorAll('[data-route-segment="clob"]')),
+    amm: Array.from(document.querySelectorAll('[data-route-segment="amm"]')),
+    fallback: Array.from(document.querySelectorAll('[data-route-segment="fallback"]')),
+  };
   const snapshotNotesList = document.querySelector('[data-result="snapshot-notes"]');
   const sideSelect = document.querySelector("#trade-side-select");
   const modeButtons = Array.from(document.querySelectorAll(".mode-chip"));
@@ -1803,10 +1846,26 @@ export function initSellImpact() {
     setResultText(resultMixSummary, "Explain data appears after estimate.");
     setResultText(resultRiskBook, placeholder);
     setResultText(resultRiskBridge, placeholder);
+    setResultText(resultRoutePathCaption, "Selected route path appears after estimate.");
+    setResultText(resultRouteBottleneck, placeholder);
+    setResultText(resultRouteConfidence, placeholder);
     setBarPercent(resultMixClobBar, 0);
     setBarPercent(resultMixAmmBar, 0);
     setBarPercent(resultRiskBookBar, 0);
     setBarPercent(resultRiskBridgeBar, 0);
+    [routeCards.a, routeCards.b, routeCards.c].forEach((slot) => {
+      setResultText(slot?.output, placeholder);
+      setResultText(slot?.impact, placeholder);
+      setResultText(slot?.bottleneck, placeholder);
+      setResultText(slot?.reason, placeholder);
+      setResultText(slot?.confidence, placeholder);
+      setBarPercent(slot?.confidenceBar, 0);
+    });
+    Object.values(routePathSegments).forEach((segments) => {
+      segments.forEach((segment) => {
+        segment.style.opacity = "1";
+      });
+    });
     setResultText(resultFiatRate, t("results.receive.fiat_pending"));
     setFiatWarning(null);
     lastReceiveXrp = 0;
@@ -3255,6 +3314,182 @@ export function initSellImpact() {
       })
     );
     setResultText(resultMaxSellNote, t("results.max_sell.fiat_unavailable"));
+  };
+
+  const formatCandidateOutput = ({ simulation, venue }) => {
+    if (!simulation || !Number.isFinite(simulation.receiveXrp)) {
+      return t("common.not_available");
+    }
+    return `${formatNumber(simulation.receiveXrp, { maximumFractionDigits: 6 })} XRP (${venue})`;
+  };
+
+  const describeBottleneck = ({ simulation, offersCount, venue, thresholdPct, maxSellResult, hasAmm }) => {
+    if (!simulation || simulation.filledToken <= 0) {
+      return "No executable liquidity.";
+    }
+    if (simulation.filledToken < simulation.requestedToken) {
+      return `Fill limited at ${formatPercent(simulation.fillRatePct)} by depth.`;
+    }
+    if (venue === VENUE_AMM) {
+      if (!hasAmm) {
+        return "AMM path unavailable; synthetic fallback only.";
+      }
+      return `AMM slippage budget capped at ${formatPercent(thresholdPct)}.`;
+    }
+    if (!offersCount) {
+      return "Orderbook empty for current side.";
+    }
+    if (maxSellResult?.status === "available") {
+      const cap = formatNumber(maxSellResult.maxSellAmount, { maximumFractionDigits: 4 });
+      return `Book depth cap around ${cap} ${lastCurrency || "token"}.`;
+    }
+    return "Book refill risk dominates tail slices.";
+  };
+
+  const buildRouteCandidates = ({
+    clobSimulation,
+    ammSimulation,
+    chosenVenue,
+    clobSlippagePct,
+    ammSlippagePct,
+    clobCanFill,
+    hasAmm,
+    thresholdPct,
+    offersCount,
+    maxSellResult,
+  }) => {
+    const clobOutput = Number.isFinite(clobSimulation?.receiveXrp) ? clobSimulation.receiveXrp : 0;
+    const ammOutput = ammSimulation?.ok && Number.isFinite(ammSimulation?.receivedXrp) ? ammSimulation.receivedXrp : 0;
+    const selectedRoute = chosenVenue === VENUE_AMM ? "AMM assisted" : "Orderbook primary";
+    const altRoute = chosenVenue === VENUE_AMM ? "Orderbook primary" : "AMM assisted";
+    const selectedSimulation = chosenVenue === VENUE_AMM && ammSimulation?.ok
+      ? {
+          filledToken: clobSimulation.requestedToken,
+          requestedToken: clobSimulation.requestedToken,
+          fillRatePct: 100,
+          receiveXrp: ammOutput,
+        }
+      : clobSimulation;
+
+    const selected = {
+      title: `Route A · ${selectedRoute}`,
+      role: "Selected",
+      output: formatCandidateOutput({ simulation: selectedSimulation, venue: chosenVenue }),
+      impact: chosenVenue === VENUE_AMM
+        ? (Number.isFinite(ammSlippagePct) ? formatPercent(ammSlippagePct) : t("common.not_available"))
+        : (Number.isFinite(clobSlippagePct) ? formatPercent(clobSlippagePct) : t("common.not_available")),
+      bottleneck: describeBottleneck({
+        simulation: selectedSimulation,
+        offersCount,
+        venue: chosenVenue,
+        thresholdPct,
+        maxSellResult,
+        hasAmm,
+      }),
+      reason: chosenVenue === VENUE_AMM
+        ? `Chosen because book share dropped below thin cutoff (${formatPercent(getThinCutoffPct())}).`
+        : `Chosen because direct book route remains fill-safe at ${formatPercent(thresholdPct)} slippage guard.`,
+      confidencePct: chosenVenue === VENUE_AMM ? 78 : (clobCanFill ? 86 : 72),
+    };
+
+    const alternativeVenue = chosenVenue === VENUE_AMM ? VENUE_CLOB : VENUE_AMM;
+    const alternativeSimulation = alternativeVenue === VENUE_CLOB
+      ? clobSimulation
+      : (ammSimulation?.ok
+        ? {
+            filledToken: clobSimulation.requestedToken,
+            requestedToken: clobSimulation.requestedToken,
+            fillRatePct: 100,
+            receiveXrp: ammOutput,
+          }
+        : null);
+
+    const alternative = {
+      title: `Route B · ${altRoute}`,
+      role: "Alternative",
+      output: formatCandidateOutput({ simulation: alternativeSimulation, venue: alternativeVenue }),
+      impact: alternativeVenue === VENUE_AMM
+        ? (Number.isFinite(ammSlippagePct) ? formatPercent(ammSlippagePct) : t("common.not_available"))
+        : (Number.isFinite(clobSlippagePct) ? formatPercent(clobSlippagePct) : t("common.not_available")),
+      bottleneck: describeBottleneck({
+        simulation: alternativeSimulation,
+        offersCount,
+        venue: alternativeVenue,
+        thresholdPct,
+        maxSellResult,
+        hasAmm,
+      }),
+      reason: alternativeVenue === VENUE_AMM
+        ? (hasAmm ? "Not selected: AMM route improves depth but adds bridge dependence." : "Not selected: AMM liquidity unavailable.")
+        : "Not selected: book route loses on current thinness decision.",
+      confidencePct: alternativeVenue === VENUE_AMM ? (hasAmm ? 62 : 28) : 67,
+    };
+
+    const fallbackOutput = Math.max(0, Math.min(clobOutput, ammOutput || clobOutput) * 0.82);
+    const fallback = {
+      title: "Route C · Bounded fallback",
+      role: "Fallback",
+      output: `${formatNumber(fallbackOutput, { maximumFractionDigits: 6 })} XRP (bounded)` ,
+      impact: Number.isFinite(clobSlippagePct)
+        ? formatPercent(Math.min(99, clobSlippagePct + 2.5))
+        : t("common.not_available"),
+      bottleneck: "Tail depth exhaustion and confidence floor.",
+      reason: "Kept for degraded execution context only; not preferred while selected route is healthy.",
+      confidencePct: 39,
+    };
+
+    return [selected, alternative, fallback];
+  };
+
+  const updateRoutePathVisual = ({ chosenVenue, hasAmm, fallbackConfidence = 39 }) => {
+    const setOpacity = (nodes, active) => {
+      nodes.forEach((node) => {
+        node.style.opacity = active ? "1" : "0.22";
+      });
+    };
+    setOpacity(routePathSegments.clob, chosenVenue === VENUE_CLOB || !hasAmm);
+    setOpacity(routePathSegments.amm, chosenVenue === VENUE_AMM && hasAmm);
+    setOpacity(routePathSegments.fallback, fallbackConfidence >= 30);
+
+    const caption = chosenVenue === VENUE_AMM && hasAmm
+      ? "Selected path emphasizes AMM-assisted lanes; orderbook remains fallback context."
+      : "Selected path emphasizes orderbook lanes; AMM branch stays contextual."
+    setResultText(resultRoutePathCaption, caption);
+  };
+
+  const updateRouteCandidates = ({ candidates, chosenVenue }) => {
+    const slots = [routeCards.a, routeCards.b, routeCards.c];
+    slots.forEach((slot, index) => {
+      const data = candidates[index];
+      if (!slot || !data) {
+        return;
+      }
+      slot.card?.classList.toggle("is-selected", index === 0);
+      setResultText(slot.title, data.title);
+      setResultText(slot.role, data.role);
+      setResultText(slot.output, data.output);
+      setResultText(slot.impact, data.impact);
+      setResultText(slot.bottleneck, data.bottleneck);
+      setResultText(slot.reason, data.reason);
+      setResultText(slot.confidence, `confidence ${formatPercent(data.confidencePct)}`);
+      setBarPercent(slot.confidenceBar, data.confidencePct);
+    });
+
+    const selected = candidates[0];
+    setResultText(resultRouteBottleneck, selected?.bottleneck || t("common.not_available"));
+    setResultText(resultRouteConfidence, selected ? formatPercent(selected.confidencePct) : t("common.not_available"));
+    setResultText(resultUsedVenueSummary, selected?.reason || t("common.not_available"));
+    setResultText(
+      resultWhyLine,
+      selected
+        ? `${selected.reason} Bottleneck: ${selected.bottleneck}`
+        : t("common.not_available")
+    );
+    updateRoutePathVisual({
+      chosenVenue,
+      hasAmm: lastAmmAvailable,
+      fallbackConfidence: candidates[2]?.confidencePct ?? 39,
+    });
   };
 
   const updateResultsSummary = ({
@@ -4871,6 +5106,20 @@ export function initSellImpact() {
         { immediate: true }
       );
       updateLiquidityBreakdown({ thresholdPct, currency });
+
+      const routeCandidates = buildRouteCandidates({
+        clobSimulation,
+        ammSimulation,
+        chosenVenue,
+        clobSlippagePct,
+        ammSlippagePct: ammSimulation?.slippagePct ?? null,
+        clobCanFill,
+        hasAmm: lastAmmAvailable,
+        thresholdPct,
+        offersCount: sortedOffers.length,
+        maxSellResult,
+      });
+      updateRouteCandidates({ candidates: routeCandidates, chosenVenue });
 
       updateDebugPanel({
         responseStatus: "success",
