@@ -462,7 +462,14 @@ export function initSellImpact() {
     amm: Array.from(document.querySelectorAll('[data-route-segment="amm"]')),
     fallback: Array.from(document.querySelectorAll('[data-route-segment="fallback"]')),
   };
-  const snapshotNotesList = document.querySelector('[data-result="snapshot-notes"]');
+  const snapshotNoteCurrent = document.querySelector('[data-result="snapshot-note-current"]');
+  const snapshotNoteDelta = document.querySelector('[data-result="snapshot-note-delta"]');
+  const snapshotStripOutput = document.querySelector('[data-result="snapshot-strip-output"]');
+  const snapshotStripImpact = document.querySelector('[data-result="snapshot-strip-impact"]');
+  const snapshotStripContext = document.querySelector('[data-result="snapshot-strip-context"]');
+  const snapshotOutputNote = document.querySelector('[data-result="snapshot-output-note"]');
+  const snapshotImpactNote = document.querySelector('[data-result="snapshot-impact-note"]');
+  const snapshotContextNote = document.querySelector('[data-result="snapshot-context-note"]');
   const sideSelect = document.querySelector("#trade-side-select");
   const modeButtons = Array.from(document.querySelectorAll(".mode-chip"));
   const impactChart = document.querySelector("#impact-chart");
@@ -512,6 +519,8 @@ export function initSellImpact() {
   let lastDisplaySimulation = null;
   let lastDisplayMaxSellResult = null;
   let lastAmmMaxSellResult = null;
+  const SNAPSHOT_HISTORY_LIMIT = 10;
+  const snapshotHistory = [];
   let chartUpdateTimer = null;
   let pendingChartPayload = null;
   let shareUrlTimer = null;
@@ -1894,6 +1903,19 @@ export function initSellImpact() {
     lastDisplaySimulation = null;
     lastDisplayMaxSellResult = null;
     lastAmmMaxSellResult = null;
+    snapshotHistory.splice(0, snapshotHistory.length);
+    renderSnapshotSeries();
+    if (snapshotOutputNote) {
+      snapshotOutputNote.textContent = "Waiting for snapshot updates.";
+    }
+    if (snapshotImpactNote) {
+      snapshotImpactNote.textContent = "Waiting for slippage context.";
+    }
+    if (snapshotContextNote) {
+      snapshotContextNote.textContent = "Waiting for route selection context.";
+    }
+    setSnapshotListItems(snapshotNoteCurrent, ["Waiting for estimate."]);
+    setSnapshotListItems(snapshotNoteDelta, ["Run estimate to compare with previous snapshot."]);
     scheduleChartsUpdate(
       { offers: null, simulation: null, maxSellResult: null, currency: "" },
       { immediate: true }
@@ -3492,6 +3514,125 @@ export function initSellImpact() {
     });
   };
 
+  const buildSnapshotPath = (values) => {
+    if (!Array.isArray(values) || values.length === 0) {
+      return "M8 56 L296 56";
+    }
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min;
+    const startX = 8;
+    const endX = 296;
+    const yTop = 16;
+    const yBottom = 66;
+    const step = values.length > 1 ? (endX - startX) / (values.length - 1) : 0;
+    return values
+      .map((value, index) => {
+        const ratio = span > 0 ? (value - min) / span : 0.5;
+        const x = startX + (step * index);
+        const y = yBottom - ((yBottom - yTop) * ratio);
+        return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+      })
+      .join(" ");
+  };
+
+  const setSnapshotListItems = (target, items) => {
+    if (!target) {
+      return;
+    }
+    const safeItems = Array.isArray(items) && items.length ? items : ["Waiting for estimate."];
+    while (target.firstChild) {
+      target.removeChild(target.firstChild);
+    }
+    safeItems.forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      target.appendChild(li);
+    });
+  };
+
+  const renderSnapshotSeries = () => {
+    const outputValues = snapshotHistory.map((item) => item.outputXrp);
+    const impactValues = snapshotHistory.map((item) => item.impactScore);
+    const contextValues = snapshotHistory.map((item) => item.contextScore);
+    if (snapshotStripOutput) {
+      snapshotStripOutput.setAttribute("d", buildSnapshotPath(outputValues));
+    }
+    if (snapshotStripImpact) {
+      snapshotStripImpact.setAttribute("d", buildSnapshotPath(impactValues));
+    }
+    if (snapshotStripContext) {
+      snapshotStripContext.setAttribute("d", buildSnapshotPath(contextValues));
+    }
+  };
+
+  const updateSnapshotPanel = ({ simulation, chosenVenue, slippagePct, routeCandidates, cacheStatus }) => {
+    const selected = routeCandidates?.[0] || null;
+    const previous = snapshotHistory.length > 0 ? snapshotHistory[snapshotHistory.length - 1] : null;
+    const outputXrp = Number.isFinite(simulation?.receiveXrp) ? simulation.receiveXrp : 0;
+    const fillRatePct = Number.isFinite(simulation?.fillRatePct) ? simulation.fillRatePct : 0;
+    const impactScore = Number.isFinite(slippagePct) ? slippagePct : Math.max(0, 100 - fillRatePct);
+    const contextScore = Number.isFinite(selected?.confidencePct)
+      ? selected.confidencePct
+      : (chosenVenue === VENUE_AMM ? 52 : 64);
+    const outputDeltaPct = previous && previous.outputXrp > 0
+      ? ((outputXrp - previous.outputXrp) / previous.outputXrp) * 100
+      : null;
+
+    snapshotHistory.push({
+      outputXrp,
+      impactScore,
+      contextScore,
+      outputDeltaPct,
+      venue: chosenVenue,
+      cacheStatus: cacheStatus || "live",
+      isPartial: fillRatePct > 0 && fillRatePct < 100,
+      timestamp: Date.now(),
+    });
+    if (snapshotHistory.length > SNAPSHOT_HISTORY_LIMIT) {
+      snapshotHistory.splice(0, snapshotHistory.length - SNAPSHOT_HISTORY_LIMIT);
+    }
+
+    renderSnapshotSeries();
+
+    if (snapshotOutputNote) {
+      snapshotOutputNote.textContent = outputDeltaPct === null
+        ? `First bounded point from ${chosenVenue}.`
+        : `Output ${outputDeltaPct >= 0 ? "up" : "down"} ${formatPercent(Math.abs(outputDeltaPct))} vs previous.`;
+    }
+    if (snapshotImpactNote) {
+      const impactText = Number.isFinite(slippagePct) ? formatPercent(slippagePct) : "n/a";
+      snapshotImpactNote.textContent = `Impact trend tracks slippage ${impactText}.`;
+    }
+    if (snapshotContextNote) {
+      snapshotContextNote.textContent = `Route confidence ${selected ? formatPercent(selected.confidencePct) : "n/a"} on ${chosenVenue}.`;
+    }
+
+    const latest = snapshotHistory[snapshotHistory.length - 1];
+    setSnapshotListItems(snapshotNoteCurrent, [
+      `Selected route: ${selected?.title || "unavailable"}.`,
+      `Fill ${formatPercent(fillRatePct)} / slippage ${Number.isFinite(slippagePct) ? formatPercent(slippagePct) : "n/a"}.`,
+      `Snapshot state ${latest.cacheStatus}${latest.isPartial ? " · partial" : ""}.`,
+    ]);
+
+    if (snapshotHistory.length < 2) {
+      setSnapshotListItems(snapshotNoteDelta, [
+        "Need one more estimate to show previous delta.",
+        "Snapshot remains bounded and decision-support only.",
+      ]);
+      return;
+    }
+
+    const prev = snapshotHistory[snapshotHistory.length - 2];
+    const confidenceDelta = latest.contextScore - prev.contextScore;
+    const impactDelta = latest.impactScore - prev.impactScore;
+    setSnapshotListItems(snapshotNoteDelta, [
+      `Output delta ${latest.outputDeltaPct === null ? "n/a" : `${latest.outputDeltaPct >= 0 ? "+" : ""}${formatPercent(latest.outputDeltaPct)}`}.`,
+      `Confidence ${confidenceDelta >= 0 ? "improved" : "softened"} by ${formatPercent(Math.abs(confidenceDelta))}.`,
+      `Impact score ${impactDelta >= 0 ? "widened" : "tightened"} by ${formatPercent(Math.abs(impactDelta))}.`,
+    ]);
+  };
+
   const updateResultsSummary = ({
     simulation,
     bestPrice,
@@ -3580,21 +3721,6 @@ export function initSellImpact() {
         ? t("results.why_line_amm")
         : t("results.why_line", { count: simulation.topConsumedOffersCount })
     );
-    if (snapshotNotesList) {
-      snapshotNotesList.innerHTML = "";
-      const notes = [
-        `Fill rate ${formatPercent(simulation.fillRatePct)} keeps current decision cards usable.`,
-        isPartialFill
-          ? "Partial-safe state: selected path remains readable while alternatives may lag."
-          : "Selected route remains primary; alternatives are support context only.",
-        `Current venue ${venue} with slippage ${resolvedSlippage === null ? "n/a" : formatPercent(resolvedSlippage)}.`
-      ];
-      notes.forEach((note) => {
-        const li = document.createElement("li");
-        li.textContent = note;
-        snapshotNotesList.appendChild(li);
-      });
-    }
   };
 
   const updateExecutionDetails = ({
@@ -5120,6 +5246,13 @@ export function initSellImpact() {
         maxSellResult,
       });
       updateRouteCandidates({ candidates: routeCandidates, chosenVenue });
+      updateSnapshotPanel({
+        simulation: displaySimulation,
+        chosenVenue,
+        slippagePct: displaySlippagePct,
+        routeCandidates,
+        cacheStatus,
+      });
 
       updateDebugPanel({
         responseStatus: "success",
