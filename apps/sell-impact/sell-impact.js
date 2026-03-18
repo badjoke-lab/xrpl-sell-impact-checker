@@ -383,8 +383,8 @@ export function initSellImpact() {
   const resultFilledLine = document.querySelector('[data-result="filled-line"]');
   const resultDataFetched = document.querySelector('[data-result="data-fetched"]');
   const resultEndpoint = document.querySelector('[data-result="endpoint"]');
-  const resultEndpointDetails = document.querySelector(
-    '[data-result="endpoint-details"]'
+  const resultEndpointDetails = Array.from(
+    document.querySelectorAll('[data-result="endpoint-details"]')
   );
   const resultOrderCount = document.querySelector('[data-result="order-count"]');
   const resultBestPrice = document.querySelector('[data-result="best-price"]');
@@ -404,6 +404,7 @@ export function initSellImpact() {
   const resultWarning = document.querySelector('[data-result="warning"]');
   const resultMaxSellLabel = document.querySelector('[data-result="max-sell-label"]');
   const resultMaxSellValue = document.querySelector('[data-result="max-sell-value"]');
+  const resultMixSummary = document.querySelector('[data-result="mix-summary"]');
   const resultMaxSellNote = document.querySelector('[data-result="max-sell-note"]');
   const resultUsedVenueSummary = document.querySelector('[data-result="used-venue-summary"]');
   const resultUsedVenueDetails = document.querySelector('[data-result="used-venue-details"]');
@@ -497,8 +498,12 @@ export function initSellImpact() {
   const depthChart = document.querySelector("#depth-chart");
   const impactChartNote = document.querySelector('[data-result="impact-note"]');
   const depthChartNote = document.querySelector('[data-result="depth-note"]');
-  const impactChartSummary = document.querySelector('[data-result="impact-summary"]');
-  const depthChartSummary = document.querySelector('[data-result="depth-summary"]');
+  const impactChartSummary = Array.from(
+    document.querySelectorAll('[data-result="impact-summary"]')
+  );
+  const depthChartSummary = Array.from(
+    document.querySelectorAll('[data-result="depth-summary"]')
+  );
   const debugPanel = document.querySelector("#debug-panel");
   const debugCopyButton = document.querySelector("#debug-copy");
   const debugCopyStatus = document.querySelector('[data-debug="copy-status"]');
@@ -663,6 +668,38 @@ export function initSellImpact() {
       return issuer;
     }
     return `${issuer.slice(0, 6)}…${issuer.slice(-4)}`;
+  };
+
+  const SUGGESTION_ALIAS_OVERRIDES = [
+    { currency: "XLM",  issuer: "rKiCet8SdvWxPXnAgYarFUXMh1zCPz432Y", name: "Ripple Fox",   label: "XLM" },
+    { currency: "CNY",  issuer: "rKiCet8SdvWxPXnAgYarFUXMh1zCPz432Y", name: "Ripple Fox",   label: "CNY" },
+    { currency: "XRG",  issuer: "rUo5UNKiRGhLq4LVgbCzvx53DH65cgk5Dp", name: "xGreen.Energy", label: "XRG" },
+
+    // ここからは現在の suggest probe で見えている候補に対する短縮issuerベースの補強
+    { currency: "EVR",  issuerShort: "ra9g3L…FtSe", name: "GateHub EVR",  label: "EVR" },
+    { currency: "FLR",  issuerShort: "rcxJwV…o1Eu", name: "GateHub FLR",  label: "FLR" },
+    { currency: "USDC", issuerShort: "rDsvn6…TJUf", name: "GateHub USDC", label: "USDC" },
+  ];
+
+  const getSuggestionAlias = ({ currency, issuer = "", issuerShort = "" }) => {
+    const cur = String(currency || "").trim().toUpperCase();
+    const full = String(issuer || "").trim();
+    const short = String(issuerShort || "").trim();
+
+    return (
+      SUGGESTION_ALIAS_OVERRIDES.find((item) => {
+        if (item.currency !== cur) {
+          return false;
+        }
+        if (item.issuer && item.issuer === full) {
+          return true;
+        }
+        if (item.issuerShort && item.issuerShort === short) {
+          return true;
+        }
+        return false;
+      }) || null
+    );
   };
 
   const normalizePresetTags = (tags) => {
@@ -1567,6 +1604,19 @@ export function initSellImpact() {
     }
   };
 
+  const setResultTextMany = (elements, text) => {
+    if (Array.isArray(elements)) {
+      elements.forEach((element) => setResultText(element, text));
+      return;
+    }
+    setResultText(elements, text);
+  };
+
+  const setMaxSellValueText = (text) => {
+    setResultText(resultMaxSellValue, text);
+    setResultText(resultMixSummary, text);
+  };
+
   const getImpactThresholdPct = () => {
     const raw = impactThresholdSelect?.value;
     const parsed = Number(raw);
@@ -1854,7 +1904,7 @@ export function initSellImpact() {
     setResultText(resultFilledLine, placeholder);
     setResultText(resultDataFetched, placeholder);
     setResultText(resultEndpoint, placeholder);
-    setResultText(resultEndpointDetails, placeholder);
+    setResultTextMany(resultEndpointDetails, placeholder);
     setResultText(resultOrderCount, placeholder);
     setResultText(resultBestPrice, placeholder);
     setResultText(resultWorstPrice, placeholder);
@@ -1926,7 +1976,7 @@ export function initSellImpact() {
     lastCurrency = "";
     updateMaxSellLabel(getImpactThresholdPct());
     updateImpactThresholdHelp(getImpactThresholdPct());
-    setResultText(resultMaxSellValue, placeholder);
+    setMaxSellValueText( placeholder);
     setResultText(resultMaxSellNote, "");
     if (resultWarning) {
       resultWarning.hidden = true;
@@ -3277,7 +3327,7 @@ export function initSellImpact() {
       const result =
         precomputedResult ?? buildAmmMaxSellResult({ reserves: ammReserves, thresholdPct });
       if (result.status !== "available") {
-        setResultText(resultMaxSellValue, t("results.max_sell.not_available"));
+        setMaxSellValueText( t("results.max_sell.not_available"));
         setResultText(resultMaxSellNote, "");
         return;
       }
@@ -3295,8 +3345,7 @@ export function initSellImpact() {
           result.simulation.receiveXrp * fiatRate.rate,
           fiat
         );
-        setResultText(
-          resultMaxSellValue,
+        setMaxSellValueText(
           t("results.max_sell.value_with_fiat", {
             amount: tokenAmount,
             currency,
@@ -3312,8 +3361,7 @@ export function initSellImpact() {
         return;
       }
 
-      setResultText(
-        resultMaxSellValue,
+      setMaxSellValueText(
         t("results.max_sell.value_with_xrp", {
           amount: tokenAmount,
           currency,
@@ -3325,7 +3373,7 @@ export function initSellImpact() {
     }
 
     if (!offers || offers.length === 0) {
-      setResultText(resultMaxSellValue, t("results.max_sell.not_available"));
+      setMaxSellValueText( t("results.max_sell.not_available"));
       setResultText(resultMaxSellNote, "");
       return;
     }
@@ -3339,7 +3387,7 @@ export function initSellImpact() {
       });
 
     if (result.status !== "available") {
-      setResultText(resultMaxSellValue, t("results.max_sell.not_available"));
+      setMaxSellValueText( t("results.max_sell.not_available"));
       setResultText(resultMaxSellNote, "");
       return;
     }
@@ -3353,8 +3401,7 @@ export function initSellImpact() {
 
     if (fiatRate && Number.isFinite(fiatRate.rate)) {
       const fiatAmount = formatFiatAmount(result.simulation.receiveXrp * fiatRate.rate, fiat);
-      setResultText(
-        resultMaxSellValue,
+      setMaxSellValueText(
         t("results.max_sell.value_with_fiat", {
           amount: tokenAmount,
           currency,
@@ -3370,8 +3417,7 @@ export function initSellImpact() {
       return;
     }
 
-    setResultText(
-      resultMaxSellValue,
+    setMaxSellValueText(
       t("results.max_sell.value_with_xrp", {
         amount: tokenAmount,
         currency,
@@ -3879,7 +3925,7 @@ export function initSellImpact() {
           return `${t(endpoint.labelKey)}${attemptSuffix} (${endpoint.url})`;
         })
         .join(" → ");
-      setResultText(resultEndpointDetails, endpointTrail);
+      setResultTextMany(resultEndpointDetails, endpointTrail);
     } else {
       setResultText(
         resultEndpointDetails,
@@ -4052,8 +4098,8 @@ export function initSellImpact() {
       renderDepthChart({ svg: depthChart, depthSeries: { points: [] } });
       setChartNote(impactChartNote, null);
       setChartNote(depthChartNote, null);
-      setResultText(impactChartSummary, t("graphs.impact.summary_empty"));
-      setResultText(depthChartSummary, t("graphs.depth.summary_empty"));
+      setResultTextMany(impactChartSummary, t("graphs.impact.summary_empty"));
+      setResultTextMany(depthChartSummary, t("graphs.depth.summary_empty"));
       return;
     }
 
@@ -4109,7 +4155,7 @@ export function initSellImpact() {
     if (samples.length === 0 || totalLiquidity <= 0) {
       renderImpactChart({ svg: impactChart, samples: [] });
       setChartNote(impactChartNote, t("graphs.impact.note_no_liquidity"));
-      setResultText(impactChartSummary, t("graphs.impact.summary_empty"));
+      setResultTextMany(impactChartSummary, t("graphs.impact.summary_empty"));
     }
     const currentSellAmount = isPartial ? simulation.filledToken : simulation.requestedToken;
     const currentReceiveValue = simulation.receiveXrp * (hasFiat ? rate : 1);
@@ -4197,7 +4243,7 @@ export function initSellImpact() {
     if (!depthSeries.hasLiquidity) {
       renderDepthChart({ svg: depthChart, depthSeries: { points: [] } });
       setChartNote(depthChartNote, t("graphs.depth.note_no_liquidity"));
-      setResultText(depthChartSummary, t("graphs.depth.summary_empty"));
+      setResultTextMany(depthChartSummary, t("graphs.depth.summary_empty"));
       return;
     }
 
@@ -4762,10 +4808,17 @@ export function initSellImpact() {
 
         // 3カラム：currency / name / issuer(+TL)
         const tl = t.trustlines ? fmtCompact(t.trustlines) : "";
-        const name = norm(t.name);
-        const curDisp = norm(t.currencyDisp);
         const curRaw = norm(t.currency);
         const iss = norm(t.issuer);
+        const issuerShort = shorten(iss);
+        const alias = getSuggestionAlias({
+          currency: norm(t.currencyDisp || t.currency || ""),
+          issuer: iss,
+          issuerShort,
+        });
+
+        const name = norm(alias?.name || t.name);
+        const curDisp = norm(alias?.label || t.currencyDisp || t.currency);
 
         btn.innerHTML = `
           <div style="display:flex; gap:10px; align-items:center; min-width:0;">
@@ -4778,7 +4831,7 @@ export function initSellImpact() {
             <div style="flex: 0 0 34%; min-width:0; display:flex; justify-content:flex-end; gap:8px; align-items:center;">
               ${tl ? `<span style="font-size:11px; padding:2px 6px; border-radius:999px; background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.75); white-space:nowrap;">TL ${esc(tl)}</span>` : ""}
               <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color: rgba(0,0,0,0.70); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px;">
-                ${esc(shorten(iss))}
+                ${esc(issuerShort)}
               </span>
             </div>
           </div>
@@ -4794,15 +4847,15 @@ export function initSellImpact() {
         });
 
         btn.addEventListener("click", () => {
-          // UIには表示用（ASCII/短縮）を入れる。raw(hex)はdatasetに保持する
-          input.value = curRaw;
-          issuer.value = iss;
+          applyTokenSuggestion({
+            currency: curRaw,
+            issuer: iss,
+            label: (alias?.label || curDisp || curRaw),
+            name: (alias?.name || name || ""),
+            trustlines: t.trustlines ?? null,
+          });
           close();
           input.focus();
-
-          // downstream
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          issuer.dispatchEvent(new Event("input", { bubbles: true }));
         });
 
         li.appendChild(btn);
