@@ -46,47 +46,71 @@
     <main class="page__content static-content">
       <section class="card" aria-labelledby="methods-title">
         <p class="eyebrow">Method reference</p>
-        <h2 id="methods-title" class="page__title">How XSIC outputs are generated and how to read them</h2>
-        <p class="page__lede">Use each section as an operator checklist: Input → Output → How to read → Limits. XSIC is directional and bounded, not deterministic.</p>
+        <h2 id="methods-title" class="page__title">How to operate XSIC as a four-app decision console</h2>
+        <p class="page__lede">Each app answers a different question. Recommended sequence is Sell Impact → Liquidity Pulse → Flow Alert → Exposure Graph. Use the full chain when execution size, timing, or confidence is material.</p>
+      </section>
+
+      <section class="card" aria-labelledby="method-order">
+        <h3 id="method-order">Recommended operating sequence</h3>
+        <ul class="info-list">
+          <li><strong>Step 1 / Sell Impact:</strong> estimate immediate execution outcome and route dependence for the planned size.</li>
+          <li><strong>Step 2 / Liquidity Pulse:</strong> verify whether current depth posture supports the same assumptions beyond one snapshot.</li>
+          <li><strong>Step 3 / Flow Alert:</strong> check transfer pressure regime that may alter book behavior between decision and execution.</li>
+          <li><strong>Step 4 / Exposure Graph:</strong> confirm structural concentration risk around issuer/trustline topology before committing.</li>
+        </ul>
       </section>
 
       <section class="card" aria-labelledby="sell-impact-methods">
         <h3 id="sell-impact-methods">Sell Impact</h3>
         <ul class="info-list">
-          <li><strong>Input:</strong> token+issuer pair, trade side/size, and current XRPL orderbook and AMM state.</li>
-          <li><strong>Output:</strong> estimated receive, impact/slippage signal, route mix, and quality/confidence cues.</li>
-          <li><strong>How to read:</strong> compare impact against your size policy and check whether execution relies on fragile tail liquidity.</li>
-          <li><strong>Limits:</strong> snapshot-bound estimate; fast orderbook movement, path updates, and latency can increase divergence.</li>
+          <li><strong>What it watches:</strong> executable route state across orderbook and AMM paths at request time.</li>
+          <li><strong>Primary input:</strong> token + issuer pair, side/size assumptions, and current market snapshot from connected XRPL endpoints.</li>
+          <li><strong>Output:</strong> estimated receive amount, impact/slippage range, route composition, and confidence cues.</li>
+          <li><strong>How to interpret:</strong> compare the estimate against internal size tolerance and note whether the route depends on thin or unstable liquidity segments.</li>
+          <li><strong>Limits:</strong> estimate is snapshot-bound; rapid queue changes, path updates, and latency can widen realized divergence.</li>
         </ul>
       </section>
 
       <section class="card" aria-labelledby="liquidity-pulse-methods">
         <h3 id="liquidity-pulse-methods">Liquidity Pulse</h3>
         <ul class="info-list">
-          <li><strong>Input:</strong> tracked pair/pool presets and rolling depth-price snapshots from available endpoints.</li>
-          <li><strong>Output:</strong> state labels, trend strips, liquidity/deviation metrics, and source freshness context.</li>
-          <li><strong>How to read:</strong> prioritize persistence across multiple windows instead of reacting to one noisy update.</li>
-          <li><strong>Limits:</strong> reflects tracked markets only; events between sampling intervals may be missed.</li>
+          <li><strong>What it watches:</strong> depth posture and short-horizon persistence for tracked pairs and pools.</li>
+          <li><strong>Primary input:</strong> rolling depth/price snapshots with app-level presets and window configuration.</li>
+          <li><strong>Output:</strong> state labels, trend strips, deviation metrics, and freshness markers.</li>
+          <li><strong>How to interpret:</strong> treat multi-window persistence as stronger evidence than a single print; adjust size or timing when posture is unstable.</li>
+          <li><strong>Limits:</strong> only covered pairs/pools are represented; events between polling intervals may not be visible in real time.</li>
         </ul>
       </section>
 
       <section class="card" aria-labelledby="flow-alert-methods">
         <h3 id="flow-alert-methods">Flow Alert</h3>
         <ul class="info-list">
-          <li><strong>Input:</strong> labeled exchange/whale transfer history, snapshot aggregates, and configured windows.</li>
-          <li><strong>Output:</strong> directional pressure cues, alert states, and supporting flow context.</li>
-          <li><strong>How to read:</strong> treat alerts as pressure regime hints and cross-check with liquidity + impact before action.</li>
-          <li><strong>Limits:</strong> labeling quality and ingestion delay can produce temporary false positives/negatives.</li>
+          <li><strong>What it watches:</strong> exchange-linked and whale-linked transfer pressure over configured windows.</li>
+          <li><strong>Primary input:</strong> labeled address flows, aggregate snapshots, and historical window data maintained by XSIC pipelines.</li>
+          <li><strong>Output:</strong> pressure direction cues, alert states, and supporting context totals.</li>
+          <li><strong>How to interpret:</strong> use alerts as regime context; confirm with Sell Impact and Liquidity Pulse before changing execution assumptions.</li>
+          <li><strong>Limits:</strong> label coverage and ingestion delay can create temporary false positives, false negatives, or muted signals.</li>
         </ul>
       </section>
 
       <section class="card" aria-labelledby="exposure-graph-methods">
         <h3 id="exposure-graph-methods">Exposure Graph</h3>
         <ul class="info-list">
-          <li><strong>Input:</strong> issuer, account, and trustline relationship state from XRPL ledger views.</li>
-          <li><strong>Output:</strong> concentration patterns, dependency structure, and topology-level risk cues.</li>
-          <li><strong>How to read:</strong> focus on concentration clusters and key intermediaries, not only total node count.</li>
-          <li><strong>Limits:</strong> structural exposure is not equal to immediate tradability; combine with live market checks.</li>
+          <li><strong>What it watches:</strong> issuer-account-trustline topology and concentration structure.</li>
+          <li><strong>Primary input:</strong> ledger relationship state for selected issuer/accounts and trustline graph extraction.</li>
+          <li><strong>Output:</strong> concentration patterns, dependency clusters, and intermediary concentration cues.</li>
+          <li><strong>How to interpret:</strong> identify single points of structural dependency and concentration pockets that can amplify execution fragility.</li>
+          <li><strong>Limits:</strong> structural concentration is not a fill guarantee signal; always pair with live impact/liquidity checks.</li>
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="estimate-vs-observed">
+        <h3 id="estimate-vs-observed">Estimated values vs observed values</h3>
+        <ul class="info-list">
+          <li><strong>Estimated values:</strong> model-derived projections from the latest readable state (for example expected receive or implied impact).</li>
+          <li><strong>Observed values:</strong> recorded snapshots, flow aggregates, and graph structure that describe what has already been ingested.</li>
+          <li><strong>Operational rule:</strong> when estimate and observed context disagree, reduce size, delay execution, or require manual review.</li>
+          <li><strong>Decision hygiene:</strong> do not treat any single app as authoritative; confidence comes from cross-app alignment plus fresh timestamps.</li>
         </ul>
       </section>
     </main>
