@@ -2653,6 +2653,32 @@ body {
   overflow-wrap: anywhere;
 }
 
+.qa-list {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.qa-list div {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-soft);
+}
+
+.qa-list dt {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.qa-list dd {
+  margin: 0;
+  color: var(--color-text-soft);
+}
+
 .inline-links {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -2698,5 +2724,13 @@ body {
 
   .page__title {
     font-size: 1.35rem;
+  }
+
+  .app__title {
+    overflow-wrap: anywhere;
+  }
+
+  .inline-links {
+    grid-template-columns: 1fr;
   }
 }
