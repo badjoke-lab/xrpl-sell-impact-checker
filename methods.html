@@ -4,16 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>XSIC Methods | Inputs, Outputs, Interpretation, Limits</title>
-  <meta name="description" content="Methods for XSIC Sell Impact, Liquidity Pulse, Flow Alert, and Exposure Graph: data inputs, outputs, interpretation tips, and known limits." />
+  <meta name="description" content="Method notes for all XSIC apps: input definitions, output meaning, interpretation rules, and known limits for operational use." />
   <link rel="stylesheet" href="/styles.css" />
   <link rel="canonical" href="https://xsic.badjoke-lab.com/methods/" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="XSIC" />
-  <meta property="og:title" content="XSIC Methods" />
-  <meta property="og:description" content="How XSIC computes and presents XRPL market signals." />
+  <meta property="og:title" content="XSIC Methods | Inputs, Outputs, Interpretation, Limits" />
+  <meta property="og:description" content="Operational method reference for Sell Impact, Liquidity Pulse, Flow Alert, and Exposure Graph." />
   <meta property="og:url" content="https://xsic.badjoke-lab.com/methods/" />
   <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="XSIC Methods" />
+  <meta name="twitter:description" content="Use this page to interpret app outputs correctly before acting." />
+  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -42,48 +45,48 @@
 
     <main class="page__content static-content">
       <section class="card" aria-labelledby="methods-title">
-        <p class="eyebrow">Documentation</p>
-        <h2 id="methods-title" class="page__title">Methods by app</h2>
-        <p class="page__lede">Each XSIC app has different assumptions. Use this page to map input fields to outputs, interpret values, and understand hard limits.</p>
+        <p class="eyebrow">Method reference</p>
+        <h2 id="methods-title" class="page__title">How XSIC outputs are generated and how to read them</h2>
+        <p class="page__lede">Use each section as an operator checklist: Input → Output → How to read → Limits. XSIC is directional and bounded, not deterministic.</p>
       </section>
 
       <section class="card" aria-labelledby="sell-impact-methods">
         <h3 id="sell-impact-methods">Sell Impact</h3>
         <ul class="info-list">
-          <li><strong>Input:</strong> token pair, sell size, and market context from XRPL DEX/AMM snapshots.</li>
-          <li><strong>Output:</strong> estimated execution impact, expected receive amount, and route context.</li>
-          <li><strong>How to read:</strong> larger estimated impact usually means thinner available depth for the size entered.</li>
-          <li><strong>Limits:</strong> estimates can diverge from final execution under fast market movement or path changes.</li>
+          <li><strong>Input:</strong> token+issuer pair, trade side/size, and current XRPL orderbook and AMM state.</li>
+          <li><strong>Output:</strong> estimated receive, impact/slippage signal, route mix, and quality/confidence cues.</li>
+          <li><strong>How to read:</strong> compare impact against your size policy and check whether execution relies on fragile tail liquidity.</li>
+          <li><strong>Limits:</strong> snapshot-bound estimate; fast orderbook movement, path updates, and latency can increase divergence.</li>
         </ul>
       </section>
 
       <section class="card" aria-labelledby="liquidity-pulse-methods">
         <h3 id="liquidity-pulse-methods">Liquidity Pulse</h3>
         <ul class="info-list">
-          <li><strong>Input:</strong> tracked pair set and periodic depth/state snapshots.</li>
-          <li><strong>Output:</strong> liquidity condition labels, comparative depth indicators, and changes over time.</li>
-          <li><strong>How to read:</strong> use direction and persistence, not one isolated point, before changing execution plans.</li>
-          <li><strong>Limits:</strong> coverage follows tracked markets and may miss untracked venues or short-lived events.</li>
+          <li><strong>Input:</strong> tracked pair/pool presets and rolling depth-price snapshots from available endpoints.</li>
+          <li><strong>Output:</strong> state labels, trend strips, liquidity/deviation metrics, and source freshness context.</li>
+          <li><strong>How to read:</strong> prioritize persistence across multiple windows instead of reacting to one noisy update.</li>
+          <li><strong>Limits:</strong> reflects tracked markets only; events between sampling intervals may be missed.</li>
         </ul>
       </section>
 
       <section class="card" aria-labelledby="flow-alert-methods">
         <h3 id="flow-alert-methods">Flow Alert</h3>
         <ul class="info-list">
-          <li><strong>Input:</strong> labeled exchange/whale flow history and recent snapshots.</li>
-          <li><strong>Output:</strong> flow pressure indicators and directionally useful context.</li>
-          <li><strong>How to read:</strong> alerts indicate notable shifts, not guaranteed future price moves.</li>
-          <li><strong>Limits:</strong> wallet labeling, reporting delay, and chain activity spikes can affect interpretation.</li>
+          <li><strong>Input:</strong> labeled exchange/whale transfer history, snapshot aggregates, and configured windows.</li>
+          <li><strong>Output:</strong> directional pressure cues, alert states, and supporting flow context.</li>
+          <li><strong>How to read:</strong> treat alerts as pressure regime hints and cross-check with liquidity + impact before action.</li>
+          <li><strong>Limits:</strong> labeling quality and ingestion delay can produce temporary false positives/negatives.</li>
         </ul>
       </section>
 
       <section class="card" aria-labelledby="exposure-graph-methods">
         <h3 id="exposure-graph-methods">Exposure Graph</h3>
         <ul class="info-list">
-          <li><strong>Input:</strong> issuer and trustline relationship data from XRPL account states.</li>
-          <li><strong>Output:</strong> network-style exposure structures and concentration cues.</li>
-          <li><strong>How to read:</strong> focus on concentration pockets and dependency paths, not only node count.</li>
-          <li><strong>Limits:</strong> structural exposure is not equivalent to immediate liquidity or trading intent.</li>
+          <li><strong>Input:</strong> issuer, account, and trustline relationship state from XRPL ledger views.</li>
+          <li><strong>Output:</strong> concentration patterns, dependency structure, and topology-level risk cues.</li>
+          <li><strong>How to read:</strong> focus on concentration clusters and key intermediaries, not only total node count.</li>
+          <li><strong>Limits:</strong> structural exposure is not equal to immediate tradability; combine with live market checks.</li>
         </ul>
       </section>
     </main>
