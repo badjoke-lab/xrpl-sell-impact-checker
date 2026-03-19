@@ -3,22 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>XSIC Disclaimer | Non-Advice, Latency, Estimation, Responsibility</title>
-  <meta name="description" content="XSIC disclaimer covering non-advice status, data latency, estimation boundaries, and user self-responsibility." />
+  <title>XSIC Disclaimer | Non-Advice, Latency, Estimation Error, Responsibility</title>
+  <meta name="description" content="XSIC disclaimer covering non-investment-advice status, data latency risk, model estimation error, and user self-responsibility." />
   <link rel="stylesheet" href="/styles.css" />
   <link rel="canonical" href="https://xsic.badjoke-lab.com/disclaimer/" />
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="XSIC" />
   <meta property="og:title" content="XSIC Disclaimer" />
-  <meta property="og:description" content="Important limitations and responsibility terms for XSIC usage." />
+  <meta property="og:description" content="Read critical usage boundaries for XSIC outputs before acting." />
   <meta property="og:url" content="https://xsic.badjoke-lab.com/disclaimer/" />
   <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="XSIC Disclaimer" />
+  <meta name="twitter:description" content="Operational limits and responsibility terms for XSIC usage." />
+  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "WebPage",
     "name": "XSIC Disclaimer",
     "url": "https://xsic.badjoke-lab.com/disclaimer/",
-    "description": "Non-advice and usage limits for XSIC analytics output."
+    "description": "Non-advice and usage limits for XSIC analytics outputs."
   }
   </script>
 </head>
@@ -38,15 +43,31 @@
     </header>
 
     <main class="page__content static-content">
-      <section class="card">
+      <section class="card" aria-labelledby="disclaimer-title">
         <p class="eyebrow">Policy</p>
-        <h2 class="page__title">Disclaimer</h2>
+        <h2 id="disclaimer-title" class="page__title">Disclaimer</h2>
+        <p class="page__lede">XSIC is an operational analytics console. Treat all outputs as context, not guarantees.</p>
       </section>
 
-      <section class="card"><h3>Non-advice</h3><p>XSIC content and outputs are informational only and do not constitute financial, legal, tax, or investment advice.</p></section>
-      <section class="card"><h3>Latency and availability</h3><p>XRPL endpoints and service pipelines may be delayed, stale, degraded, or temporarily unavailable at any time.</p></section>
-      <section class="card"><h3>Estimation boundaries</h3><p>App outputs are model-based estimates using observed state. They are not guarantees of execution, slippage, or market reaction.</p></section>
-      <section class="card"><h3>Self-responsibility</h3><p>You are solely responsible for validating assumptions, verifying data freshness, and making final decisions based on your own judgment.</p></section>
+      <section class="card" aria-labelledby="d1">
+        <h3 id="d1">1) Non-investment advice</h3>
+        <p>XSIC content is informational and technical only. It does not constitute financial, investment, legal, tax, or fiduciary advice.</p>
+      </section>
+
+      <section class="card" aria-labelledby="d2">
+        <h3 id="d2">2) Data latency and availability</h3>
+        <p>Upstream endpoints and internal pipelines may become stale, delayed, partial, or unavailable without notice.</p>
+      </section>
+
+      <section class="card" aria-labelledby="d3">
+        <h3 id="d3">3) Estimation error and model bounds</h3>
+        <p>Impact, liquidity, flow, and exposure outputs are model-derived approximations of observed state and may diverge from realized outcomes.</p>
+      </section>
+
+      <section class="card" aria-labelledby="d4">
+        <h3 id="d4">4) User responsibility</h3>
+        <p>You are solely responsible for validating freshness, applying your own risk controls, and making final execution decisions.</p>
+      </section>
     </main>
 
     <div data-global-footer></div>

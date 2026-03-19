@@ -3,22 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>XSIC Credits | Data Sources, Libraries, Maintenance</title>
-  <meta name="description" content="Credits for XSIC including primary XRPL data sources, key libraries, and maintenance ownership." />
+  <title>XSIC Credits | Data Sources, Technology, Operations</title>
+  <meta name="description" content="Credits for XSIC including upstream data sources, implementation stack, and ongoing maintenance ownership." />
   <link rel="stylesheet" href="/styles.css" />
   <link rel="canonical" href="https://xsic.badjoke-lab.com/credits/" />
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="XSIC" />
   <meta property="og:title" content="XSIC Credits" />
-  <meta property="og:description" content="Data source and implementation credits for XSIC." />
+  <meta property="og:description" content="Source, technology, and maintenance credits for XSIC." />
   <meta property="og:url" content="https://xsic.badjoke-lab.com/credits/" />
   <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="XSIC Credits" />
+  <meta name="twitter:description" content="See where XSIC data comes from and who maintains the project." />
+  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "WebPage",
     "name": "XSIC Credits",
     "url": "https://xsic.badjoke-lab.com/credits/",
-    "description": "Credits for XRPL data sources, software libraries, and maintenance."
+    "description": "Credits for XRPL data sources, software stack, and operations."
   }
   </script>
 </head>
@@ -38,14 +43,38 @@
     </header>
 
     <main class="page__content static-content">
-      <section class="card">
+      <section class="card" aria-labelledby="credits-title">
         <p class="eyebrow">Project details</p>
-        <h2 class="page__title">Credits</h2>
+        <h2 id="credits-title" class="page__title">Credits</h2>
+        <p class="page__lede">XSIC is built as an operational XRPL console. This page clarifies where data comes from, what technology is used, and who maintains the service.</p>
       </section>
 
-      <section class="card" aria-labelledby="credit-data"><h3 id="credit-data">Data sources</h3><ul class="info-list"><li>XRPL ledger/network APIs and market data endpoints used by XSIC app backends.</li><li>Project-maintained snapshots and derived summaries where explicitly labeled.</li></ul></section>
-      <section class="card" aria-labelledby="credit-libs"><h3 id="credit-libs">Libraries</h3><ul class="info-list"><li>Frontend and utility dependencies declared in the repository package manifests.</li><li>XRPL ecosystem tooling used for parsing, request handling, and response shaping.</li></ul></section>
-      <section class="card" aria-labelledby="credit-maint"><h3 id="credit-maint">Maintenance</h3><p>XSIC is maintained by Badjoke-lab. Ongoing updates prioritize tool reliability, clarity, and practical XRPL workflow support.</p></section>
+      <section class="card" aria-labelledby="credit-data">
+        <h3 id="credit-data">Data sources</h3>
+        <ul class="info-list">
+          <li>XRPL ledger/network endpoints and related market-state interfaces consumed by XSIC server functions.</li>
+          <li>Project-managed derived snapshots and cached summaries where explicitly displayed as such.</li>
+          <li>Timestamp/state labels in each app should be treated as the primary freshness signal for operational use.</li>
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="credit-tech">
+        <h3 id="credit-tech">Technology stack</h3>
+        <ul class="info-list">
+          <li>Vanilla HTML/CSS/JavaScript front-end with shared UI/navigation modules.</li>
+          <li>Serverless API/function layer for XRPL data retrieval, normalization, and response shaping.</li>
+          <li>Package-manifest dependencies and XRPL ecosystem tooling documented in this repository.</li>
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="credit-ops">
+        <h3 id="credit-ops">Operations and maintenance</h3>
+        <ul class="info-list">
+          <li>Maintained by Badjoke-lab.</li>
+          <li>Release priorities: reliability, clarity, and safe interpretation of model outputs.</li>
+          <li>Feedback and bug reports are reviewed with reproducibility details (URL, timestamp, pair/preset, state label).</li>
+        </ul>
+      </section>
     </main>
 
     <div data-global-footer></div>
