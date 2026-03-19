@@ -3,100 +3,93 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>XSIC – Methods</title>
-  <meta name="description" content="How XSIC estimates sell impact using XRPL CLOB + AMM." />
+  <title>XSIC Methods | Inputs, Outputs, Interpretation, Limits</title>
+  <meta name="description" content="Methods for XSIC Sell Impact, Liquidity Pulse, Flow Alert, and Exposure Graph: data inputs, outputs, interpretation tips, and known limits." />
   <link rel="stylesheet" href="/styles.css" />
-  <link rel="canonical" href="https://xsic.badjoke-lab.com/methods/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/methods/">
-  <meta property="og:site_name" content="XSIC">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta property="og:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta name="twitter:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <link rel="icon" href="/favicon.png">
-  <link rel="apple-touch-icon" href="/favicon.png">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0D84H0D66W"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-0D84H0D66W');
+  <link rel="canonical" href="https://xsic.badjoke-lab.com/methods/" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="XSIC" />
+  <meta property="og:title" content="XSIC Methods" />
+  <meta property="og:description" content="How XSIC computes and presents XRPL market signals." />
+  <meta property="og:url" content="https://xsic.badjoke-lab.com/methods/" />
+  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "XSIC Methods",
+    "url": "https://xsic.badjoke-lab.com/methods/",
+    "about": "XRPL analytics methodology",
+    "author": {"@type": "Organization", "name": "Badjoke-lab"}
+  }
   </script>
 </head>
-<body>
-  <header class="page-header">
-    <div class="page-header__row">
-      <a href="/" class="brand-link" aria-label="Home"><div class="page-header__brand" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <img class="page-header__logo" src="/xsic_logo.png" alt="XRPL Sell Impact Checker logo" width="36" height="36" />
-</div></a>
-      <div
-        class="lang-switch"
-        role="group"
-        aria-label="Language"
-        data-i18n-aria-label="language.label"
-      >
-        <span class="lang-switch__label" data-i18n="language.label"></span>
-        <button
-          class="ghost-button lang-switch__button"
-          type="button"
-          data-lang-switch="en"
-          aria-pressed="false"
-        >
-          EN
-        </button>
-        <button
-          class="ghost-button lang-switch__button"
-          type="button"
-          data-lang-switch="ja"
-          aria-pressed="false"
-        >
-          JA
-        </button>
+<body data-nav-key="docs">
+  <div class="app page console-page static-page">
+    <header class="app__header global-header">
+      <div class="app__header-top">
+        <a href="/" class="brand-link" aria-label="XSIC Home">
+          <div class="app__brand">
+            <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+            <h1 class="app__title">XSIC</h1>
+          </div>
+        </a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+        <div data-global-nav></div>
       </div>
-    </div>
-    <p class="page-header__catchcopy" data-i18n="header.tagline"></p>
-    <nav class="site-nav" aria-label="Primary">
-      <a href="/methods/" data-i18n="nav.methods"></a>
-      <a href="/faq/" data-i18n="nav.faq"></a>
-      <a href="/disclaimer/" data-i18n="nav.disclaimer"></a>
-      <a href="/credits/" data-i18n="nav.credits"></a>
-      <a href="/donate/" data-i18n="nav.donate"></a>
-      <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-i18n="nav.contact"></a>
-        </nav>
-  </header>
+    </header>
 
-  <main class="page">
-    <h1 class="page__title" data-i18n="pages.methods.title"></h1>
-    <h2 data-i18n="pages.methods.what_title"></h2>
-    <p data-i18n="pages.methods.what_body"></p>
+    <main class="page__content static-content">
+      <section class="card" aria-labelledby="methods-title">
+        <p class="eyebrow">Documentation</p>
+        <h2 id="methods-title" class="page__title">Methods by app</h2>
+        <p class="page__lede">Each XSIC app has different assumptions. Use this page to map input fields to outputs, interpret values, and understand hard limits.</p>
+      </section>
 
-    <h2 data-i18n="pages.methods.data_title"></h2>
-    <ul>
-      <li data-i18n="pages.methods.data_item_clob"></li>
-      <li data-i18n="pages.methods.data_item_amm"></li>
-    </ul>
+      <section class="card" aria-labelledby="sell-impact-methods">
+        <h3 id="sell-impact-methods">Sell Impact</h3>
+        <ul class="info-list">
+          <li><strong>Input:</strong> token pair, sell size, and market context from XRPL DEX/AMM snapshots.</li>
+          <li><strong>Output:</strong> estimated execution impact, expected receive amount, and route context.</li>
+          <li><strong>How to read:</strong> larger estimated impact usually means thinner available depth for the size entered.</li>
+          <li><strong>Limits:</strong> estimates can diverge from final execution under fast market movement or path changes.</li>
+        </ul>
+      </section>
 
-    <h2 data-i18n="pages.methods.notes_title"></h2>
-    <ul>
-      <li data-i18n="pages.methods.notes_item_1"></li>
-      <li data-i18n="pages.methods.notes_item_2"></li>
-      <li data-i18n="pages.methods.notes_item_3"></li>
-    </ul>
-  </main>
+      <section class="card" aria-labelledby="liquidity-pulse-methods">
+        <h3 id="liquidity-pulse-methods">Liquidity Pulse</h3>
+        <ul class="info-list">
+          <li><strong>Input:</strong> tracked pair set and periodic depth/state snapshots.</li>
+          <li><strong>Output:</strong> liquidity condition labels, comparative depth indicators, and changes over time.</li>
+          <li><strong>How to read:</strong> use direction and persistence, not one isolated point, before changing execution plans.</li>
+          <li><strong>Limits:</strong> coverage follows tracked markets and may miss untracked venues or short-lived events.</li>
+        </ul>
+      </section>
 
-  <footer class="page-footer">
-    <nav class="page-links">
-      <a href="/faq/" data-i18n="nav.faq"></a>
-      <a href="/disclaimer/" data-i18n="nav.disclaimer"></a>
-      <a href="/credits/" data-i18n="nav.credits"></a>
-      <a href="/donate/" data-i18n="nav.donate"></a>
-    </nav>
-  </footer>
-  <script type="module" src="/src/i18n/page-init.js"></script>
+      <section class="card" aria-labelledby="flow-alert-methods">
+        <h3 id="flow-alert-methods">Flow Alert</h3>
+        <ul class="info-list">
+          <li><strong>Input:</strong> labeled exchange/whale flow history and recent snapshots.</li>
+          <li><strong>Output:</strong> flow pressure indicators and directionally useful context.</li>
+          <li><strong>How to read:</strong> alerts indicate notable shifts, not guaranteed future price moves.</li>
+          <li><strong>Limits:</strong> wallet labeling, reporting delay, and chain activity spikes can affect interpretation.</li>
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="exposure-graph-methods">
+        <h3 id="exposure-graph-methods">Exposure Graph</h3>
+        <ul class="info-list">
+          <li><strong>Input:</strong> issuer and trustline relationship data from XRPL account states.</li>
+          <li><strong>Output:</strong> network-style exposure structures and concentration cues.</li>
+          <li><strong>How to read:</strong> focus on concentration pockets and dependency paths, not only node count.</li>
+          <li><strong>Limits:</strong> structural exposure is not equivalent to immediate liquidity or trading intent.</li>
+        </ul>
+      </section>
+    </main>
+
+    <div data-global-footer></div>
+  </div>
+  <script src="/shared/nav.js"></script>
 </body>
 </html>

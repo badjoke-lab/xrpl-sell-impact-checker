@@ -2631,3 +2631,72 @@ svg polygon[fill="black"]{
     grid-template-columns: minmax(220px,1.1fr) minmax(180px,.9fr) auto auto auto auto;
   }
 }
+
+/* XSIC static pages unification */
+html,
+body {
+  overflow-x: clip;
+}
+
+.static-page {
+  gap: 20px;
+}
+
+.static-content h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+.static-content p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.inline-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inline-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 600;
+  color: #334155;
+  background: #fff;
+}
+
+.inline-links a:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
+}
+
+.status-card pre,
+.address-card code {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 420px) {
+  .app {
+    padding-inline: 14px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .page__title {
+    font-size: 1.35rem;
+  }
+}

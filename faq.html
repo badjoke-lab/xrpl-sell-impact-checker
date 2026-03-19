@@ -3,94 +3,80 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>XSIC – FAQ</title>
-  <meta name="description" content="Frequently asked questions about XSIC." />
+  <title>XSIC FAQ | General, Data Freshness, Accuracy, Privacy, Support</title>
+  <meta name="description" content="Frequently asked questions for XSIC covering general usage, data freshness, estimation accuracy, privacy posture, and support." />
   <link rel="stylesheet" href="/styles.css" />
-  <link rel="canonical" href="https://xsic.badjoke-lab.com/faq/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/faq/">
-  <meta property="og:site_name" content="XSIC">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta property="og:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta name="twitter:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <link rel="icon" href="/favicon.png">
-  <link rel="apple-touch-icon" href="/favicon.png">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0D84H0D66W"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-0D84H0D66W');
+  <link rel="canonical" href="https://xsic.badjoke-lab.com/faq/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="XSIC" />
+  <meta property="og:title" content="XSIC FAQ" />
+  <meta property="og:description" content="Answers for common XSIC usage and reliability questions." />
+  <meta property="og:url" content="https://xsic.badjoke-lab.com/faq/" />
+  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type": "Question", "name": "What is XSIC for?", "acceptedAnswer": {"@type": "Answer", "text": "XSIC is an XRPL signal toolkit for pre-trade and risk-context checks across sell impact, liquidity, flow, and exposure."}},
+      {"@type": "Question", "name": "How fresh is XSIC data?", "acceptedAnswer": {"@type": "Answer", "text": "Data freshness depends on each app pipeline and endpoint status. Check the status panel and app timestamps before using a value."}},
+      {"@type": "Question", "name": "Are estimates exact outcomes?", "acceptedAnswer": {"@type": "Answer", "text": "No. Outputs are estimates and context signals. Actual execution may differ due to latency, path changes, and market activity."}},
+      {"@type": "Question", "name": "Does XSIC store private keys?", "acceptedAnswer": {"@type": "Answer", "text": "No private keys are required to use XSIC pages, and the site is designed for read-side analytics workflows."}},
+      {"@type": "Question", "name": "How can I get support?", "acceptedAnswer": {"@type": "Answer", "text": "Use the contact link in site navigation to send feedback, bug reports, and requests."}}
+    ]
+  }
   </script>
 </head>
-<body>
-  <header class="page-header">
-    <div class="page-header__row">
-      <a href="/" class="brand-link" aria-label="Home"><div class="page-header__brand" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <img class="page-header__logo" src="/xsic_logo.png" alt="XRPL Sell Impact Checker logo" width="36" height="36" />
-        <span class="page-header__title" style="font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; word-break: keep-all;">XSIC</span>
-</div></a>
-      <div
-        class="lang-switch"
-        role="group"
-        aria-label="Language"
-        data-i18n-aria-label="language.label"
-      >
-        <span class="lang-switch__label" data-i18n="language.label"></span>
-        <button
-          class="ghost-button lang-switch__button"
-          type="button"
-          data-lang-switch="en"
-          aria-pressed="false"
-        >
-          EN
-        </button>
-        <button
-          class="ghost-button lang-switch__button"
-          type="button"
-          data-lang-switch="ja"
-          aria-pressed="false"
-        >
-          JA
-        </button>
+<body data-nav-key="docs">
+  <div class="app page console-page static-page">
+    <header class="app__header global-header">
+      <div class="app__header-top">
+        <a href="/" class="brand-link" aria-label="XSIC Home">
+          <div class="app__brand">
+            <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+            <h1 class="app__title">XSIC</h1>
+          </div>
+        </a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+        <div data-global-nav></div>
       </div>
-    </div>
-    <p class="page-header__catchcopy" data-i18n="header.tagline"></p>
-    <nav class="site-nav" aria-label="Primary">
-      <a href="/methods/" data-i18n="nav.methods"></a>
-      <a href="/faq/" data-i18n="nav.faq"></a>
-      <a href="/disclaimer/" data-i18n="nav.disclaimer"></a>
-      <a href="/credits/" data-i18n="nav.credits"></a>
-      <a href="/donate/" data-i18n="nav.donate"></a>
-      <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-i18n="nav.contact"></a>
-        </nav>
-  </header>
+    </header>
 
-  <main class="page">
-    <h1 class="page__title" data-i18n="pages.faq_short.title"></h1>
-    <h2 data-i18n="pages.faq_short.q1_title"></h2>
-    <p data-i18n="pages.faq_short.q1_body"></p>
+    <main class="page__content static-content">
+      <section class="card">
+        <p class="eyebrow">Support</p>
+        <h2 class="page__title">FAQ</h2>
+      </section>
 
-    <h2 data-i18n="pages.faq_short.q2_title"></h2>
-    <p data-i18n="pages.faq_short.q2_body"></p>
+      <section class="card" aria-labelledby="faq-general">
+        <h3 id="faq-general">General</h3>
+        <p><strong>What is XSIC for?</strong><br />XSIC helps you evaluate XRPL execution and risk context with four focused apps.</p>
+      </section>
 
-    <h2 data-i18n="pages.faq_short.q3_title"></h2>
-    <p data-i18n="pages.faq_short.q3_body"></p>
-  </main>
+      <section class="card" aria-labelledby="faq-freshness">
+        <h3 id="faq-freshness">Data freshness</h3>
+        <p><strong>How fresh is the data?</strong><br />Freshness varies by endpoint and pipeline. Always verify timestamps and the site status card before acting.</p>
+      </section>
 
-  <footer class="page-footer">
-    <nav class="page-links">
-      <a href="/methods/" data-i18n="nav.methods"></a>
-      <a href="/disclaimer/" data-i18n="nav.disclaimer"></a>
-      <a href="/credits/" data-i18n="nav.credits"></a>
-      <a href="/donate/" data-i18n="nav.donate"></a>
-    </nav>
-  </footer>
-  <script type="module" src="/src/i18n/page-init.js"></script>
+      <section class="card" aria-labelledby="faq-accuracy">
+        <h3 id="faq-accuracy">Accuracy</h3>
+        <p><strong>Are the numbers final?</strong><br />No. Outputs are estimates based on available state and can differ from final fills or future outcomes.</p>
+      </section>
+
+      <section class="card" aria-labelledby="faq-privacy">
+        <h3 id="faq-privacy">Privacy</h3>
+        <p><strong>Do I need wallet secrets?</strong><br />No. XSIC static pages and tools are designed for analytics use without private key submission.</p>
+      </section>
+
+      <section class="card" aria-labelledby="faq-support">
+        <h3 id="faq-support">Support</h3>
+        <p><strong>Where do I report issues?</strong><br />Use the contact link in navigation to send bug reports, data concerns, and enhancement requests.</p>
+      </section>
+    </main>
+
+    <div data-global-footer></div>
+  </div>
+  <script src="/shared/nav.js"></script>
 </body>
 </html>

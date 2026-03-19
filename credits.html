@@ -3,92 +3,53 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>XSIC – Credits</title>
-  <meta name="description" content="Credits and data sources for XSIC." />
+  <title>XSIC Credits | Data Sources, Libraries, Maintenance</title>
+  <meta name="description" content="Credits for XSIC including primary XRPL data sources, key libraries, and maintenance ownership." />
   <link rel="stylesheet" href="/styles.css" />
-  <link rel="canonical" href="https://xsic.badjoke-lab.com/credits/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/credits/">
-  <meta property="og:site_name" content="XSIC">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta property="og:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta name="twitter:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <link rel="icon" href="/favicon.png">
-  <link rel="apple-touch-icon" href="/favicon.png">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0D84H0D66W"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-0D84H0D66W');
+  <link rel="canonical" href="https://xsic.badjoke-lab.com/credits/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="XSIC Credits" />
+  <meta property="og:description" content="Data source and implementation credits for XSIC." />
+  <meta property="og:url" content="https://xsic.badjoke-lab.com/credits/" />
+  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "XSIC Credits",
+    "url": "https://xsic.badjoke-lab.com/credits/",
+    "description": "Credits for XRPL data sources, software libraries, and maintenance."
+  }
   </script>
 </head>
-<body>
-  <header class="page-header">
-    <div class="page-header__row">
-      <a href="/" class="brand-link" aria-label="Home"><div class="page-header__brand" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <img class="page-header__logo" src="/xsic_logo.png" alt="XRPL Sell Impact Checker logo" width="36" height="36" />
-</div></a>
-      <div
-        class="lang-switch"
-        role="group"
-        aria-label="Language"
-        data-i18n-aria-label="language.label"
-      >
-        <span class="lang-switch__label" data-i18n="language.label"></span>
-        <button
-          class="ghost-button lang-switch__button"
-          type="button"
-          data-lang-switch="en"
-          aria-pressed="false"
-        >
-          EN
-        </button>
-        <button
-          class="ghost-button lang-switch__button"
-          type="button"
-          data-lang-switch="ja"
-          aria-pressed="false"
-        >
-          JA
-        </button>
+<body data-nav-key="docs">
+  <div class="app page console-page static-page">
+    <header class="app__header global-header">
+      <div class="app__header-top">
+        <a href="/" class="brand-link" aria-label="XSIC Home">
+          <div class="app__brand">
+            <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+            <h1 class="app__title">XSIC</h1>
+          </div>
+        </a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+        <div data-global-nav></div>
       </div>
-    </div>
-    <p class="page-header__catchcopy" data-i18n="header.tagline"></p>
-    <nav class="site-nav" aria-label="Primary">
-      <a href="/methods/" data-i18n="nav.methods"></a>
-      <a href="/faq/" data-i18n="nav.faq"></a>
-      <a href="/disclaimer/" data-i18n="nav.disclaimer"></a>
-      <a href="/credits/" data-i18n="nav.credits"></a>
-      <a href="/donate/" data-i18n="nav.donate"></a>
-      <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-i18n="nav.contact"></a>
-        </nav>
-  </header>
+    </header>
 
-  <main class="page">
-    <h1 class="page__title" data-i18n="pages.credits.title"></h1>
-    <h2 data-i18n="pages.credits.data_title"></h2>
-    <ul>
-      <li data-i18n="pages.credits.data_item_1"></li>
-    </ul>
+    <main class="page__content static-content">
+      <section class="card">
+        <p class="eyebrow">Project details</p>
+        <h2 class="page__title">Credits</h2>
+      </section>
 
-    <h2 data-i18n="pages.credits.project_title"></h2>
-    <p data-i18n="pages.credits.project_body"></p>
-  </main>
+      <section class="card" aria-labelledby="credit-data"><h3 id="credit-data">Data sources</h3><ul class="info-list"><li>XRPL ledger/network APIs and market data endpoints used by XSIC app backends.</li><li>Project-maintained snapshots and derived summaries where explicitly labeled.</li></ul></section>
+      <section class="card" aria-labelledby="credit-libs"><h3 id="credit-libs">Libraries</h3><ul class="info-list"><li>Frontend and utility dependencies declared in the repository package manifests.</li><li>XRPL ecosystem tooling used for parsing, request handling, and response shaping.</li></ul></section>
+      <section class="card" aria-labelledby="credit-maint"><h3 id="credit-maint">Maintenance</h3><p>XSIC is maintained by Badjoke-lab. Ongoing updates prioritize tool reliability, clarity, and practical XRPL workflow support.</p></section>
+    </main>
 
-  <footer class="page-footer">
-    <nav class="page-links">
-      <a href="/methods/" data-i18n="nav.methods"></a>
-      <a href="/faq/" data-i18n="nav.faq"></a>
-      <a href="/disclaimer/" data-i18n="nav.disclaimer"></a>
-      <a href="/donate/" data-i18n="nav.donate"></a>
-    </nav>
-  </footer>
-  <script type="module" src="/src/i18n/page-init.js"></script>
+    <div data-global-footer></div>
+  </div>
+  <script src="/shared/nav.js"></script>
 </body>
 </html>
