@@ -1,112 +1,100 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FAQ | XRPL Sell Impact Checker</title>
-    <meta
-      name="description"
-      content="Frequently asked questions about XSIC, including XRP-only handling and data freshness."
-    />
-    <meta property="og:title" content="FAQ | XRPL Sell Impact Checker" />
-    <meta
-      property="og:description"
-      content="Frequently asked questions about XSIC, including XRP-only handling and data freshness."
-    />
-    <link rel="stylesheet" href="/styles.css" />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/faq/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/faq/">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>XSIC FAQ | Workflow, Freshness, Accuracy, Privacy, Support</title>
+  <meta name="description" content="Frequently asked XSIC questions organized by workflow, data freshness, estimation limits, privacy basics, and support." />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="canonical" href="https://xsic.badjoke-lab.com/faq/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="XSIC" />
+  <meta property="og:title" content="XSIC FAQ | Workflow and Reliability" />
+  <meta property="og:description" content="Operational FAQ for XSIC usage, data interpretation, and support." />
+  <meta property="og:url" content="https://xsic.badjoke-lab.com/faq/" />
+  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="XSIC FAQ" />
+  <meta name="twitter:description" content="Read this FAQ before relying on XSIC outputs for decisions." />
+  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type": "Question", "name": "What is XSIC for?", "acceptedAnswer": {"@type": "Answer", "text": "XSIC is a decision-support console for XRPL execution impact, liquidity state, transfer pressure, and exposure structure."}},
+      {"@type": "Question", "name": "How fresh is XSIC data?", "acceptedAnswer": {"@type": "Answer", "text": "Freshness depends on each app pipeline and endpoint condition. Check timestamps and state labels before using outputs."}},
+      {"@type": "Question", "name": "Are outputs guaranteed?", "acceptedAnswer": {"@type": "Answer", "text": "No. Outputs are model-based estimates or context cues and can diverge from realized outcomes."}},
+      {"@type": "Question", "name": "Do I need private keys?", "acceptedAnswer": {"@type": "Answer", "text": "No wallet secret input is required for normal XSIC analytics usage."}}
+    ]
+  }
+  </script>
 </head>
-  <body data-nav-key="docs">
-    <div class="app page">
-      <header class="app__header">
-        <div class="app__header-top">
-          <div>
-            <p class="eyebrow" data-i18n="app.eyebrow"></p>
-            <h1 data-i18n="app.title"></h1>
+<body data-nav-key="docs">
+  <div class="app page console-page static-page">
+    <header class="app__header global-header">
+      <div class="app__header-top">
+        <a href="/" class="brand-link" aria-label="XSIC Home">
+          <div class="app__brand">
+            <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+            <h1 class="app__title">XSIC</h1>
           </div>
-          <div
-            class="lang-switch"
-            role="group"
-            aria-label="Language"
-            data-i18n-aria-label="language.label"
-          >
-            <span class="lang-switch__label" data-i18n="language.label"></span>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="en"
-              aria-pressed="false"
-            >
-              EN
-            </button>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="ja"
-              aria-pressed="false"
-            >
-              JA
-            </button>
-          </div>
-        </div>
+        </a>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-        <nav class="site-nav global-nav" id="global-nav" aria-label="Primary">
-          <a href="/" data-nav-item="home">Home</a>
-          <a href="/apps/" data-nav-item="apps">Apps</a>
-          <a href="/methods/" data-nav-item="docs">Docs</a>
-          <a href="/donate/" data-nav-item="donate">Donate</a>
-          
-        </nav>
-      </header>
+        <div data-global-nav></div>
+      </div>
+    </header>
 
-      <main class="page__content">
-        <section class="card">
-          <h2 class="page__title" data-i18n="pages.faq.title"></h2>
-          <p class="page__lede" data-i18n="pages.faq.lede"></p>
-        </section>
+    <main class="page__content static-content">
+      <section class="card" aria-labelledby="faq-title">
+        <p class="eyebrow">Support</p>
+        <h2 id="faq-title" class="page__title">FAQ</h2>
+        <p class="page__lede">Questions are grouped to match XSIC decision flow so operators can validate assumptions quickly.</p>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.faq.q1_title"></h3>
-          <p data-i18n="pages.faq.q1_body"></p>
-        </section>
+      <section class="card" aria-labelledby="faq-workflow">
+        <h3 id="faq-workflow">Workflow and scope</h3>
+        <dl class="qa-list">
+          <div><dt>What is the recommended way to use XSIC?</dt><dd>Run Sell Impact first, then check Liquidity Pulse persistence, confirm Flow Alert pressure context, and finish with Exposure Graph concentration review.</dd></div>
+          <div><dt>Can one app be used alone?</dt><dd>Yes, but confidence improves when at least one neighboring context app is used for cross-checking.</dd></div>
+        </dl>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.faq.q2_title"></h3>
-          <p data-i18n="pages.faq.q2_body"></p>
-        </section>
+      <section class="card" aria-labelledby="faq-freshness">
+        <h3 id="faq-freshness">Data freshness and availability</h3>
+        <dl class="qa-list">
+          <div><dt>How fresh is XSIC data?</dt><dd>Freshness varies by app and endpoint. Always read timestamp, state badge, and source label before acting.</dd></div>
+          <div><dt>What does stale or partial mean?</dt><dd>It means XSIC is retaining the latest readable snapshot while some refresh paths are delayed or degraded.</dd></div>
+        </dl>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.faq.q3_title"></h3>
-          <p data-i18n="pages.faq.q3_body"></p>
-        </section>
+      <section class="card" aria-labelledby="faq-accuracy">
+        <h3 id="faq-accuracy">Accuracy and model limits</h3>
+        <dl class="qa-list">
+          <div><dt>Are outputs final execution results?</dt><dd>No. They are bounded estimates from observed state and can differ from realized fills.</dd></div>
+          <div><dt>Can XSIC predict future prices?</dt><dd>No. XSIC provides context and pressure signals, not deterministic price forecasts.</dd></div>
+        </dl>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.faq.q4_title"></h3>
-          <p data-i18n="pages.faq.q4_body"></p>
-        </section>
+      <section class="card" aria-labelledby="faq-privacy">
+        <h3 id="faq-privacy">Privacy and security basics</h3>
+        <dl class="qa-list">
+          <div><dt>Do I need to provide wallet secrets?</dt><dd>No. XSIC analytics pages do not require seed phrase or private key submission.</dd></div>
+          <div><dt>What should users avoid?</dt><dd>Never paste secret material into websites, chats, screenshots, or browser extensions.</dd></div>
+        </dl>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.faq.q5_title"></h3>
-          <p data-i18n="pages.faq.q5_body"></p>
-        </section>
-      </main>
+      <section class="card" aria-labelledby="faq-support">
+        <h3 id="faq-support">Support and requests</h3>
+        <dl class="qa-list">
+          <div><dt>Where should bugs be reported?</dt><dd>Use the contact route in navigation and include URL, timestamp, pair/preset, and state badge.</dd></div>
+          <div><dt>Can I request new pairs or features?</dt><dd>Yes. Include concrete workflow impact so prioritization can be done objectively.</dd></div>
+        </dl>
+      </section>
+    </main>
 
-      <footer class="site-footer">
-        <div class="site-footer__brand">
-          <p class="site-footer__title" data-i18n="footer.brand"></p>
-          <p class="site-footer__note" data-i18n="footer.note"></p>
-        </div>
-        <nav class="site-footer__links" aria-label="Footer">
-          <a href="/methods" data-i18n="nav.methods"></a>
-          <a href="/faq" data-i18n="nav.faq"></a>
-          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
-          <a href="/credits" data-i18n="nav.credits"></a>
-          <a href="/donate" data-i18n="nav.donate"></a>
-        </nav>
-      </footer>
-    </div>
-    <script type="module" src="/src/i18n/page-init.js"></script>
-      <script src="/shared/global-nav.js"></script>
-  </body>
+    <div data-global-footer></div>
+  </div>
+  <script src="/shared/nav.js"></script>
+</body>
 </html>
