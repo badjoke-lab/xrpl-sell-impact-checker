@@ -1,106 +1,77 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Disclaimer | XRPL Sell Impact Checker</title>
-    <meta
-      name="description"
-      content="XSIC provides estimates only and is not investment advice. Please read the full disclaimer."
-    />
-    <meta property="og:title" content="Disclaimer | XRPL Sell Impact Checker" />
-    <meta
-      property="og:description"
-      content="XSIC provides estimates only and is not investment advice. Please read the full disclaimer."
-    />
-    <link rel="stylesheet" href="/styles.css" />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/disclaimer/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/disclaimer/">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>XSIC Disclaimer | Non-Advice, Latency, Estimation Error, Responsibility</title>
+  <meta name="description" content="XSIC disclaimer covering non-investment-advice status, data latency risk, model estimation error, and user self-responsibility." />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="canonical" href="https://xsic.badjoke-lab.com/disclaimer/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="XSIC" />
+  <meta property="og:title" content="XSIC Disclaimer" />
+  <meta property="og:description" content="Read critical usage boundaries for XSIC outputs before acting." />
+  <meta property="og:url" content="https://xsic.badjoke-lab.com/disclaimer/" />
+  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="XSIC Disclaimer" />
+  <meta name="twitter:description" content="Operational limits and responsibility terms for XSIC usage." />
+  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "XSIC Disclaimer",
+    "url": "https://xsic.badjoke-lab.com/disclaimer/",
+    "description": "Non-advice and usage limits for XSIC analytics outputs."
+  }
+  </script>
 </head>
-  <body data-nav-key="docs">
-    <div class="app page">
-      <header class="app__header">
-        <div class="app__header-top">
-          <div>
-            <p class="eyebrow" data-i18n="app.eyebrow"></p>
-            <h1 data-i18n="app.title"></h1>
+<body data-nav-key="docs">
+  <div class="app page console-page static-page">
+    <header class="app__header global-header">
+      <div class="app__header-top">
+        <a href="/" class="brand-link" aria-label="XSIC Home">
+          <div class="app__brand">
+            <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+            <h1 class="app__title">XSIC</h1>
           </div>
-          <div
-            class="lang-switch"
-            role="group"
-            aria-label="Language"
-            data-i18n-aria-label="language.label"
-          >
-            <span class="lang-switch__label" data-i18n="language.label"></span>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="en"
-              aria-pressed="false"
-            >
-              EN
-            </button>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="ja"
-              aria-pressed="false"
-            >
-              JA
-            </button>
-          </div>
-        </div>
+        </a>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-        <nav class="site-nav global-nav" id="global-nav" aria-label="Primary">
-          <a href="/" data-nav-item="home">Home</a>
-          <a href="/apps/" data-nav-item="apps">Apps</a>
-          <a href="/methods/" data-nav-item="docs">Docs</a>
-          <a href="/donate/" data-nav-item="donate">Donate</a>
-          
-        </nav>
-      </header>
+        <div data-global-nav></div>
+      </div>
+    </header>
 
-      <main class="page__content">
-        <section class="card">
-          <h2 class="page__title" data-i18n="pages.disclaimer.title"></h2>
-          <p class="page__lede" data-i18n="pages.disclaimer.lede"></p>
-        </section>
+    <main class="page__content static-content">
+      <section class="card" aria-labelledby="disclaimer-title">
+        <p class="eyebrow">Policy</p>
+        <h2 id="disclaimer-title" class="page__title">Disclaimer</h2>
+        <p class="page__lede">XSIC is an operational analytics console. Treat all outputs as context, not guarantees.</p>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.disclaimer.advice_title"></h3>
-          <p data-i18n="pages.disclaimer.advice_body"></p>
-        </section>
+      <section class="card" aria-labelledby="d1">
+        <h3 id="d1">1) Non-investment advice</h3>
+        <p>XSIC content is informational and technical only. It does not constitute financial, investment, legal, tax, or fiduciary advice.</p>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.disclaimer.limits_title"></h3>
-          <ul class="info-list">
-            <li data-i18n="pages.disclaimer.limits_item_1"></li>
-            <li data-i18n="pages.disclaimer.limits_item_2"></li>
-            <li data-i18n="pages.disclaimer.limits_item_3"></li>
-          </ul>
-        </section>
+      <section class="card" aria-labelledby="d2">
+        <h3 id="d2">2) Data latency and availability</h3>
+        <p>Upstream endpoints and internal pipelines may become stale, delayed, partial, or unavailable without notice.</p>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.disclaimer.warranty_title"></h3>
-          <p data-i18n="pages.disclaimer.warranty_body"></p>
-        </section>
-      </main>
+      <section class="card" aria-labelledby="d3">
+        <h3 id="d3">3) Estimation error and model bounds</h3>
+        <p>Impact, liquidity, flow, and exposure outputs are model-derived approximations of observed state and may diverge from realized outcomes.</p>
+      </section>
 
-      <footer class="site-footer">
-        <div class="site-footer__brand">
-          <p class="site-footer__title" data-i18n="footer.brand"></p>
-          <p class="site-footer__note" data-i18n="footer.note"></p>
-        </div>
-        <nav class="site-footer__links" aria-label="Footer">
-          <a href="/methods" data-i18n="nav.methods"></a>
-          <a href="/faq" data-i18n="nav.faq"></a>
-          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
-          <a href="/credits" data-i18n="nav.credits"></a>
-          <a href="/donate" data-i18n="nav.donate"></a>
-        </nav>
-      </footer>
-    </div>
-    <script type="module" src="/src/i18n/page-init.js"></script>
-      <script src="/shared/global-nav.js"></script>
-  </body>
+      <section class="card" aria-labelledby="d4">
+        <h3 id="d4">4) User responsibility</h3>
+        <p>You are solely responsible for validating freshness, applying your own risk controls, and making final execution decisions.</p>
+      </section>
+    </main>
+
+    <div data-global-footer></div>
+  </div>
+  <script src="/shared/nav.js"></script>
+</body>
 </html>
