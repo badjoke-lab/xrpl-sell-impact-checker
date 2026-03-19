@@ -49,46 +49,51 @@
       <section class="card" aria-labelledby="faq-title">
         <p class="eyebrow">Support</p>
         <h2 id="faq-title" class="page__title">FAQ</h2>
-        <p class="page__lede">Questions are grouped to match XSIC decision flow so operators can validate assumptions quickly.</p>
+        <p class="page__lede">Questions are grouped for XSIC-wide operations: workflow, freshness, route interpretation, service limits, and coverage boundaries.</p>
       </section>
 
       <section class="card" aria-labelledby="faq-workflow">
-        <h3 id="faq-workflow">Workflow and scope</h3>
+        <h3 id="faq-workflow">XSIC workflow and app roles</h3>
         <dl class="qa-list">
-          <div><dt>What is the recommended way to use XSIC?</dt><dd>Run Sell Impact first, then check Liquidity Pulse persistence, confirm Flow Alert pressure context, and finish with Exposure Graph concentration review.</dd></div>
-          <div><dt>Can one app be used alone?</dt><dd>Yes, but confidence improves when at least one neighboring context app is used for cross-checking.</dd></div>
+          <div><dt>What is XSIC in one line?</dt><dd>XSIC is a four-app decision console for XRPL execution checks: impact estimate, liquidity posture, flow regime, and structural exposure.</dd></div>
+          <div><dt>What order should operators use?</dt><dd>Default order is Sell Impact → Liquidity Pulse → Flow Alert → Exposure Graph. This sequence reduces single-snapshot bias.</dd></div>
+          <div><dt>Can one app be used alone?</dt><dd>Yes, but single-app reads are lower confidence. XSIC is designed for cross-checking disagreement before execution.</dd></div>
         </dl>
       </section>
 
       <section class="card" aria-labelledby="faq-freshness">
         <h3 id="faq-freshness">Data freshness and availability</h3>
         <dl class="qa-list">
-          <div><dt>How fresh is XSIC data?</dt><dd>Freshness varies by app and endpoint. Always read timestamp, state badge, and source label before acting.</dd></div>
-          <div><dt>What does stale or partial mean?</dt><dd>It means XSIC is retaining the latest readable snapshot while some refresh paths are delayed or degraded.</dd></div>
+          <div><dt>How fresh is data across XSIC?</dt><dd>Freshness differs by app and endpoint path. Always verify timestamp, state badge, and any stale/partial markers shown in-app.</dd></div>
+          <div><dt>What does stale, partial, or unavailable mean?</dt><dd>Stale means last readable state is older than target cadence; partial means some upstream paths degraded; unavailable means required data could not be served.</dd></div>
+          <div><dt>Should execution continue during degraded state?</dt><dd>That is a user decision, but operationally the safer baseline is smaller size, slower cadence, or pause until key checks recover.</dd></div>
         </dl>
       </section>
 
-      <section class="card" aria-labelledby="faq-accuracy">
-        <h3 id="faq-accuracy">Accuracy and model limits</h3>
+      <section class="card" aria-labelledby="faq-pricing">
+        <h3 id="faq-pricing">Price guarantees and route differences</h3>
         <dl class="qa-list">
-          <div><dt>Are outputs final execution results?</dt><dd>No. They are bounded estimates from observed state and can differ from realized fills.</dd></div>
-          <div><dt>Can XSIC predict future prices?</dt><dd>No. XSIC provides context and pressure signals, not deterministic price forecasts.</dd></div>
+          <div><dt>Does XSIC guarantee execution price or fill amount?</dt><dd>No. XSIC provides estimates and context, not guarantees. Realized outcomes can move between quote time and execution time.</dd></div>
+          <div><dt>Why can route mix change quickly?</dt><dd>Orderbook queue changes, AMM state changes, and concurrent activity can alter best path composition in short intervals.</dd></div>
+          <div><dt>How should route disagreement between checks be read?</dt><dd>Treat disagreement as risk signal. Re-run impact, confirm liquidity persistence, and avoid assuming the earlier route remains executable.</dd></div>
         </dl>
       </section>
 
-      <section class="card" aria-labelledby="faq-privacy">
-        <h3 id="faq-privacy">Privacy and security basics</h3>
+      <section class="card" aria-labelledby="faq-limits">
+        <h3 id="faq-limits">Model limits and coverage</h3>
         <dl class="qa-list">
-          <div><dt>Do I need to provide wallet secrets?</dt><dd>No. XSIC analytics pages do not require seed phrase or private key submission.</dd></div>
-          <div><dt>What should users avoid?</dt><dd>Never paste secret material into websites, chats, screenshots, or browser extensions.</dd></div>
+          <div><dt>Are XSIC outputs predictions?</dt><dd>No. XSIC uses observed state and derived estimates. It is decision support, not deterministic forecasting.</dd></div>
+          <div><dt>Does Exposure Graph represent immediate tradability?</dt><dd>No. It shows structural concentration and dependency, which must be combined with live impact and liquidity checks.</dd></div>
+          <div><dt>Is every token/pair covered equally?</dt><dd>No. Coverage depends on app presets, endpoint reachability, and data pipeline scope at the time of query.</dd></div>
         </dl>
       </section>
 
-      <section class="card" aria-labelledby="faq-support">
-        <h3 id="faq-support">Support and requests</h3>
+      <section class="card" aria-labelledby="faq-security">
+        <h3 id="faq-security">Security and operational safety</h3>
         <dl class="qa-list">
-          <div><dt>Where should bugs be reported?</dt><dd>Use the contact route in navigation and include URL, timestamp, pair/preset, and state badge.</dd></div>
-          <div><dt>Can I request new pairs or features?</dt><dd>Yes. Include concrete workflow impact so prioritization can be done objectively.</dd></div>
+          <div><dt>Does XSIC require wallet seeds or private keys?</dt><dd>No. Normal analytics usage should never require sharing secret credentials.</dd></div>
+          <div><dt>What minimum safety practice is recommended?</dt><dd>Never paste secret data into web forms, and always confirm URLs plus on-page address strings before sending funds.</dd></div>
+          <div><dt>Where should incidents or bugs be reported?</dt><dd>Report with reproducible context: URL, timestamp, selected pair/preset, visible state badges, and observed vs expected behavior.</dd></div>
         </dl>
       </section>
     </main>
