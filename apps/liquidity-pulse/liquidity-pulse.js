@@ -334,17 +334,23 @@
     }
 
     function normalizeSnapshot(snapshot) {
-      const price = Number(snapshot?.price);
-      const liquidityUsd = Number(snapshot?.liquidityUsd);
-      const swaps5m = Number(snapshot?.swaps5m);
-      const deviationBps = Number(snapshot?.deviationBps);
+      const toFiniteOrNull = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        const n = Number(value);
+        return Number.isFinite(n) ? n : null;
+      };
+
+      const price = toFiniteOrNull(snapshot?.price);
+      const liquidityUsd = toFiniteOrNull(snapshot?.liquidityUsd);
+      const swaps5m = toFiniteOrNull(snapshot?.swaps5m);
+      const deviationBps = toFiniteOrNull(snapshot?.deviationBps);
 
       return {
         pool: snapshot?.poolLabel || 'XRPL AMM',
-        price: Number.isFinite(price) ? price : null,
-        liquidityUsd: Number.isFinite(liquidityUsd) ? liquidityUsd : null,
-        swaps5m: Number.isFinite(swaps5m) ? Math.round(swaps5m) : null,
-        deviationBps: Number.isFinite(deviationBps) ? Math.round(deviationBps) : null,
+        price,
+        liquidityUsd,
+        swaps5m: swaps5m === null ? null : Math.round(swaps5m),
+        deviationBps: deviationBps === null ? null : Math.round(deviationBps),
         source: snapshot?.source || 'api',
         stale: Boolean(snapshot?.stale),
         trend1h: 24,
