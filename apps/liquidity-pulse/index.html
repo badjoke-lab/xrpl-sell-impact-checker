@@ -42,7 +42,7 @@
         <section class="flow-hero-head">
           <h2 class="flow-page-title">Liquidity Pulse</h2>
           <p class="flow-page-subtitle">
-            AMM/DEX liquidity shell aligned to Flow Alert with live snapshot compatibility, trend context, and staged fallback states.
+            Observe XRPL pool liquidity, short-horizon pulse, and data freshness in one lightweight page.
           </p>
           <noscript>
             <p class="flow-note">
@@ -68,9 +68,7 @@
               <label><input id="demo-mode-toggle" type="checkbox" /> Demo only</label>
             </div>
             <button id="retry-button" class="flow-button" type="button">Retry</button>
-            <a class="flow-button" href="/apps/">Back to apps</a>
-            <a class="flow-button" href="/">Back home</a>
-          </div>
+                      </div>
         </section>
 
         <section class="card">
@@ -78,7 +76,7 @@
             Data may be delayed. Latest known liquidity snapshot is retained while refresh continues.
           </div>
           <p class="flow-note flow-note--quiet">
-            State guide: stale/partial keeps the latest readable snapshot, empty means no eligible data, and error means live rendering is unavailable.
+            State guide: stale keeps the latest readable snapshot, partial means some metrics are unavailable, demo means fallback sample data, and error means live rendering failed.
           </p>
         </section>
 
@@ -92,19 +90,19 @@
           <div class="flow-signal-block">
             <div class="flow-signal-label">Pool</div>
             <div class="flow-hero-value" data-snapshot="pool">—</div>
-            <div class="flow-meta">active routing pool label</div>
+            <div class="flow-meta">current observed pool</div>
           </div>
           <div class="flow-signal-block">
             <div class="flow-signal-label">Price</div>
             <p class="flow-copy" data-snapshot="price">—</p>
-            <div class="flow-meta">latest normalized swap price</div>
+            <div class="flow-meta">latest observed swap price</div>
           </div>
           <div class="flow-signal-block">
             <div class="flow-signal-label">Context</div>
-            <span class="flow-context-chip">mode: live/demo</span>
-            <span class="flow-context-chip">pool: xrp-rlusd</span>
-            <span class="flow-context-chip">source: synchronized in metrics</span>
-            <div class="flow-context-line">Sampling interval adapts to Lite mode and visibility.</div>
+            <span class="flow-context-chip">mode shown below</span>
+            <span class="flow-context-chip">pool: XRP / RLUSD</span>
+            <span class="flow-context-chip">source shown in metrics</span>
+            <div class="flow-context-line">Lite mode reduces update frequency and visual load.</div>
           </div>
           <div id="lpTrends" class="flow-history-strip">
             <div class="flow-history-row">
@@ -112,21 +110,21 @@
               <div class="flow-history-bars" role="img" aria-label="1 hour liquidity pulse">
                 <div data-trend="1h" style="height:12%"></div>
               </div>
-              <div class="flow-meta">trend bar normalized each refresh</div>
+              <div class="flow-meta">short pulse view (currently lightweight placeholder)</div>
             </div>
             <div class="flow-history-row">
               <div class="flow-signal-label">6h pulse</div>
               <div class="flow-history-bars" role="img" aria-label="6 hour liquidity pulse">
                 <div data-trend="6h" style="height:12%"></div>
               </div>
-              <div class="flow-meta">medium horizon pulse estimate</div>
+              <div class="flow-meta">mid pulse view (currently lightweight placeholder)</div>
             </div>
             <div class="flow-history-row">
               <div class="flow-signal-label">24h pulse</div>
               <div class="flow-history-bars" role="img" aria-label="24 hour liquidity pulse">
                 <div data-trend="24h" style="height:12%"></div>
               </div>
-              <div class="flow-meta">session baseline and drift context</div>
+              <div class="flow-meta">broad pulse view (currently lightweight placeholder)</div>
             </div>
           </div>
         </section>
@@ -154,7 +152,7 @@
           <div class="flow-mainviz-head">
             <div>
               <h3 class="flow-section-title">Main Viz</h3>
-              <p class="flow-section-note">Animated liquidity pulse canvas with runtime fallback overlays.</p>
+              <p class="flow-section-note">Quick visual read of current liquidity state and fallback status.</p>
             </div>
             <span class="flow-context-chip">pulse / liquidity</span>
           </div>
@@ -166,17 +164,17 @@
                 <p>Could not load live snapshot. Toggle Demo only or Retry.</p>
               </div>
               <div data-state-overlay="empty" class="flow-overlay" hidden>
-                <p>No liquidity data available for this pool.</p>
+                <p>No usable liquidity snapshot is available right now for this pool.</p>
               </div>
             </div>
             <aside class="flow-reason-panel">
               <div class="flow-signal-label">Reason / Context</div>
-              <h4 class="flow-reason-title">Liquidity momentum brief</h4>
-              <p class="flow-reason-copy">Price, liquidity, and swap cadence combine into a single pulse score for quick ops triage.</p>
+              <h4 class="flow-reason-title">Liquidity read summary</h4>
+              <p class="flow-reason-copy">Use this panel to read whether the pool currently looks available, thin, or temporarily unavailable.</p>
               <ul class="flow-reason-list">
-                <li>Lite mode lowers animation + polling load.</li>
-                <li>Demo mode guarantees deterministic fallback output.</li>
-                <li>Retry triggers immediate fetch and loop restart.</li>
+                <li>Lite mode lowers update frequency and visual load.</li>
+                <li>Demo mode uses sample data instead of live fetch.</li>
+                <li>Retry refreshes the current mode without changing your selection.</li>
               </ul>
             </aside>
           </div>
@@ -184,20 +182,20 @@
 
         <section class="card flow-flows-card">
           <div class="flow-mini-head">
-            <h3 class="flow-mini-title">Snapshot support</h3>
-            <div class="flow-mini-meta">guardrails / integration / navigation</div>
+            <h3 class="flow-mini-title">Current read notes</h3>
+            <div class="flow-mini-meta">status / source / interpretation</div>
           </div>
           <ul class="flow-escrow-list">
-            <li>Pool data is reflected in the signal summary above.</li>
-            <li>Price context is refreshed on every successful snapshot render.</li>
-            <li>Source and stale status stay visible in the metrics + stale banner blocks.</li>
+            <li>Status explains whether the page is using live, stale, partial, demo, or error output.</li>
+            <li>Source stays visible in the metrics row so live and demo reads are not confused.</li>
+            <li>Use Retry to refresh the current mode, or toggle Demo only for a sample fallback view.</li>
           </ul>
         </section>
 
         <section class="card flow-debug-card">
           <details>
             <summary>Debug (collapsed, release readiness)</summary>
-            <p class="flow-debug-status">DOM compatibility shell is active for existing liquidity-pulse.js selectors.</p>
+            <p class="flow-debug-status">Debug tools for state and selector validation.</p>
             <p class="flow-debug-status flow-debug-mono">IDs retained: #lpActions #lpCanvasWrap #lpSnapshot #lpTrends #lpStatus</p>
           </details>
         </section>

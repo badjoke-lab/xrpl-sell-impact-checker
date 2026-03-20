@@ -30,21 +30,21 @@
     },
     empty: {
       badge: 'EMPTY',
-      status: 'No liquidity data available.',
-      helper: 'Try Retry or switch mode to demo for deterministic output.',
+      status: 'No usable liquidity snapshot is available.',
+      helper: 'Try Retry, or switch to Demo mode for a sample fallback view.',
       note: null,
     },
     error: {
       badge: 'ERROR',
-      status: 'Unable to load liquidity snapshot.',
-      helper: 'Main fetch failed. Retry or switch to Demo mode.',
+      status: 'Unable to load a live liquidity snapshot.',
+      helper: 'Live fetch failed. Retry or switch to Demo mode.',
       note: null,
     },
     demo: {
       badge: 'DEMO',
       status: 'Demo source is active.',
-      helper: 'Live fetch is bypassed; demo data is rendered intentionally.',
-      note: 'Demo fallback is active.',
+      helper: 'Sample fallback data is being shown intentionally.',
+      note: 'Demo sample data is active.',
     },
   };
 
@@ -183,7 +183,7 @@
     const onRetry = () => {
       restartSnapshotLoop();
       setStatus('Retrying snapshot fetch…');
-      void reloadSnapshot({ forceApi: true });
+      void reloadSnapshot({ preferDemo: state.demoMode, forceApi: !state.demoMode });
     };
     refs.retryButton?.addEventListener('click', onRetry);
     cleanups.push(() => refs.retryButton?.removeEventListener('click', onRetry));
@@ -349,7 +349,7 @@
         stale: Boolean(snapshot?.stale),
         trend1h: 24,
         trend6h: 42,
-        trend24h: 62,
+        trend24h: 62, // temporary placeholder until real trend series is wired
       };
     }
 
