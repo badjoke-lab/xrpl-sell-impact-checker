@@ -300,9 +300,9 @@
     }
 
     function isPartialSnapshot(snapshot) {
-      const values = [snapshot?.price, snapshot?.liquidityUsd, snapshot?.swaps5m, snapshot?.deviationBps];
-      const available = values.filter((value) => value !== null && value !== undefined).length;
-      return available > 0 && available < values.length;
+      const requiredValues = [snapshot?.price, snapshot?.liquidityUsd];
+      const requiredAvailable = requiredValues.filter((value) => value !== null && value !== undefined).length;
+      return requiredAvailable > 0 && requiredAvailable < requiredValues.length;
     }
 
     async function fetchSnapshot() {
