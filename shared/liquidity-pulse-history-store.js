@@ -77,6 +77,24 @@ function sortByTs(rows) {
   return [...rows].sort((a, b) => toTs(a?.ts) - toTs(b?.ts));
 }
 
+function toFiniteOrNull(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function snapshotsEquivalent(a, b) {
+  if (!a || !b) return false;
+
+  return (
+    toFiniteOrNull(a?.price) === toFiniteOrNull(b?.price) &&
+    toFiniteOrNull(a?.liquidityUsd) === toFiniteOrNull(b?.liquidityUsd) &&
+    toFiniteOrNull(a?.reserves?.a) === toFiniteOrNull(b?.reserves?.a) &&
+    toFiniteOrNull(a?.reserves?.b) === toFiniteOrNull(b?.reserves?.b) &&
+    Boolean(a?.stale) === Boolean(b?.stale) &&
+    String(a?.source || '') === String(b?.source || '')
+  );
+}
+
 async function readSnapshots(resolved) {
   const mem = memoryStore.get(resolved.key);
   if (Array.isArray(mem)) return sortByTs(mem);
@@ -103,14 +121,17 @@ export async function readHistory(pool) {
 export async function appendSnapshot(snapshot) {
   const resolved = keyFor(snapshot?.pool);
   const prev = await readSnapshots(resolved);
-  const merged = sortByTs(
-    prev.concat([
-      {
-        ...snapshot,
-        pool: resolved.pool,
-      },
-    ]),
-  );
+  const incoming = {
+    ...snapshot,
+    pool: resolved.pool,
+  };
+
+  const latest = prev[prev.length - 1] || null;
+  if (snapshotsEquivalent(latest, incoming)) {
+    return latest;
+  }
+
+  const merged = sortByTs(prev.concat([incoming]));
   const trimmed = merged.slice(Math.max(0, merged.length - MAX_PER_KEY));
   memoryStore.set(resolved.key, trimmed);
 
