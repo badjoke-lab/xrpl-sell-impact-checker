@@ -1,3 +1,5 @@
+import { appendSnapshot } from '../../../shared/liquidity-pulse-history-store.js';
+
 const XRPL_ENDPOINTS = [
   'https://s1.ripple.com:51234/',
   'https://s2.ripple.com:51234/',
@@ -184,6 +186,9 @@ export async function onRequestGet({ request }) {
 
   try {
     const fresh = await fetchFreshSnapshot(preset);
+    try {
+      await appendSnapshot({ pool: preset.id, ...fresh });
+    } catch {}
     cache.set(preset.id, { data: fresh, fetchedAt: now });
     return json(fresh);
   } catch (error) {
