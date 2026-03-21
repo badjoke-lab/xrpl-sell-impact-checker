@@ -2,6 +2,7 @@
   const STORAGE_KEY = 'xsic.liquidityPulse.liteMode';
   const DEMO_KEY = 'xsic.liquidityPulse.demoMode';
   const API_POOL = 'xrp-rlusd';
+const HISTORY_WARMUP_MIN = 5;
   const LIQUIDITY_WINDOW = 12;
   const LIQUIDITY_EMA_ALPHA = 0.3;
   const MAX_FETCH_TIMEOUT_MS = 5000;
@@ -335,27 +336,29 @@
       });
       if (!res.ok) throw new Error(`history_http_${res.status}`);
       const payload = await res.json();
-      return Array.isArray(payload?.recent) ? payload.recent : [];
+      return {
+        recent: Array.isArray(payload?.recent) ? payload.recent : [],
+        historyMeta: payload?.historyMeta || null,
+      };
     }
 
     async function enrichSnapshotWithHistory(snapshot) {
       if (!snapshot || snapshot.source === 'demo') return snapshot;
 
       try {
-        const recent = await fetchHistory();
+        const historyPayload = await fetchHistory();
         return {
           ...snapshot,
-          ...deriveTrendMetrics(snapshot, recent),
+          ...deriveTrendMetrics(snapshot, historyPayload),
         };
       } catch {
         return snapshot;
       }
     }
 
-    function deriveTrendMetrics(snapshot, recent) {
-      const rows = Array.isArray(recent)
-        ? recent.filter((row) => row && row.ts && Number.isFinite(Number(row.liquidityUsd)))
-        : [];
+    function deriveTrendMetrics(snapshot, historyPayload) {
+      const recent = Array.isArray(historyPayload?.recent) ? historyPayload.recent : [];
+      const rows = recent.filter((row) => row && row.ts && Number.isFinite(Number(row.liquidityUsd)));
 
       const fallback = {
         trend1h: snapshot?.trend1h ?? 24,
@@ -363,12 +366,18 @@
         trend24h: snapshot?.trend24h ?? 62,
       };
 
+      const historyCountRaw = Number(historyPayload?.historyMeta?.count);
+      const historyCount = Number.isFinite(historyCountRaw) ? historyCountRaw : rows.length;
+      const historyWarmup = historyCount < HISTORY_WARMUP_MIN;
+
       const nowTs = Date.parse(snapshot?.ts || '') || Date.now();
 
       return {
         trend1h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '1h'), fallback.trend1h),
         trend6h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '6h'), fallback.trend6h),
         trend24h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '24h'), fallback.trend24h),
+        historyCount,
+        historyWarmup,
       };
     }
 
@@ -509,9 +518,9 @@
       if (refs.trendBars.h6) refs.trendBars.h6.style.height = `${snapshot.trend6h}%`;
       if (refs.trendBars.h24) refs.trendBars.h24.style.height = `${snapshot.trend24h}%`;
 
-      safeText(refs.trendMeta.h1, describeTrendPulse(snapshot.trend1h, '1h', snapshot.source));
-      safeText(refs.trendMeta.h6, describeTrendPulse(snapshot.trend6h, '6h', snapshot.source));
-      safeText(refs.trendMeta.h24, describeTrendPulse(snapshot.trend24h, '24h', snapshot.source));
+      safeText(refs.trendMeta.h1, describeTrendPulse(snapshot.trend1h, '1h', snapshot));
+      safeText(refs.trendMeta.h6, describeTrendPulse(snapshot.trend6h, '6h', snapshot));
+      safeText(refs.trendMeta.h24, describeTrendPulse(snapshot.trend24h, '24h', snapshot));
 
       const reason = buildReasonSummary(snapshot);
       safeText(refs.reasonFields.title, reason.title);
@@ -547,10 +556,15 @@
 
 
 
-    function describeTrendPulse(value, horizonLabel, source) {
+    function describeTrendPulse(value, horizonLabel, snapshot) {
       const n = Number(value);
-      const modeLabel = source === 'demo' ? 'sample' : 'live';
+      const modeLabel = snapshot?.source === 'demo' ? 'sample' : 'live';
       const focusPrefix = (state.windowMode && state.windowMode !== 'blend') ? `${state.windowMode} focus · ` : '';
+      const historyCount = Number(snapshot?.historyCount) || 0;
+
+      if (snapshot?.historyWarmup) {
+        return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is warming up (${historyCount} samples).`;
+      }
       if (!Number.isFinite(n)) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse unavailable.`;
       if (n >= 70) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is elevated.`;
       if (n >= 40) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is active.`;
@@ -568,19 +582,28 @@
         else depthLabel = 'thin';
       }
 
-      const title = snapshot?.source === 'demo'
-        ? 'Liquidity read summary · demo'
-        : (snapshot?.stale ? 'Liquidity read summary · stale' : 'Liquidity read summary · live');
+      const warmup = Boolean(snapshot?.historyWarmup);
+      const historyCount = Number(snapshot?.historyCount) || 0;
+
+      const title = warmup
+        ? 'Liquidity read summary · warming up'
+        : (snapshot?.source === 'demo'
+            ? 'Liquidity read summary · demo'
+            : (snapshot?.stale ? 'Liquidity read summary · stale' : 'Liquidity read summary · live'));
 
       const windowLabel = state.windowMode === 'blend' ? 'blended window view' : `${state.windowMode} focus view`;
-      const copy = `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars through the ${windowLabel}, then confirm source and freshness above.`;
+      const copy = warmup
+        ? `History is still building (${historyCount} samples). Read the pulse band and trend bars as provisional hints through the ${windowLabel}.`
+        : `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars through the ${windowLabel}, then confirm source and freshness above.`;
 
       const bullets = [
-        snapshot?.source === 'demo'
-          ? 'Demo mode shows sample cadence instead of live pool activity.'
-          : (snapshot?.stale
-              ? 'Source is stale, so cadence hints should be treated as delayed.'
-              : 'Source is live and fresh, so cadence hints reflect the latest fetch.'),
+        warmup
+          ? `History still building: ${historyCount} sample${historyCount === 1 ? '' : 's'} captured so far.`
+          : (snapshot?.source === 'demo'
+              ? 'Demo mode shows sample cadence instead of live pool activity.'
+              : (snapshot?.stale
+                  ? 'Source is stale, so cadence hints should be treated as delayed.'
+                  : 'Source is live and fresh, so cadence hints reflect the latest fetch.')),
         snapshot?.swaps5m === null || snapshot?.swaps5m === undefined
           ? '5m swaps are unavailable right now, so the panel avoids implying zero activity.'
           : `5m swaps currently read ${snapshot.swaps5m}.`,
