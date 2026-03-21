@@ -30,21 +30,21 @@
     },
     empty: {
       badge: 'EMPTY',
-      status: 'No liquidity data available.',
-      helper: 'Try Retry or switch mode to demo for deterministic output.',
+      status: 'No usable liquidity snapshot is available.',
+      helper: 'Try Retry, or switch to Demo mode for a sample fallback view.',
       note: null,
     },
     error: {
       badge: 'ERROR',
-      status: 'Unable to load liquidity snapshot.',
-      helper: 'Main fetch failed. Retry or switch to Demo mode.',
+      status: 'Unable to load a live liquidity snapshot.',
+      helper: 'Live fetch failed. Retry or switch to Demo mode.',
       note: null,
     },
     demo: {
       badge: 'DEMO',
       status: 'Demo source is active.',
-      helper: 'Live fetch is bypassed; demo data is rendered intentionally.',
-      note: 'Demo fallback is active.',
+      helper: 'Sample fallback data is being shown intentionally.',
+      note: 'Demo sample data is active.',
     },
   };
 
@@ -183,7 +183,7 @@
     const onRetry = () => {
       restartSnapshotLoop();
       setStatus('Retrying snapshot fetch…');
-      void reloadSnapshot({ forceApi: true });
+      void reloadSnapshot({ preferDemo: state.demoMode, forceApi: !state.demoMode });
     };
     refs.retryButton?.addEventListener('click', onRetry);
     cleanups.push(() => refs.retryButton?.removeEventListener('click', onRetry));
@@ -300,9 +300,9 @@
     }
 
     function isPartialSnapshot(snapshot) {
-      const values = [snapshot?.price, snapshot?.liquidityUsd, snapshot?.swaps5m, snapshot?.deviationBps];
-      const available = values.filter((value) => value !== null && value !== undefined).length;
-      return available > 0 && available < values.length;
+      const requiredValues = [snapshot?.price, snapshot?.liquidityUsd];
+      const requiredAvailable = requiredValues.filter((value) => value !== null && value !== undefined).length;
+      return requiredAvailable > 0 && requiredAvailable < requiredValues.length;
     }
 
     async function fetchSnapshot() {
@@ -334,22 +334,28 @@
     }
 
     function normalizeSnapshot(snapshot) {
-      const price = Number(snapshot?.price);
-      const liquidityUsd = Number(snapshot?.liquidityUsd);
-      const swaps5m = Number(snapshot?.swaps5m);
-      const deviationBps = Number(snapshot?.deviationBps);
+      const toFiniteOrNull = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        const n = Number(value);
+        return Number.isFinite(n) ? n : null;
+      };
+
+      const price = toFiniteOrNull(snapshot?.price);
+      const liquidityUsd = toFiniteOrNull(snapshot?.liquidityUsd);
+      const swaps5m = toFiniteOrNull(snapshot?.swaps5m);
+      const deviationBps = toFiniteOrNull(snapshot?.deviationBps);
 
       return {
         pool: snapshot?.poolLabel || 'XRPL AMM',
-        price: Number.isFinite(price) ? price : null,
-        liquidityUsd: Number.isFinite(liquidityUsd) ? liquidityUsd : null,
-        swaps5m: Number.isFinite(swaps5m) ? Math.round(swaps5m) : null,
-        deviationBps: Number.isFinite(deviationBps) ? Math.round(deviationBps) : null,
+        price,
+        liquidityUsd,
+        swaps5m: swaps5m === null ? null : Math.round(swaps5m),
+        deviationBps: deviationBps === null ? null : Math.round(deviationBps),
         source: snapshot?.source || 'api',
         stale: Boolean(snapshot?.stale),
         trend1h: 24,
         trend6h: 42,
-        trend24h: 62,
+        trend24h: 62, // temporary placeholder until real trend series is wired
       };
     }
 
