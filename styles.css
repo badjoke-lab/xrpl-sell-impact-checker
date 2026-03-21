@@ -2828,3 +2828,51 @@ body {
     justify-content: start;
   }
 }
+
+
+/* Liquidity Pulse pulse band */
+.liquidity-pulse-page .lp-viz-pulse {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.liquidity-pulse-page .lp-viz-band {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  align-items: end;
+  gap: 4px;
+  height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--flow-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fafc, #ffffff);
+  overflow: hidden;
+}
+.liquidity-pulse-page .lp-viz-band-bar {
+  display: block;
+  width: 100%;
+  height: var(--h);
+  min-height: 10%;
+  border-radius: 999px 999px 4px 4px;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.95), rgba(111, 99, 194, 0.82));
+  transform-origin: bottom center;
+  animation: lpPulseBar 1.6s ease-in-out infinite;
+  animation-delay: var(--delay, 0ms);
+}
+.liquidity-pulse-page .lp-viz-band-bar.is-stale {
+  opacity: 0.62;
+}
+.liquidity-pulse-page .lp-viz-band-bar.is-demo {
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.95), rgba(111, 99, 194, 0.72));
+}
+@keyframes lpPulseBar {
+  0%, 100% { transform: scaleY(0.88); opacity: 0.72; }
+  50% { transform: scaleY(1.06); opacity: 1; }
+}
+@media (max-width: 599px) {
+  .liquidity-pulse-page .lp-viz-band {
+    height: 52px;
+    gap: 3px;
+    padding: 8px 10px;
+  }
+}

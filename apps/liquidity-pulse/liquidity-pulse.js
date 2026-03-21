@@ -470,12 +470,37 @@
       const swapsText = snapshot.swaps5m === null || snapshot.swaps5m === undefined ? 'Unavailable' : String(snapshot.swaps5m);
       const deviationText = snapshot.deviationBps === null || snapshot.deviationBps === undefined ? 'Unavailable' : `${snapshot.deviationBps} bps`;
 
+      const pulseSeed = [
+        snapshot.trend1h ?? 24,
+        snapshot.trend6h ?? 42,
+        snapshot.trend24h ?? 62,
+        snapshot.swaps5m === null || snapshot.swaps5m === undefined ? 18 : clamp(snapshot.swaps5m * 2.8, 12, 92),
+        snapshot.deviationBps === null || snapshot.deviationBps === undefined ? 14 : clamp(snapshot.deviationBps * 1.4, 10, 88),
+        clamp(liquidityNorm * 100, 12, 96),
+      ];
+
+      const pulseBars = Array.from({ length: 18 }, (_, i) => {
+        const base = pulseSeed[i % pulseSeed.length];
+        const swing = Math.sin((i / 18) * Math.PI * 2) * 10;
+        const height = Math.max(10, Math.min(100, base + swing));
+        const staleClass = snapshot.stale ? ' is-stale' : '';
+        const demoClass = snapshot.source === 'demo' ? ' is-demo' : '';
+        const delay = (i % 6) * 120;
+        return `<span class="lp-viz-band-bar${staleClass}${demoClass}" style="--h:${height}%;--delay:${delay}ms"></span>`;
+      }).join('');
+
       refs.vizSnapshot.innerHTML = `
         <div class="lp-viz-card">
           <div class="lp-viz-top">
             <div class="lp-viz-kicker">Price</div>
             <div class="lp-viz-price">${snapshot.price === null || snapshot.price === undefined ? '—' : snapshot.price.toFixed(6)}</div>
             <div class="lp-viz-sub">${freshnessText} · ${sourceText}</div>
+          </div>
+
+          <div class="lp-viz-pulse">
+            <div class="lp-viz-kicker">Pulse band</div>
+            <div class="lp-viz-band" aria-hidden="true">${pulseBars}</div>
+            <div class="lp-viz-note">Current-state cadence view from liquidity depth and available activity signals.</div>
           </div>
 
           <div class="lp-viz-section">
