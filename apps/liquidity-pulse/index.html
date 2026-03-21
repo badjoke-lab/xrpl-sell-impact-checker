@@ -110,21 +110,21 @@
               <div class="flow-history-bars" role="img" aria-label="1 hour liquidity pulse">
                 <div data-trend="1h" style="height:12%"></div>
               </div>
-              <div class="flow-meta">short pulse view (currently lightweight placeholder)</div>
+              <div class="flow-meta" data-trend-meta="1h">short pulse view (currently lightweight placeholder)</div>
             </div>
             <div class="flow-history-row">
               <div class="flow-signal-label">6h pulse</div>
               <div class="flow-history-bars" role="img" aria-label="6 hour liquidity pulse">
                 <div data-trend="6h" style="height:12%"></div>
               </div>
-              <div class="flow-meta">mid pulse view (currently lightweight placeholder)</div>
+              <div class="flow-meta" data-trend-meta="6h">mid pulse view (currently lightweight placeholder)</div>
             </div>
             <div class="flow-history-row">
               <div class="flow-signal-label">24h pulse</div>
               <div class="flow-history-bars" role="img" aria-label="24 hour liquidity pulse">
                 <div data-trend="24h" style="height:12%"></div>
               </div>
-              <div class="flow-meta">broad pulse view (currently lightweight placeholder)</div>
+              <div class="flow-meta" data-trend-meta="24h">broad pulse view (currently lightweight placeholder)</div>
             </div>
           </div>
         </section>
@@ -170,9 +170,9 @@
             </div>
             <aside class="flow-reason-panel">
               <div class="flow-signal-label">Reason / Context</div>
-              <h4 class="flow-reason-title">Liquidity read summary</h4>
-              <p class="flow-reason-copy">Use this panel to read whether the pool currently looks available, thin, or temporarily unavailable.</p>
-              <ul class="flow-reason-list">
+              <h4 class="flow-reason-title" data-reason="title">Liquidity read summary</h4>
+              <p class="flow-reason-copy" data-reason="copy">Use this panel to read whether the pool currently looks available, thin, or temporarily unavailable.</p>
+              <ul class="flow-reason-list" data-reason="list">
                 <li>Lite mode lowers update frequency and visual load.</li>
                 <li>Demo mode uses sample data instead of live fetch.</li>
                 <li>Retry refreshes the current mode without changing your selection.</li>
