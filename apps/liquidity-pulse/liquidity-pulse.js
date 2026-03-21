@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = 'xsic.liquidityPulse.liteMode';
   const DEMO_KEY = 'xsic.liquidityPulse.demoMode';
+const WINDOW_KEY = 'xsic.liquidityPulse.window';
   const API_POOL = 'xrp-rlusd';
 const HISTORY_WARMUP_MIN = 5;
   const LIQUIDITY_WINDOW = 12;
@@ -60,6 +61,7 @@ const HISTORY_WARMUP_MIN = 5;
       actions: document.getElementById('lpActions'),
       liteToggle: document.getElementById('lite-mode-toggle'),
       demoToggle: document.getElementById('demo-mode-toggle'),
+      windowSelect: document.getElementById('lp-window-select'),
       retryButton: document.getElementById('retry-button'),
       overlays: {
         loading: document.querySelector('[data-state-overlay="loading"]'),
@@ -121,6 +123,7 @@ const HISTORY_WARMUP_MIN = 5;
       mode: 'loading',
       liteMode: loadBool(STORAGE_KEY),
       demoMode: loadBool(DEMO_KEY),
+      windowMode: loadWindowMode(),
       particles: [],
       rafId: null,
       snapshotTimer: null,
@@ -151,6 +154,7 @@ const HISTORY_WARMUP_MIN = 5;
 
     if (refs.liteToggle) refs.liteToggle.checked = state.liteMode;
     if (refs.demoToggle) refs.demoToggle.checked = state.demoMode;
+    if (refs.windowSelect) refs.windowSelect.value = state.windowMode;
 
     applyLiteMode();
     resizeCanvas();
@@ -254,6 +258,40 @@ const HISTORY_WARMUP_MIN = 5;
       }
     }
 
+    function loadWindowMode() {
+      try {
+        const raw = window.localStorage.getItem(WINDOW_KEY);
+        if (raw === 'blend' || raw === '1h' || raw === '6h' || raw === '24h') return raw;
+      } catch {
+        // ignore storage failures
+      }
+      return 'blend';
+    }
+
+    function saveWindowMode(mode) {
+      try {
+        window.localStorage.setItem(WINDOW_KEY, mode);
+      } catch {
+        // ignore storage failures
+      }
+    }
+
+    function historyLimitForWindow(mode) {
+      if (mode === '1h') return 60;
+      if (mode === '6h') return 180;
+      if (mode === '24h') return 480;
+      return HISTORY_LIMIT;
+    }
+
+    function horizonMsForWindow(mode, horizonLabel) {
+      if (mode === '1h') return 60 * 60 * 1000;
+      if (mode === '6h') return 6 * 60 * 60 * 1000;
+      if (mode === '24h') return 24 * 60 * 60 * 1000;
+      if (horizonLabel === '1h') return 60 * 60 * 1000;
+      if (horizonLabel === '6h') return 6 * 60 * 60 * 1000;
+      return 24 * 60 * 60 * 1000;
+    }
+
     function setMode(mode) {
       state.mode = mode;
       Object.entries(refs.overlays).forEach(([name, node]) => {
@@ -273,7 +311,7 @@ const HISTORY_WARMUP_MIN = 5;
       if (!silent) applyViewState('loading');
 
       try {
-        const snapshot = (!preferDemo || forceApi) ? await fetchSnapshot() : await loadDummySnapshot();
+        let snapshot = (!preferDemo || forceApi) ? await fetchSnapshot() : await loadDummySnapshot();
         if (requestId !== state.activeRequestId) return;
 
         if (!snapshot) {
