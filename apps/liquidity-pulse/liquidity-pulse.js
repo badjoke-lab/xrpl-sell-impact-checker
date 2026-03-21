@@ -191,6 +191,15 @@
     refs.demoToggle?.addEventListener('change', onDemoToggle);
     cleanups.push(() => refs.demoToggle?.removeEventListener('change', onDemoToggle));
 
+    const onWindowChange = () => {
+      state.windowMode = refs.windowSelect?.value || 'blend';
+      saveWindowMode(state.windowMode);
+      setStatus(`Window mode set to ${state.windowMode}.`);
+      void reloadSnapshot({ preferDemo: state.demoMode, forceApi: !state.demoMode, silent: true });
+    };
+    refs.windowSelect?.addEventListener('change', onWindowChange);
+    cleanups.push(() => refs.windowSelect?.removeEventListener('change', onWindowChange));
+
     const onRetry = () => {
       restartSnapshotLoop();
       setStatus('Retrying snapshot fetch…');
@@ -319,7 +328,7 @@
       return requiredAvailable > 0 && requiredAvailable < requiredValues.length;
     }
 
-    async function fetchHistory(limit = HISTORY_LIMIT) {
+    async function fetchHistory(limit = historyLimitForWindow(state.windowMode)) {
       const res = await fetch(`/api/xrpl/liquidity-history?pool=${encodeURIComponent(API_POOL)}&limit=${encodeURIComponent(limit)}`, {
         method: 'GET',
         headers: { accept: 'application/json' },
@@ -357,9 +366,9 @@
       const nowTs = Date.parse(snapshot?.ts || '') || Date.now();
 
       return {
-        trend1h: deriveTrendValue(snapshot, rows, nowTs, 60 * 60 * 1000, fallback.trend1h),
-        trend6h: deriveTrendValue(snapshot, rows, nowTs, 6 * 60 * 60 * 1000, fallback.trend6h),
-        trend24h: deriveTrendValue(snapshot, rows, nowTs, 24 * 60 * 60 * 1000, fallback.trend24h),
+        trend1h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '1h'), fallback.trend1h),
+        trend6h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '6h'), fallback.trend6h),
+        trend24h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '24h'), fallback.trend24h),
       };
     }
 
@@ -541,10 +550,11 @@
     function describeTrendPulse(value, horizonLabel, source) {
       const n = Number(value);
       const modeLabel = source === 'demo' ? 'sample' : 'live';
-      if (!Number.isFinite(n)) return `${horizonLabel} ${modeLabel} pulse unavailable.`;
-      if (n >= 70) return `${horizonLabel} ${modeLabel} pulse is elevated.`;
-      if (n >= 40) return `${horizonLabel} ${modeLabel} pulse is active.`;
-      return `${horizonLabel} ${modeLabel} pulse is quiet.`;
+      const focusPrefix = (state.windowMode && state.windowMode !== 'blend') ? `${state.windowMode} focus · ` : '';
+      if (!Number.isFinite(n)) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse unavailable.`;
+      if (n >= 70) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is elevated.`;
+      if (n >= 40) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is active.`;
+      return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is quiet.`;
     }
 
     function buildReasonSummary(snapshot) {
@@ -562,7 +572,8 @@
         ? 'Liquidity read summary · demo'
         : (snapshot?.stale ? 'Liquidity read summary · stale' : 'Liquidity read summary · live');
 
-      const copy = `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars as quick cadence hints, then confirm source and freshness above.`;
+      const windowLabel = state.windowMode === 'blend' ? 'blended window view' : `${state.windowMode} focus view`;
+      const copy = `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars through the ${windowLabel}, then confirm source and freshness above.`;
 
       const bullets = [
         snapshot?.source === 'demo'
