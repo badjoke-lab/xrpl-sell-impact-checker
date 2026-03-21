@@ -191,6 +191,15 @@
     refs.demoToggle?.addEventListener('change', onDemoToggle);
     cleanups.push(() => refs.demoToggle?.removeEventListener('change', onDemoToggle));
 
+    const onWindowChange = () => {
+      state.windowMode = refs.windowSelect?.value || 'blend';
+      saveWindowMode(state.windowMode);
+      setStatus(`Window mode set to ${state.windowMode}.`);
+      void reloadSnapshot({ preferDemo: state.demoMode, forceApi: !state.demoMode, silent: true });
+    };
+    refs.windowSelect?.addEventListener('change', onWindowChange);
+    cleanups.push(() => refs.windowSelect?.removeEventListener('change', onWindowChange));
+
     const onRetry = () => {
       restartSnapshotLoop();
       setStatus('Retrying snapshot fetch…');
@@ -272,6 +281,9 @@
           return;
         }
 
+        snapshot = await enrichSnapshotWithHistory(snapshot);
+        if (requestId !== state.activeRequestId) return;
+
         renderSnapshot(snapshot);
         updateVisualState(snapshot);
         applyViewState(resolveViewState(snapshot, { forcedDemo: preferDemo && !forceApi }));
@@ -316,6 +328,76 @@
       return requiredAvailable > 0 && requiredAvailable < requiredValues.length;
     }
 
+    async function fetchHistory(limit = historyLimitForWindow(state.windowMode)) {
+      const res = await fetch(`/api/xrpl/liquidity-history?pool=${encodeURIComponent(API_POOL)}&limit=${encodeURIComponent(limit)}`, {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+      });
+      if (!res.ok) throw new Error(`history_http_${res.status}`);
+      const payload = await res.json();
+      return Array.isArray(payload?.recent) ? payload.recent : [];
+    }
+
+    async function enrichSnapshotWithHistory(snapshot) {
+      if (!snapshot || snapshot.source === 'demo') return snapshot;
+
+      try {
+        const recent = await fetchHistory();
+        return {
+          ...snapshot,
+          ...deriveTrendMetrics(snapshot, recent),
+        };
+      } catch {
+        return snapshot;
+      }
+    }
+
+    function deriveTrendMetrics(snapshot, recent) {
+      const rows = Array.isArray(recent)
+        ? recent.filter((row) => row && row.ts && Number.isFinite(Number(row.liquidityUsd)))
+        : [];
+
+      const fallback = {
+        trend1h: snapshot?.trend1h ?? 24,
+        trend6h: snapshot?.trend6h ?? 42,
+        trend24h: snapshot?.trend24h ?? 62,
+      };
+
+      const nowTs = Date.parse(snapshot?.ts || '') || Date.now();
+
+      return {
+        trend1h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '1h'), fallback.trend1h),
+        trend6h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '6h'), fallback.trend6h),
+        trend24h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '24h'), fallback.trend24h),
+      };
+    }
+
+    function deriveTrendValue(snapshot, rows, nowTs, horizonMs, fallback) {
+      const horizonRows = rows.filter((row) => {
+        const ts = Date.parse(row?.ts || '');
+        return Number.isFinite(ts) && nowTs - ts <= horizonMs;
+      });
+
+      if (horizonRows.length < 2) return fallback;
+
+      const first = horizonRows[0];
+      const last = horizonRows[horizonRows.length - 1];
+      const firstLiquidity = Number(first?.liquidityUsd);
+      const lastLiquidity = Number(last?.liquidityUsd);
+
+      if (!Number.isFinite(firstLiquidity) || !Number.isFinite(lastLiquidity) || firstLiquidity <= 0) {
+        return fallback;
+      }
+
+      const deltaPct = Math.abs((lastLiquidity - firstLiquidity) / firstLiquidity);
+      const base = 14 + Math.min(56, deltaPct * 220);
+      const swapsBonus = snapshot?.swaps5m === null || snapshot?.swaps5m === undefined ? 0 : Math.min(16, snapshot.swaps5m * 0.8);
+      const deviationBonus = snapshot?.deviationBps === null || snapshot?.deviationBps === undefined ? 0 : Math.min(14, snapshot.deviationBps * 0.22);
+      const sampleBonus = Math.min(10, horizonRows.length * 1.25);
+
+      return Math.max(10, Math.min(96, Math.round(base + swapsBonus + deviationBonus + sampleBonus)));
+    }
+
     async function fetchSnapshot() {
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), MAX_FETCH_TIMEOUT_MS);
@@ -357,9 +439,13 @@
       const deviationBps = toFiniteOrNull(snapshot?.deviationBps);
       const reserveA = toFiniteOrNull(snapshot?.reserves?.a);
       const reserveB = toFiniteOrNull(snapshot?.reserves?.b);
+      const trend1h = toFiniteOrNull(snapshot?.trend1h);
+      const trend6h = toFiniteOrNull(snapshot?.trend6h);
+      const trend24h = toFiniteOrNull(snapshot?.trend24h);
 
       return {
-        pool: snapshot?.poolLabel || 'XRPL AMM',
+        ts: snapshot?.ts || new Date().toISOString(),
+        pool: snapshot?.poolLabel || snapshot?.pool || 'XRPL AMM',
         price,
         liquidityUsd,
         swaps5m: swaps5m === null ? null : Math.round(swaps5m),
@@ -368,9 +454,9 @@
         reserveB,
         source: snapshot?.source || 'api',
         stale: Boolean(snapshot?.stale),
-        trend1h: 24,
-        trend6h: 42,
-        trend24h: 62, // temporary placeholder until real trend series is wired
+        trend1h: trend1h === null ? 24 : Math.round(trend1h),
+        trend6h: trend6h === null ? 42 : Math.round(trend6h),
+        trend24h: trend24h === null ? 62 : Math.round(trend24h),
       };
     }
 
@@ -395,6 +481,7 @@
     async function loadDummySnapshot() {
       await wait(250);
       return {
+        ts: new Date().toISOString(),
         pool: 'XRP / RLUSD Demo',
         price: 0.5 + Math.random() * 0.05,
         liquidityUsd: 850000 + Math.random() * 190000,
@@ -463,10 +550,11 @@
     function describeTrendPulse(value, horizonLabel, source) {
       const n = Number(value);
       const modeLabel = source === 'demo' ? 'sample' : 'live';
-      if (!Number.isFinite(n)) return `${horizonLabel} ${modeLabel} pulse unavailable.`;
-      if (n >= 70) return `${horizonLabel} ${modeLabel} pulse is elevated.`;
-      if (n >= 40) return `${horizonLabel} ${modeLabel} pulse is active.`;
-      return `${horizonLabel} ${modeLabel} pulse is quiet.`;
+      const focusPrefix = (state.windowMode && state.windowMode !== 'blend') ? `${state.windowMode} focus · ` : '';
+      if (!Number.isFinite(n)) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse unavailable.`;
+      if (n >= 70) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is elevated.`;
+      if (n >= 40) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is active.`;
+      return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is quiet.`;
     }
 
     function buildReasonSummary(snapshot) {
@@ -484,7 +572,8 @@
         ? 'Liquidity read summary · demo'
         : (snapshot?.stale ? 'Liquidity read summary · stale' : 'Liquidity read summary · live');
 
-      const copy = `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars as quick cadence hints, then confirm source and freshness above.`;
+      const windowLabel = state.windowMode === 'blend' ? 'blended window view' : `${state.windowMode} focus view`;
+      const copy = `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars through the ${windowLabel}, then confirm source and freshness above.`;
 
       const bullets = [
         snapshot?.source === 'demo'
