@@ -52,6 +52,7 @@
     const refs = {
       canvasWrap: document.getElementById('lpCanvasWrap'),
       canvas: document.getElementById('lpCanvas'),
+      vizSnapshot: document.getElementById('lpVizSnapshot'),
       status: document.getElementById('lpStatus'),
       snapshot: document.getElementById('lpSnapshot'),
       trends: document.getElementById('lpTrends'),
@@ -344,6 +345,8 @@
       const liquidityUsd = toFiniteOrNull(snapshot?.liquidityUsd);
       const swaps5m = toFiniteOrNull(snapshot?.swaps5m);
       const deviationBps = toFiniteOrNull(snapshot?.deviationBps);
+      const reserveA = toFiniteOrNull(snapshot?.reserves?.a);
+      const reserveB = toFiniteOrNull(snapshot?.reserves?.b);
 
       return {
         pool: snapshot?.poolLabel || 'XRPL AMM',
@@ -351,6 +354,8 @@
         liquidityUsd,
         swaps5m: swaps5m === null ? null : Math.round(swaps5m),
         deviationBps: deviationBps === null ? null : Math.round(deviationBps),
+        reserveA,
+        reserveB,
         source: snapshot?.source || 'api',
         stale: Boolean(snapshot?.stale),
         trend1h: 24,
@@ -401,6 +406,7 @@
       safeText(refs.snapshotFields.deviationBps, snapshot.deviationBps === null ? '—' : `${snapshot.deviationBps} bps`);
       const sourceLabel = snapshot.source === 'demo' ? 'demo' : `live${snapshot.stale ? ' / stale' : ' / fresh'}`;
       safeText(refs.snapshotFields.source, sourceLabel);
+      renderVizSnapshot(snapshot);
 
       if (refs.trendBars.h1) refs.trendBars.h1.style.height = `${snapshot.trend1h}%`;
       if (refs.trendBars.h6) refs.trendBars.h6.style.height = `${snapshot.trend6h}%`;
@@ -419,6 +425,97 @@
       Object.values(refs.trendBars).forEach((node) => {
         if (node) node.style.height = '12%';
       });
+      if (refs.vizSnapshot) refs.vizSnapshot.innerHTML = '';
+    }
+
+
+    function renderVizSnapshot(snapshot) {
+      if (!refs.vizSnapshot) return;
+
+      if (!snapshot) {
+        refs.vizSnapshot.innerHTML = '<div class="lp-viz-empty">Waiting for liquidity snapshot…</div>';
+        return;
+      }
+
+      const compact = (value) => {
+        if (value === null || value === undefined) return 'Unavailable';
+        return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+      };
+
+      const sourceText = snapshot.source === 'demo' ? 'demo' : (snapshot.stale ? 'live / stale' : 'live / fresh');
+      const freshnessText = snapshot.stale ? 'STALE' : 'FRESH';
+
+      const liquidityLabel = (() => {
+        if (snapshot.liquidityUsd === null || snapshot.liquidityUsd === undefined) return 'Unavailable';
+        if (snapshot.liquidityUsd >= 5000000) return 'Deep';
+        if (snapshot.liquidityUsd >= 1000000) return 'Moderate';
+        return 'Thin';
+      })();
+
+      const liquidityNorm = snapshot.liquidityUsd === null || snapshot.liquidityUsd === undefined
+        ? 0
+        : clamp(logScale(snapshot.liquidityUsd, 10000000), 0.08, 1);
+
+      let reserveA = snapshot.reserveA;
+      let reserveB = snapshot.reserveB;
+
+      if ((reserveA === null || reserveA === undefined || reserveB === null || reserveB === undefined) && snapshot.source === 'demo' && snapshot.liquidityUsd) {
+        reserveA = snapshot.liquidityUsd * 0.56;
+        reserveB = snapshot.liquidityUsd * 0.44;
+      }
+
+      const reserveTotal = (reserveA || 0) + (reserveB || 0);
+      const reserveRatio = reserveTotal > 0 ? reserveA / reserveTotal : null;
+
+      const swapsText = snapshot.swaps5m === null || snapshot.swaps5m === undefined ? 'Unavailable' : String(snapshot.swaps5m);
+      const deviationText = snapshot.deviationBps === null || snapshot.deviationBps === undefined ? 'Unavailable' : `${snapshot.deviationBps} bps`;
+
+      refs.vizSnapshot.innerHTML = `
+        <div class="lp-viz-card">
+          <div class="lp-viz-top">
+            <div class="lp-viz-kicker">Price</div>
+            <div class="lp-viz-price">${snapshot.price === null || snapshot.price === undefined ? '—' : snapshot.price.toFixed(6)}</div>
+            <div class="lp-viz-sub">${freshnessText} · ${sourceText}</div>
+          </div>
+
+          <div class="lp-viz-section">
+            <div class="lp-viz-label">Liquidity depth</div>
+            <div class="lp-viz-meter">
+              <div class="lp-viz-meter-fill" style="width:${Math.max(0, Math.min(100, liquidityNorm * 100)).toFixed(1)}%"></div>
+            </div>
+            <div class="lp-viz-note">${compact(snapshot.liquidityUsd)} USD · ${liquidityLabel}</div>
+          </div>
+
+          <div class="lp-viz-section">
+            <div class="lp-viz-label">Reserve split</div>
+            ${
+              reserveRatio === null
+                ? '<div class="lp-viz-unavailable">Reserve breakdown unavailable.</div>'
+                : `
+                  <div class="lp-viz-split">
+                    <div class="lp-viz-split-a" style="width:${(reserveRatio * 100).toFixed(1)}%"></div>
+                    <div class="lp-viz-split-b" style="width:${((1 - reserveRatio) * 100).toFixed(1)}%"></div>
+                  </div>
+                  <div class="lp-viz-note lp-viz-note--two">
+                    <span>XRP side: ${compact(reserveA)}</span>
+                    <span>RLUSD side: ${compact(reserveB)}</span>
+                  </div>
+                `
+            }
+          </div>
+
+          <div class="lp-viz-grid">
+            <div class="lp-viz-mini">
+              <div class="lp-viz-kicker">Swaps (5m, optional)</div>
+              <div class="lp-viz-mini-value">${swapsText}</div>
+            </div>
+            <div class="lp-viz-mini">
+              <div class="lp-viz-kicker">Deviation (optional)</div>
+              <div class="lp-viz-mini-value">${deviationText}</div>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     function safeText(node, value) {

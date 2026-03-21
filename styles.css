@@ -2699,3 +2699,132 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Liquidity Pulse responsive Main Viz */
+.liquidity-pulse-page #lpCanvas { display: none !important; }
+.liquidity-pulse-page .flow-viz-panel {
+  min-height: 0;
+  overflow: hidden;
+}
+.liquidity-pulse-page .lp-viz-snapshot {
+  width: 100%;
+  min-width: 0;
+}
+.liquidity-pulse-page .lp-viz-card {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--flow-border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff, #fcfcfd);
+}
+.liquidity-pulse-page .lp-viz-top,
+.liquidity-pulse-page .lp-viz-section,
+.liquidity-pulse-page .lp-viz-mini {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.liquidity-pulse-page .lp-viz-kicker,
+.liquidity-pulse-page .lp-viz-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--flow-soft);
+  font-weight: 700;
+}
+.liquidity-pulse-page .lp-viz-price {
+  font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  font-size: clamp(1.6rem, 6vw, 2.3rem);
+  line-height: 1;
+  letter-spacing: -.04em;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+.liquidity-pulse-page .lp-viz-sub,
+.liquidity-pulse-page .lp-viz-note,
+.liquidity-pulse-page .lp-viz-unavailable {
+  font-size: 12px;
+  color: var(--flow-muted);
+  overflow-wrap: anywhere;
+}
+.liquidity-pulse-page .lp-viz-meter,
+.liquidity-pulse-page .lp-viz-split {
+  width: 100%;
+  height: 18px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+.liquidity-pulse-page .lp-viz-meter-fill {
+  height: 100%;
+  background: var(--flow-accent);
+}
+.liquidity-pulse-page .lp-viz-split {
+  display: flex;
+}
+.liquidity-pulse-page .lp-viz-split-a {
+  height: 100%;
+  background: rgba(111, 99, 194, 0.92);
+}
+.liquidity-pulse-page .lp-viz-split-b {
+  height: 100%;
+  background: rgba(59, 130, 246, 0.92);
+}
+.liquidity-pulse-page .lp-viz-note--two {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  justify-content: space-between;
+}
+.liquidity-pulse-page .lp-viz-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.liquidity-pulse-page .lp-viz-mini {
+  padding: 12px;
+  border: 1px solid var(--flow-border);
+  border-radius: 12px;
+  background: var(--flow-panel-subtle);
+}
+.liquidity-pulse-page .lp-viz-mini-value {
+  font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  font-weight: 740;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.liquidity-pulse-page .lp-viz-empty {
+  padding: 18px;
+  border: 1px dashed var(--flow-border);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--flow-muted);
+  background: #fff;
+}
+@media (max-width: 899px) {
+  .liquidity-pulse-page .flow-mainviz-body {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 599px) {
+  .liquidity-pulse-page .flow-viz-panel {
+    padding: 12px;
+  }
+  .liquidity-pulse-page .lp-viz-card {
+    padding: 12px;
+    gap: 12px;
+  }
+  .liquidity-pulse-page .lp-viz-grid {
+    grid-template-columns: 1fr;
+  }
+  .liquidity-pulse-page .lp-viz-note--two {
+    display: grid;
+    gap: 6px;
+    justify-content: start;
+  }
+}
