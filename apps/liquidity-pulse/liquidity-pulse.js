@@ -81,6 +81,16 @@
         h6: document.querySelector('[data-trend="6h"]'),
         h24: document.querySelector('[data-trend="24h"]'),
       },
+      trendMeta: {
+        h1: document.querySelector('[data-trend-meta="1h"]'),
+        h6: document.querySelector('[data-trend-meta="6h"]'),
+        h24: document.querySelector('[data-trend-meta="24h"]'),
+      },
+      reasonFields: {
+        title: document.querySelector('[data-reason="title"]'),
+        copy: document.querySelector('[data-reason="copy"]'),
+        list: document.querySelector('[data-reason="list"]'),
+      },
     };
 
     const setStatus = (message) => {
@@ -411,6 +421,18 @@
       if (refs.trendBars.h1) refs.trendBars.h1.style.height = `${snapshot.trend1h}%`;
       if (refs.trendBars.h6) refs.trendBars.h6.style.height = `${snapshot.trend6h}%`;
       if (refs.trendBars.h24) refs.trendBars.h24.style.height = `${snapshot.trend24h}%`;
+
+      safeText(refs.trendMeta.h1, describeTrendPulse(snapshot.trend1h, '1h', snapshot.source));
+      safeText(refs.trendMeta.h6, describeTrendPulse(snapshot.trend6h, '6h', snapshot.source));
+      safeText(refs.trendMeta.h24, describeTrendPulse(snapshot.trend24h, '24h', snapshot.source));
+
+      const reason = buildReasonSummary(snapshot);
+      safeText(refs.reasonFields.title, reason.title);
+      safeText(refs.reasonFields.copy, reason.copy);
+      if (refs.reasonFields.list) {
+        refs.reasonFields.list.innerHTML = reason.bullets.map((item) => `<li>${item}</li>`).join('');
+      }
+
       requestRender();
     }
 
@@ -425,9 +447,61 @@
       Object.values(refs.trendBars).forEach((node) => {
         if (node) node.style.height = '12%';
       });
+      safeText(refs.trendMeta.h1, '—');
+      safeText(refs.trendMeta.h6, '—');
+      safeText(refs.trendMeta.h24, '—');
+      safeText(refs.reasonFields.title, 'Liquidity read summary');
+      safeText(refs.reasonFields.copy, 'Waiting for current liquidity interpretation.');
+      if (refs.reasonFields.list) {
+        refs.reasonFields.list.innerHTML = '<li>Waiting for current liquidity interpretation.</li>';
+      }
       if (refs.vizSnapshot) refs.vizSnapshot.innerHTML = '';
     }
 
+
+
+    function describeTrendPulse(value, horizonLabel, source) {
+      const n = Number(value);
+      const modeLabel = source === 'demo' ? 'sample' : 'live';
+      if (!Number.isFinite(n)) return `${horizonLabel} ${modeLabel} pulse unavailable.`;
+      if (n >= 70) return `${horizonLabel} ${modeLabel} pulse is elevated.`;
+      if (n >= 40) return `${horizonLabel} ${modeLabel} pulse is active.`;
+      return `${horizonLabel} ${modeLabel} pulse is quiet.`;
+    }
+
+    function buildReasonSummary(snapshot) {
+      const liquidity = snapshot?.liquidityUsd;
+      const sourceLabel = snapshot?.source === 'demo' ? 'demo sample' : (snapshot?.stale ? 'stale live read' : 'live read');
+      let depthLabel = 'unavailable';
+
+      if (liquidity !== null && liquidity !== undefined) {
+        if (liquidity >= 5000000) depthLabel = 'deep';
+        else if (liquidity >= 1000000) depthLabel = 'moderate';
+        else depthLabel = 'thin';
+      }
+
+      const title = snapshot?.source === 'demo'
+        ? 'Liquidity read summary · demo'
+        : (snapshot?.stale ? 'Liquidity read summary · stale' : 'Liquidity read summary · live');
+
+      const copy = `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars as quick cadence hints, then confirm source and freshness above.`;
+
+      const bullets = [
+        snapshot?.source === 'demo'
+          ? 'Demo mode shows sample cadence instead of live pool activity.'
+          : (snapshot?.stale
+              ? 'Source is stale, so cadence hints should be treated as delayed.'
+              : 'Source is live and fresh, so cadence hints reflect the latest fetch.'),
+        snapshot?.swaps5m === null || snapshot?.swaps5m === undefined
+          ? '5m swaps are unavailable right now, so the panel avoids implying zero activity.'
+          : `5m swaps currently read ${snapshot.swaps5m}.`,
+        snapshot?.deviationBps === null || snapshot?.deviationBps === undefined
+          ? 'Deviation is unavailable right now, so pressure read is partial.'
+          : `Deviation currently reads ${snapshot.deviationBps} bps.`,
+      ];
+
+      return { title, copy, bullets };
+    }
 
     function renderVizSnapshot(snapshot) {
       if (!refs.vizSnapshot) return;
