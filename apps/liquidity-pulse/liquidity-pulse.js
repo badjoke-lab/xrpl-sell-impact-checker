@@ -329,6 +329,18 @@ const HISTORY_WARMUP_MIN = 5;
       } catch {
         if (requestId !== state.activeRequestId) return;
 
+        if (!preferDemo) {
+          const historyFallback = await buildHistoryFallbackSnapshot();
+          if (requestId !== state.activeRequestId) return;
+
+          if (historyFallback) {
+            renderSnapshot(historyFallback);
+            updateVisualState(historyFallback);
+            applyViewState(resolveViewState(historyFallback));
+            return;
+          }
+        }
+
         if (preferDemo) {
           try {
             const demoSnapshot = await loadDummySnapshot();
@@ -375,6 +387,7 @@ const HISTORY_WARMUP_MIN = 5;
       if (!res.ok) throw new Error(`history_http_${res.status}`);
       const payload = await res.json();
       return {
+        latest: payload?.latest || null,
         recent: Array.isArray(payload?.recent) ? payload.recent : [],
         historyMeta: payload?.historyMeta || null,
       };
@@ -453,11 +466,36 @@ const HISTORY_WARMUP_MIN = 5;
       return Math.max(10, Math.min(96, Math.round(base + swapsBonus + deviationBonus + sampleBonus)));
     }
 
+    async function buildHistoryFallbackSnapshot() {
+      try {
+        const historyPayload = await fetchHistory();
+        if (!historyPayload?.latest) return null;
+
+        let snapshot = normalizeSnapshot(historyPayload.latest);
+        snapshot = {
+          ...snapshot,
+          stale: true,
+        };
+
+        return {
+          ...snapshot,
+          ...deriveTrendMetrics(snapshot, historyPayload),
+        };
+      } catch {
+        return null;
+      }
+    }
+
     async function fetchSnapshot() {
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), MAX_FETCH_TIMEOUT_MS);
 
       try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('lp-force-live-error')) {
+          throw new Error('forced_live_error');
+        }
+
         const res = await fetch(`/api/xrpl/amm-snapshot?pool=${encodeURIComponent(API_POOL)}`, {
           method: 'GET',
           headers: { accept: 'application/json' },
