@@ -389,7 +389,7 @@ const HISTORY_WARMUP_MIN = 5;
         const historyCount = Number.isFinite(historyCountRaw)
           ? historyCountRaw
           : (Array.isArray(historyPayload?.recent) ? historyPayload.recent.length : 0);
-        const historyWarmup = historyCount > 0 && historyCount < HISTORY_WARMUP_MIN;
+        const historyWarmup = historyCount < HISTORY_WARMUP_MIN;
 
         return {
           ...snapshot,
@@ -607,7 +607,7 @@ const HISTORY_WARMUP_MIN = 5;
       const modeLabel = snapshot?.source === 'demo' ? 'sample' : 'live';
       const focusPrefix = (state.windowMode && state.windowMode !== 'blend') ? `${state.windowMode} focus · ` : '';
       const historyCount = Number(snapshot?.historyCount) || 0;
-      const historyWarmup = Boolean(snapshot?.historyWarmup) || (snapshot?.source !== 'demo' && historyCount > 0 && historyCount < HISTORY_WARMUP_MIN);
+      const historyWarmup = Boolean(snapshot?.historyWarmup) || (snapshot?.source !== 'demo' && historyCount < HISTORY_WARMUP_MIN);
 
       if (historyWarmup) {
         return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is warming up (${historyCount} samples).`;
@@ -630,7 +630,7 @@ const HISTORY_WARMUP_MIN = 5;
       }
 
       const historyCount = Number(snapshot?.historyCount) || 0;
-      const warmup = Boolean(snapshot?.historyWarmup) || (snapshot?.source !== 'demo' && historyCount > 0 && historyCount < HISTORY_WARMUP_MIN);
+      const warmup = Boolean(snapshot?.historyWarmup) || (snapshot?.source !== 'demo' && historyCount < HISTORY_WARMUP_MIN);
 
       const title = warmup
         ? 'Liquidity read summary · warming up'
