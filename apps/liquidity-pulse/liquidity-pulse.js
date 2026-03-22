@@ -610,7 +610,9 @@ const HISTORY_WARMUP_MIN = 5;
       const historyWarmup = Boolean(snapshot?.historyWarmup) || (snapshot?.source !== 'demo' && historyCount < HISTORY_WARMUP_MIN);
 
       if (historyWarmup) {
-        return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is warming up (${historyCount} samples).`;
+        return historyCount === 0
+          ? `${focusPrefix}${horizonLabel} ${modeLabel} pulse is collecting first samples.`
+          : `${focusPrefix}${horizonLabel} ${modeLabel} pulse is warming up (${historyCount} ${historyCount === 1 ? 'sample' : 'samples'}).`;
       }
       if (!Number.isFinite(n)) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse unavailable.`;
       if (n >= 70) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is elevated.`;
@@ -633,19 +635,23 @@ const HISTORY_WARMUP_MIN = 5;
       const warmup = Boolean(snapshot?.historyWarmup) || (snapshot?.source !== 'demo' && historyCount < HISTORY_WARMUP_MIN);
 
       const title = warmup
-        ? 'Liquidity read summary · warming up'
+        ? (historyCount === 0 ? 'Liquidity read summary · collecting first samples' : 'Liquidity read summary · warming up')
         : (snapshot?.source === 'demo'
             ? 'Liquidity read summary · demo'
             : (snapshot?.stale ? 'Liquidity read summary · stale' : 'Liquidity read summary · live'));
 
       const windowLabel = state.windowMode === 'blend' ? 'blended window view' : `${state.windowMode} focus view`;
       const copy = warmup
-        ? `History is still building (${historyCount} samples). Read the pulse band and trend bars as provisional hints through the ${windowLabel}.`
+        ? (historyCount === 0
+            ? `History is collecting first samples. Read the pulse band and trend bars as provisional hints through the ${windowLabel}.`
+            : `History is still building (${historyCount} ${historyCount === 1 ? 'sample' : 'samples'}). Read the pulse band and trend bars as provisional hints through the ${windowLabel}.`)
         : `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars through the ${windowLabel}, then confirm source and freshness above.`;
 
       const bullets = [
         warmup
-          ? `History still building: ${historyCount} sample${historyCount === 1 ? '' : 's'} captured so far.`
+          ? (historyCount === 0
+              ? 'History is collecting first samples for this pool.'
+              : `History still building: ${historyCount} ${historyCount === 1 ? 'sample' : 'samples'} captured so far.`)
           : (snapshot?.source === 'demo'
               ? 'Demo mode shows sample cadence instead of live pool activity.'
               : (snapshot?.stale
