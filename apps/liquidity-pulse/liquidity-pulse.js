@@ -1,7 +1,9 @@
 (() => {
   const STORAGE_KEY = 'xsic.liquidityPulse.liteMode';
   const DEMO_KEY = 'xsic.liquidityPulse.demoMode';
+const WINDOW_KEY = 'xsic.liquidityPulse.window';
   const API_POOL = 'xrp-rlusd';
+const HISTORY_WARMUP_MIN = 5;
   const LIQUIDITY_WINDOW = 12;
   const LIQUIDITY_EMA_ALPHA = 0.3;
   const MAX_FETCH_TIMEOUT_MS = 5000;
@@ -59,6 +61,7 @@
       actions: document.getElementById('lpActions'),
       liteToggle: document.getElementById('lite-mode-toggle'),
       demoToggle: document.getElementById('demo-mode-toggle'),
+      windowSelect: document.getElementById('lp-window-select'),
       retryButton: document.getElementById('retry-button'),
       overlays: {
         loading: document.querySelector('[data-state-overlay="loading"]'),
@@ -120,6 +123,7 @@
       mode: 'loading',
       liteMode: loadBool(STORAGE_KEY),
       demoMode: loadBool(DEMO_KEY),
+      windowMode: loadWindowMode(),
       particles: [],
       rafId: null,
       snapshotTimer: null,
@@ -150,6 +154,7 @@
 
     if (refs.liteToggle) refs.liteToggle.checked = state.liteMode;
     if (refs.demoToggle) refs.demoToggle.checked = state.demoMode;
+    if (refs.windowSelect) refs.windowSelect.value = state.windowMode;
 
     applyLiteMode();
     resizeCanvas();
@@ -253,6 +258,40 @@
       }
     }
 
+    function loadWindowMode() {
+      try {
+        const raw = window.localStorage.getItem(WINDOW_KEY);
+        if (raw === 'blend' || raw === '1h' || raw === '6h' || raw === '24h') return raw;
+      } catch {
+        // ignore storage failures
+      }
+      return 'blend';
+    }
+
+    function saveWindowMode(mode) {
+      try {
+        window.localStorage.setItem(WINDOW_KEY, mode);
+      } catch {
+        // ignore storage failures
+      }
+    }
+
+    function historyLimitForWindow(mode) {
+      if (mode === '1h') return 60;
+      if (mode === '6h') return 180;
+      if (mode === '24h') return 480;
+      return HISTORY_LIMIT;
+    }
+
+    function horizonMsForWindow(mode, horizonLabel) {
+      if (mode === '1h') return 60 * 60 * 1000;
+      if (mode === '6h') return 6 * 60 * 60 * 1000;
+      if (mode === '24h') return 24 * 60 * 60 * 1000;
+      if (horizonLabel === '1h') return 60 * 60 * 1000;
+      if (horizonLabel === '6h') return 6 * 60 * 60 * 1000;
+      return 24 * 60 * 60 * 1000;
+    }
+
     function setMode(mode) {
       state.mode = mode;
       Object.entries(refs.overlays).forEach(([name, node]) => {
@@ -272,7 +311,7 @@
       if (!silent) applyViewState('loading');
 
       try {
-        const snapshot = (!preferDemo || forceApi) ? await fetchSnapshot() : await loadDummySnapshot();
+        let snapshot = (!preferDemo || forceApi) ? await fetchSnapshot() : await loadDummySnapshot();
         if (requestId !== state.activeRequestId) return;
 
         if (!snapshot) {
@@ -335,27 +374,37 @@
       });
       if (!res.ok) throw new Error(`history_http_${res.status}`);
       const payload = await res.json();
-      return Array.isArray(payload?.recent) ? payload.recent : [];
+      return {
+        recent: Array.isArray(payload?.recent) ? payload.recent : [],
+        historyMeta: payload?.historyMeta || null,
+      };
     }
 
     async function enrichSnapshotWithHistory(snapshot) {
       if (!snapshot || snapshot.source === 'demo') return snapshot;
 
       try {
-        const recent = await fetchHistory();
+        const historyPayload = await fetchHistory();
+        const historyCountRaw = Number(historyPayload?.historyMeta?.count);
+        const historyCount = Number.isFinite(historyCountRaw)
+          ? historyCountRaw
+          : (Array.isArray(historyPayload?.recent) ? historyPayload.recent.length : 0);
+        const historyWarmup = historyCount < HISTORY_WARMUP_MIN;
+
         return {
           ...snapshot,
-          ...deriveTrendMetrics(snapshot, recent),
+          historyCount,
+          historyWarmup,
+          ...deriveTrendMetrics(snapshot, historyPayload),
         };
       } catch {
         return snapshot;
       }
     }
 
-    function deriveTrendMetrics(snapshot, recent) {
-      const rows = Array.isArray(recent)
-        ? recent.filter((row) => row && row.ts && Number.isFinite(Number(row.liquidityUsd)))
-        : [];
+    function deriveTrendMetrics(snapshot, historyPayload) {
+      const recent = Array.isArray(historyPayload?.recent) ? historyPayload.recent : [];
+      const rows = recent.filter((row) => row && row.ts && Number.isFinite(Number(row.liquidityUsd)));
 
       const fallback = {
         trend1h: snapshot?.trend1h ?? 24,
@@ -363,12 +412,18 @@
         trend24h: snapshot?.trend24h ?? 62,
       };
 
+      const historyCountRaw = Number(historyPayload?.historyMeta?.count);
+      const historyCount = Number.isFinite(historyCountRaw) ? historyCountRaw : rows.length;
+      const historyWarmup = historyCount < HISTORY_WARMUP_MIN;
+
       const nowTs = Date.parse(snapshot?.ts || '') || Date.now();
 
       return {
         trend1h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '1h'), fallback.trend1h),
         trend6h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '6h'), fallback.trend6h),
         trend24h: deriveTrendValue(snapshot, rows, nowTs, horizonMsForWindow(state.windowMode, '24h'), fallback.trend24h),
+        historyCount,
+        historyWarmup,
       };
     }
 
@@ -509,9 +564,9 @@
       if (refs.trendBars.h6) refs.trendBars.h6.style.height = `${snapshot.trend6h}%`;
       if (refs.trendBars.h24) refs.trendBars.h24.style.height = `${snapshot.trend24h}%`;
 
-      safeText(refs.trendMeta.h1, describeTrendPulse(snapshot.trend1h, '1h', snapshot.source));
-      safeText(refs.trendMeta.h6, describeTrendPulse(snapshot.trend6h, '6h', snapshot.source));
-      safeText(refs.trendMeta.h24, describeTrendPulse(snapshot.trend24h, '24h', snapshot.source));
+      safeText(refs.trendMeta.h1, describeTrendPulse(snapshot.trend1h, '1h', snapshot));
+      safeText(refs.trendMeta.h6, describeTrendPulse(snapshot.trend6h, '6h', snapshot));
+      safeText(refs.trendMeta.h24, describeTrendPulse(snapshot.trend24h, '24h', snapshot));
 
       const reason = buildReasonSummary(snapshot);
       safeText(refs.reasonFields.title, reason.title);
@@ -547,10 +602,16 @@
 
 
 
-    function describeTrendPulse(value, horizonLabel, source) {
+    function describeTrendPulse(value, horizonLabel, snapshot) {
       const n = Number(value);
-      const modeLabel = source === 'demo' ? 'sample' : 'live';
+      const modeLabel = snapshot?.source === 'demo' ? 'sample' : 'live';
       const focusPrefix = (state.windowMode && state.windowMode !== 'blend') ? `${state.windowMode} focus · ` : '';
+      const historyCount = Number(snapshot?.historyCount) || 0;
+      const historyWarmup = Boolean(snapshot?.historyWarmup) || (snapshot?.source !== 'demo' && historyCount < HISTORY_WARMUP_MIN);
+
+      if (historyWarmup) {
+        return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is warming up (${historyCount} samples).`;
+      }
       if (!Number.isFinite(n)) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse unavailable.`;
       if (n >= 70) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is elevated.`;
       if (n >= 40) return `${focusPrefix}${horizonLabel} ${modeLabel} pulse is active.`;
@@ -568,19 +629,28 @@
         else depthLabel = 'thin';
       }
 
-      const title = snapshot?.source === 'demo'
-        ? 'Liquidity read summary · demo'
-        : (snapshot?.stale ? 'Liquidity read summary · stale' : 'Liquidity read summary · live');
+      const historyCount = Number(snapshot?.historyCount) || 0;
+      const warmup = Boolean(snapshot?.historyWarmup) || (snapshot?.source !== 'demo' && historyCount < HISTORY_WARMUP_MIN);
+
+      const title = warmup
+        ? 'Liquidity read summary · warming up'
+        : (snapshot?.source === 'demo'
+            ? 'Liquidity read summary · demo'
+            : (snapshot?.stale ? 'Liquidity read summary · stale' : 'Liquidity read summary · live'));
 
       const windowLabel = state.windowMode === 'blend' ? 'blended window view' : `${state.windowMode} focus view`;
-      const copy = `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars through the ${windowLabel}, then confirm source and freshness above.`;
+      const copy = warmup
+        ? `History is still building (${historyCount} samples). Read the pulse band and trend bars as provisional hints through the ${windowLabel}.`
+        : `Current pool looks ${depthLabel} from this ${sourceLabel}. Read the pulse band and trend bars through the ${windowLabel}, then confirm source and freshness above.`;
 
       const bullets = [
-        snapshot?.source === 'demo'
-          ? 'Demo mode shows sample cadence instead of live pool activity.'
-          : (snapshot?.stale
-              ? 'Source is stale, so cadence hints should be treated as delayed.'
-              : 'Source is live and fresh, so cadence hints reflect the latest fetch.'),
+        warmup
+          ? `History still building: ${historyCount} sample${historyCount === 1 ? '' : 's'} captured so far.`
+          : (snapshot?.source === 'demo'
+              ? 'Demo mode shows sample cadence instead of live pool activity.'
+              : (snapshot?.stale
+                  ? 'Source is stale, so cadence hints should be treated as delayed.'
+                  : 'Source is live and fresh, so cadence hints reflect the latest fetch.')),
         snapshot?.swaps5m === null || snapshot?.swaps5m === undefined
           ? '5m swaps are unavailable right now, so the panel avoids implying zero activity.'
           : `5m swaps currently read ${snapshot.swaps5m}.`,
