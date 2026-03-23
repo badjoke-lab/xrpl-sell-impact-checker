@@ -491,11 +491,6 @@ const HISTORY_WARMUP_MIN = 5;
       const timer = window.setTimeout(() => controller.abort(), MAX_FETCH_TIMEOUT_MS);
 
       try {
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('lp-force-live-error')) {
-          throw new Error('forced_live_error');
-        }
-
         const res = await fetch(`/api/xrpl/amm-snapshot?pool=${encodeURIComponent(API_POOL)}`, {
           method: 'GET',
           headers: { accept: 'application/json' },
