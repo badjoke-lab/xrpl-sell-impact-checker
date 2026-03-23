@@ -1,10 +1,9 @@
 (() => {
   let appCleanup = null;
   const LITE_KEY = 'xsic.flowAlert.liteMode';
-  const DEMO_KEY = 'xsic.flowAlert.demoOnly';
+  const DEMO_KEY = 'xsic.flowAlert.demoOnly.v2';
   const PRESET_KEY = 'xsic.flowAlert.targetPreset';
   const WINDOW_KEY = 'xsic.flowAlert.window';
-  const FORCE_MODES = new Set(['loading', 'ok', 'empty', 'error', 'stale']);
   const PRIMARY_HISTORY_WINDOWS = new Set(['1h', '24h', '7d']);
 
 
@@ -64,13 +63,12 @@
   }
 
   function boot() {
+    try { localStorage.removeItem('xsic.flowAlert.demoOnly'); } catch { }
     if (typeof appCleanup === 'function') appCleanup();
     const refs = {
       canvasWrap: document.getElementById('flowCanvasWrap'),
       canvas: document.getElementById('flowCanvas'),
       tooltip: document.getElementById('flowTooltip'),
-      status: document.getElementById('flowStatus'),
-      debugLine: document.getElementById('flowDebugLine'),
       statusMeta: document.querySelector('[data-flow-meta="status"]'),
       refreshMeta: document.querySelector('[data-flow-meta="refresh"]'),
       staleNote: document.getElementById('flowStaleNote'),
@@ -81,7 +79,6 @@
       refreshButton: document.getElementById('flow-refresh-button'),
       retryButton: document.getElementById('flow-retry-button'),
       emptyButton: document.getElementById('flow-empty-button'),
-      debugButtons: Array.from(document.querySelectorAll('[data-flow-force]')),
       overlays: {
         loading: document.querySelector('[data-flow-state="loading"]'),
         error: document.querySelector('[data-flow-state="error"]'),
@@ -241,17 +238,6 @@
         renderCycle(true);
       });
     }
-
-    refs.debugButtons.forEach((button) => {
-      addManagedListener(button, 'click', () => {
-        const mode = button.dataset.flowForce;
-        if (!FORCE_MODES.has(mode)) return;
-        state.forcedMode = mode === 'ok' ? null : mode;
-        applyMode(state);
-        renderPanels(refs, state);
-        renderHeatmap(refs, state);
-      });
-    });
 
     const resizeHandler = () => {
       if (state.isPageHidden) return;
@@ -764,8 +750,6 @@
     const liveError = getLiveError(payload, state.demoOnly);
     const statusLabel = state.isFetching && payload ? 'REFRESHING' : state.mode.toUpperCase();
     safeText(refs.statusMeta, statusLabel);
-    safeText(refs.status, liveError ? `Status: ${statusLabel} | Live error: ${liveError}` : `Status: ${statusLabel}`);
-    safeText(refs.debugLine, buildDebugLine(state));
     refs.staleNote.hidden = state.mode !== 'stale';
 
     const snapshotKeys = ['inflow', 'outflow', 'net', 'payments', 'ledgers', 'matched', 'source', 'updated'];
@@ -782,7 +766,11 @@
           : currentMode === 'empty' ? 'EMPTY'
           : currentMode === 'error' ? 'ERROR'
           : currentMode.toUpperCase();
-      const pillClass = currentMode === 'error' ? 'medium' : 'quiet';
+      const pillClass =
+        currentMode === 'loading' ? 'quiet'
+          : currentMode === 'empty' ? 'low'
+          : currentMode === 'error' ? 'medium'
+          : 'quiet';
 
       safeText(refs.signal.statusPill, pillText);
       refs.signal.statusPill.className = `flow-pill ${pillClass}`;
@@ -817,15 +805,16 @@
           `<li>Window role: ${fallbackProfile.role}.</li>`,
         ].join('');
       } else {
+        const liveIssue = liveError || 'live_fetch_unavailable';
         safeText(refs.signal.severity, 'severity: — · pressure: unavailable');
         safeText(refs.signal.why, 'Live flow fetch failed for the selected preset and window.');
         safeText(refs.signal.observed, 'Scanned — payments across — ledgers.');
         safeText(refs.signal.ctxSource, 'source: unavailable');
-        safeText(refs.signal.context, 'Last live fetch failed before a readable snapshot was available.');
+        safeText(refs.signal.context, `Last live fetch failed before a readable snapshot was available (${liveIssue}).`);
         safeText(refs.reasonTitle, 'Live flow unavailable');
         safeText(refs.reasonCopy, 'Could not load live flow data yet. Retry after source recovery.');
         refs.reasonList.innerHTML = [
-          '<li>Live fetch failed before a readable snapshot was available.</li>',
+          `<li>Live fetch failed before a readable snapshot was available (${liveIssue}).</li>`,
           '<li>Retry after source recovery.</li>',
           fallbackProfile.try24h ? '<li>24h usually gives the broadest comparison context.</li>' : `<li>Window role: ${fallbackProfile.role}.</li>`,
         ].join('');
@@ -1169,13 +1158,6 @@
   function buildLastEventLine(event) {
     if (!event) return 'Last detected event: No detected labeled event yet.';
     return `Last detected event: ${formatDateTime(event.time)} | ${event.dir || '—'} | ${event.label || 'unknown'} | ${formatXrp(event.amountXrp || 0)}`;
-  }
-
-  function buildDebugLine(state) {
-    const payload = state.payload || {};
-    const dbg = payload.debug || {};
-    const firstWarning = Array.isArray(dbg.warnings) && dbg.warnings.length ? dbg.warnings[0] : 'none';
-    return `FLOW_DEBUG preset=${state.preset || 'none'} window=${payload.window || state.window} ok=${Boolean(payload.ok)} stale=${Boolean(payload.stale)} dur=${Math.round(dbg.durationMs || 0)}ms rpc=${dbg.rpcCalls || 0} strat=${dbg.strategy || 'n/a'} degrade=${dbg.degradeLevel || 'none'} lastError=${dbg.lastError || 'none'} warn=${firstWarning}`;
   }
 
   function getLiveError(payload, demoOnly) {
