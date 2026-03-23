@@ -147,7 +147,7 @@
       mode: 'loading',
       forcedMode: null,
       liteMode: loadBool(LITE_KEY),
-      demoOnly: loadBool(DEMO_KEY, true),
+      demoOnly: loadBool(DEMO_KEY, false),
       preset: loadValue(PRESET_KEY, 'exchanges') || 'exchanges',
       window: loadValue(WINDOW_KEY, '1h'),
       payload: null,
@@ -774,24 +774,63 @@
       safeText(refs.snapshot.subNet, 'prev: — / Δ —');
       safeText(refs.snapshot.subMatched, 'prev: — / recent: —');
       safeText(refs.snapshot.subUpdated, 'history newest: —');
-      safeText(refs.signal.statusPill, 'LOW');
-      refs.signal.statusPill.className = 'flow-pill low';
-      safeText(refs.signal.severity, 'severity: — · pressure: —');
+
+      const fallbackProfile = getWindowProfile(state.window);
+      const currentMode = state.mode;
+      const pillText =
+        currentMode === 'loading' ? 'LOADING'
+          : currentMode === 'empty' ? 'EMPTY'
+          : currentMode === 'error' ? 'ERROR'
+          : currentMode.toUpperCase();
+      const pillClass = currentMode === 'error' ? 'medium' : 'quiet';
+
+      safeText(refs.signal.statusPill, pillText);
+      refs.signal.statusPill.className = `flow-pill ${pillClass}`;
       safeText(refs.signal.impact, '—');
-      safeText(refs.signal.why, getWindowProfile(state.window).emptyHint);
-      safeText(refs.signal.observed, 'Scanned — payments across — ledgers.');
-      safeText(refs.signal.context, `${getWindowProfile(state.window).quietHint} Partial live data (timeout-limited).`);
       safeText(refs.signal.ctxPreset, `target: ${state.preset || 'unset'}`);
       safeText(refs.signal.ctxWindow, `window: ${state.window}`);
-      safeText(refs.signal.ctxSource, `source: ${state.demoOnly ? 'demo' : 'live'}`);
-      safeText(refs.reasonTitle, 'No dominant pressure');
-      safeText(refs.reasonCopy, getWindowProfile(state.window).emptyHint);
-      const fallbackProfile = getWindowProfile(state.window);
-      refs.reasonList.innerHTML = [
-        `<li>${fallbackProfile.emptyHint}</li>`,
-        '<li>Scanned 0 payments across 0 ledgers.</li>',
-        fallbackProfile.try24h ? '<li>Try 24h for broader comparison context.</li>' : `<li>Window role: ${fallbackProfile.role}.</li>`,
-      ].join('');
+
+      if (currentMode === 'loading') {
+        safeText(refs.signal.severity, 'severity: — · pressure: loading');
+        safeText(refs.signal.why, 'Loading live flow snapshot for the selected preset and window.');
+        safeText(refs.signal.observed, 'Fetching live data now…');
+        safeText(refs.signal.ctxSource, 'source: pending');
+        safeText(refs.signal.context, `Preparing ${fallbackProfile.role}. Metrics and heatmap will populate after load.`);
+        safeText(refs.reasonTitle, 'Loading current flow state');
+        safeText(refs.reasonCopy, 'Loading live flow snapshot for the selected preset and window.');
+        refs.reasonList.innerHTML = [
+          '<li>Fetching current flow snapshot.</li>',
+          `<li>Window role: ${fallbackProfile.role}.</li>`,
+          '<li>Metrics and heatmap will populate after load.</li>',
+        ].join('');
+      } else if (currentMode === 'empty') {
+        safeText(refs.signal.severity, 'severity: — · pressure: empty');
+        safeText(refs.signal.why, 'No target preset selected.');
+        safeText(refs.signal.observed, 'Scanned — payments across — ledgers.');
+        safeText(refs.signal.ctxSource, 'source: unset');
+        safeText(refs.signal.context, 'Choose a tracked preset to populate flow state.');
+        safeText(refs.reasonTitle, 'No target preset selected');
+        safeText(refs.reasonCopy, 'Select a target preset to load signal, metrics, and heatmap.');
+        refs.reasonList.innerHTML = [
+          '<li>No tracked preset is selected.</li>',
+          '<li>Use Exchanges, Whales, or Ripple / Escrow to populate the page.</li>',
+          `<li>Window role: ${fallbackProfile.role}.</li>`,
+        ].join('');
+      } else {
+        safeText(refs.signal.severity, 'severity: — · pressure: unavailable');
+        safeText(refs.signal.why, 'Live flow fetch failed for the selected preset and window.');
+        safeText(refs.signal.observed, 'Scanned — payments across — ledgers.');
+        safeText(refs.signal.ctxSource, 'source: unavailable');
+        safeText(refs.signal.context, 'Last live fetch failed before a readable snapshot was available.');
+        safeText(refs.reasonTitle, 'Live flow unavailable');
+        safeText(refs.reasonCopy, 'Could not load live flow data yet. Retry after source recovery.');
+        refs.reasonList.innerHTML = [
+          '<li>Live fetch failed before a readable snapshot was available.</li>',
+          '<li>Retry after source recovery.</li>',
+          fallbackProfile.try24h ? '<li>24h usually gives the broadest comparison context.</li>' : `<li>Window role: ${fallbackProfile.role}.</li>`,
+        ].join('');
+      }
+
       safeText(refs.refreshMeta, '—');
       return;
     }
