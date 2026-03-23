@@ -17,14 +17,6 @@ function json(payload, status = 200) {
   });
 }
 
-function errorPayload(error, endpoint = null) {
-  return {
-    ok: false,
-    endpointUsed: endpoint,
-    error: error?.message || 'upstream_unreachable',
-  };
-}
-
 async function postRpc(endpoint, payload) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -62,38 +54,55 @@ async function fetchFromAnyEndpoint(payload) {
   throw err;
 }
 
-export async function onRequestOptions() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'access-control-allow-origin': '*',
-      'access-control-allow-methods': 'POST, OPTIONS',
-      'access-control-allow-headers': 'content-type',
-      'cache-control': 'no-store',
-    },
-  });
+function resolveAccount(url) {
+  return (
+    url.searchParams.get('issuer') ||
+    url.searchParams.get('address') ||
+    url.searchParams.get('account') ||
+    ''
+  ).trim();
 }
 
-export async function onRequestPost({ request }) {
-  let payload = null;
-  try {
-    payload = await request.json();
-  } catch {
-    return json({ ok: false, error: 'invalid_json' }, 400);
+export async function onRequestGet({ request }) {
+  const url = new URL(request.url);
+  const account = resolveAccount(url);
+
+  if (!account) {
+    return json({ ok: false, error: 'missing_account' }, 400);
   }
 
-  if (!payload || typeof payload !== 'object' || !payload.method) {
-    return json({ ok: false, error: 'missing_method' }, 400);
-  }
+  const payload = {
+    method: 'account_info',
+    params: [{ account, ledger_index: 'validated' }],
+  };
 
   try {
     const { body, endpoint } = await fetchFromAnyEndpoint(payload);
+    const accountData =
+      body?.result?.account_data ||
+      body?.result?.result?.account_data ||
+      body?.account_data ||
+      null;
+
+    if (!accountData) {
+      return json({
+        ...body,
+        ok: false,
+        endpointUsed: endpoint,
+        error: body?.result?.error || 'account_data_unavailable',
+      }, 404);
+    }
+
     return json({
       ...body,
       ok: true,
       endpointUsed: endpoint,
     });
   } catch (error) {
-    return json(errorPayload(error), error?.message === 'upstream_timeout' ? 504 : 502);
+    return json({
+      ok: false,
+      endpointUsed: null,
+      error: error?.message || 'upstream_unreachable',
+    }, error?.message === 'upstream_timeout' ? 504 : 502);
   }
 }

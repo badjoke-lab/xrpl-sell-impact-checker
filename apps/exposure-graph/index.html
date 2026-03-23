@@ -59,7 +59,7 @@
               </select>
             </label>
             <button type="button" class="eg-button" id="egRefreshBtn">Refresh</button>
-            <div class="eg-status-inline">Status: <strong id="egStatusText">OK</strong></div>
+            <div class="eg-status-inline">Status: <strong id="egStatusText">Waiting for issuer data</strong></div>
             <div class="eg-status-inline">Updated: <strong id="egUpdatedText">—</strong></div>
           </div>
           <div class="eg-presets" id="egPresets" aria-label="Issuer presets"></div>
@@ -143,23 +143,12 @@
           </section>
         </section>
 
-        <section class="card eg-debug-card">
-          <details>
-            <summary>Debug (collapsed, release readiness)</summary>
-            <div class="eg-debug-buttons">
-              <button type="button" class="eg-button eg-button--ghost" data-eg-force="ok">Force ok</button>
-              <button type="button" class="eg-button eg-button--ghost" data-eg-force="empty">Force empty</button>
-              <button type="button" class="eg-button eg-button--ghost" data-eg-force="error">Force error</button>
-            </div>
-            <p class="eg-debug-status" id="egDebugStatus">EG_DEBUG · static shell ready</p>
-          </details>
-        </section>
       </main>
 
       <div data-global-footer></div>
     </div>
 
     <script src="/shared/nav.js"></script>
-    <script src="/apps/exposure-graph/exposure-graph.js"></script>
+    <script src="/apps/exposure-graph/exposure-graph.js?v=release-status-86d193f"></script>
   </body>
 </html>

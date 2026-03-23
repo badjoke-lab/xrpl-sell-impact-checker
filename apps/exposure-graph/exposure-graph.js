@@ -46,10 +46,8 @@
       evidence: document.getElementById('egEvidence'),
       status: document.getElementById('egStatusText'),
       updated: document.getElementById('egUpdatedText'),
-      debugStatus: document.getElementById('egDebugStatus'),
       tabs: Array.from(document.querySelectorAll('[data-eg-tab-target]')),
       panels: Array.from(document.querySelectorAll('.eg-tab-panel')),
-      debugButtons: Array.from(document.querySelectorAll('[data-eg-force]')),
       refreshBtn: document.getElementById('egRefreshBtn'),
     };
 
@@ -58,15 +56,6 @@
     hydratePresets(refs);
 
     refs.tabs.forEach((tab) => addManagedListener(tab, 'click', () => setActiveTab(refs, tab.dataset.egTabTarget)));
-    refs.debugButtons.forEach((button) => addManagedListener(button, 'click', async () => {
-      state.mode = button.dataset.egForce;
-      if (state.mode === 'ok') {
-        await refreshAllData(refs);
-      } else {
-        applyForcedMode();
-      }
-      render(refs);
-    }));
 
     const triggerRefresh = async () => {
       state.issuer = refs.issuerInput.value.trim();
@@ -173,29 +162,11 @@
     });
   }
 
-  function applyForcedMode() {
-    if (state.mode === 'error') {
-      state.risk = { status: 'error', error: 'Forced error mode is active.', flags: null, accountFlags: null, source: null };
-      state.exposure = { status: 'error', error: 'Forced error mode is active.', model: null, source: null };
-      return;
-    }
-    if (state.mode === 'empty') {
-      state.risk = { status: 'empty', error: null, flags: null, accountFlags: null, source: null };
-      state.exposure = { status: 'empty', error: null, model: null, source: null };
-    }
-  }
-
   async function refreshAllData(refs) {
     const seq = ++state.refreshSeq;
     resetRefreshController();
     lifecycle.refreshController = new AbortController();
     const { signal } = lifecycle.refreshController;
-
-    if (state.mode !== 'ok') {
-      applyForcedMode();
-      lifecycle.refreshController = null;
-      return;
-    }
 
     if (!isValidIssuer(state.issuer)) {
       state.risk = { status: 'invalid', error: 'Enter a valid XRPL issuer address to load risk evidence.', flags: null, accountFlags: null, source: null };
@@ -429,10 +400,8 @@
   }
 
   function render(refs) {
-    const partial = isPartialState() ? ' / partial' : '';
-    refs.status.textContent = `${state.mode.toUpperCase()} / ${state.exposure.status} / ${state.risk.status}${partial}`;
+    refs.status.textContent = describeStatusLine();
     refs.updated.textContent = new Date().toLocaleTimeString();
-    refs.debugStatus.textContent = `EG_DEBUG · mode=${state.mode} · tab=${state.activeTab} · exposure=${state.exposure.status} · risk=${state.risk.status}`;
 
     renderSignal(refs.signalCard);
     renderMetrics(refs.metricsGrid);
@@ -562,6 +531,27 @@
     const exposureUsable = ['ready', 'stale'].includes(state.exposure.status);
     const riskUsable = ['ready', 'stale'].includes(state.risk.status);
     return exposureUsable !== riskUsable;
+  }
+
+  function describeStatusLine() {
+    const exposure = state.exposure.status;
+    const risk = state.risk.status;
+    const partial = isPartialState();
+
+    if (exposure === 'loading' || risk === 'loading') return 'Loading issuer exposure and risk…';
+    if (exposure === 'no_issuer' || risk === 'invalid') return 'Enter a valid issuer to load exposure and risk.';
+    if (exposure === 'error' && risk === 'error') return 'Exposure and risk could not be loaded.';
+    if (exposure === 'error') return 'Exposure unavailable; issuer risk is shown from current data.';
+    if (risk === 'error') return 'Issuer risk unavailable; exposure is shown from current data.';
+    if (exposure === 'stale' || risk === 'stale') {
+      return partial
+        ? 'Showing a mixed live/stale read while one data source recovers.'
+        : 'Showing the latest readable snapshot while live refresh recovers.';
+    }
+    if (exposure === 'empty' && risk === 'ready') return 'No usable trustline exposure found; issuer risk is available.';
+    if (exposure === 'ready' && risk === 'ready') return 'Live issuer exposure and risk loaded.';
+    if (partial) return 'Partial issuer read loaded.';
+    return 'Waiting for issuer data.';
   }
 
   function getOverallSummaryModel() {
