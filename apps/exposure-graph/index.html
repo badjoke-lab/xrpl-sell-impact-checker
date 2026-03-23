@@ -48,21 +48,13 @@
             <label class="eg-field">Issuer
               <input id="egIssuerInput" type="text" class="eg-control" value="rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq" placeholder="r..." spellcheck="false" autocomplete="off" />
             </label>
-            <label class="eg-field">Window
-              <select class="eg-control" aria-label="Window" disabled>
-                <option>24h</option>
-              </select>
-            </label>
-            <label class="eg-field">Render mode
-              <select id="egRenderMode" class="eg-control" disabled>
-                <option>Live bounded SVG</option>
-              </select>
-            </label>
             <button type="button" class="eg-button" id="egRefreshBtn">Refresh</button>
+            <div class="eg-status-inline">View: <strong>24h · Live bounded SVG</strong></div>
             <div class="eg-status-inline">Status: <strong id="egStatusText">Waiting for issuer data</strong></div>
             <div class="eg-status-inline">Updated: <strong id="egUpdatedText">—</strong></div>
           </div>
           <div class="eg-presets" id="egPresets" aria-label="Issuer presets"></div>
+          <p class="flow-note flow-note--quiet">View is fixed to a 24h bounded SVG for stable release rendering.</p>
           <p class="flow-note flow-note--quiet">State guide: stale/partial keeps last readable snapshot, empty means no trustline visibility, and invalid/no_issuer/error means risk status is unknown until input/data recovers.</p>
         </section>
 
@@ -149,6 +141,6 @@
     </div>
 
     <script src="/shared/nav.js"></script>
-    <script src="/apps/exposure-graph/exposure-graph.js?v=release-status-86d193f"></script>
+    <script src="/apps/exposure-graph/exposure-graph.js?v=deadcontrols782aeea"></script>
   </body>
 </html>

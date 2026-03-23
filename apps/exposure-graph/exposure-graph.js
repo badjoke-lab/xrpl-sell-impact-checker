@@ -677,7 +677,6 @@
       ['Entities visible', model ? String(model.nodes.length) : '—', 'fixed max node count'],
       ['Top node share', model ? toPct(model.counterparties?.[0]?.share || 0) : '—', 'largest visible counterparty'],
       ['Top 5 concentration', model ? toPct(model.top5Share) : '—', 'share captured by top 5 nodes'],
-      ['Render mode', 'Inline SVG', 'no force engine / no loop'],
     ];
 
     mount.innerHTML = metrics.map((m) => `<article class="card eg-metric-card"><div class="eg-metric-label">${m[0]}</div><div class="eg-metric-value">${m[1]}</div><div class="eg-metric-sub">${m[2]}</div></article>`).join('');
