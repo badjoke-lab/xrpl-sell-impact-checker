@@ -842,42 +842,52 @@
   }
 
   function buildHistoryFallbackHeatmap(state) {
+    const recentRows = getRecentDetections(state, state.liteMode ? 6 : 10).rows
+      .filter((row) => row && row.label && row.label !== 'unknown')
+      .slice()
+      .reverse();
+
+    if (recentRows.length) {
+      const labels = [];
+      recentRows.forEach((row) => {
+        if (row.label && !labels.includes(row.label)) labels.push(row.label);
+      });
+
+      const buckets = recentRows.map((row, index) => row.sourceSnapshotTs || row.time || `h${index + 1}`);
+      const matrix = labels.map(() => Array.from({ length: buckets.length }, () => 0));
+      const labelIndex = new Map(labels.map((label, index) => [label, index]));
+
+      recentRows.forEach((row, col) => {
+        const idx = labelIndex.get(row.label);
+        if (idx == null) return;
+        const amount = Number(row.amountXrp || 0);
+        const signed = row.dir === 'OUT' ? -amount : amount;
+        matrix[idx][col] = Number.isFinite(signed) ? signed : 0;
+      });
+
+      return {
+        labels,
+        buckets,
+        matrix,
+        unit: 'xrp',
+        derivedFrom: 'history',
+        historyMode: 'recent-detections',
+      };
+    }
+
     const recent = Array.isArray(state.historyPayload?.recent) ? state.historyPayload.recent : [];
     const tail = recent.slice(-Math.max(1, Math.min(recent.length, 12)));
-    const payloadLabels = Array.isArray(state.payload?.heatmap?.labels) ? state.payload.heatmap.labels.filter(Boolean) : [];
-    const eventLabels = [];
-    tail.forEach((row) => {
-      const label = row?.latestEvent?.label;
-      if (label && !eventLabels.includes(label)) eventLabels.push(label);
-    });
-
-    const labels = eventLabels.length
-      ? eventLabels
-      : (payloadLabels.length ? payloadLabels : ['Unknown']);
-
     const buckets = tail.length
       ? tail.map((row, index) => row?.timeBucket || row?.latestEvent?.timeBucket || `h${index + 1}`)
       : ['h1'];
 
-    const matrix = labels.map(() => Array.from({ length: buckets.length }, () => 0));
-    const labelIndex = new Map(labels.map((label, index) => [label, index]));
-
-    tail.forEach((row, col) => {
-      const evt = row?.latestEvent;
-      if (!evt) return;
-      const idx = labelIndex.get(evt.label || 'Unknown');
-      if (idx == null) return;
-      const amount = Number(evt.amountXrp || 0);
-      const signed = evt.dir === 'OUT' ? -amount : amount;
-      matrix[idx][col] = Number.isFinite(signed) ? signed : 0;
-    });
-
     return {
-      labels,
+      labels: ['No recent labels'],
       buckets,
-      matrix,
+      matrix: [Array.from({ length: buckets.length }, () => 0)],
       unit: 'xrp',
       derivedFrom: 'history',
+      historyMode: 'empty',
     };
   }
 
@@ -1150,13 +1160,24 @@
     state.heatmapLayout = { leftPad, topPad, chartW, chartH, cols, rows: Math.max(1, labels.length), cellW, cellH };
     const max = Math.max(...state.heatmapCells.map((cell) => cell.value), 1);
 
+    const historyFallback = renderHeatmapData?.derivedFrom === 'history';
+
     state.heatmapCells.forEach((cell) => {
-      const alpha = 0.15 + (cell.value / max) * 0.8;
+      const ratio = cell.value / max;
+      const alpha = cell.value > 0
+        ? (historyFallback ? 0.22 + ratio * 0.78 : 0.15 + ratio * 0.8)
+        : (historyFallback ? 0.04 : 0.08);
       const x = leftPad + (cell.x * cellW);
       const y = topPad + (cell.y * cellH);
       ctx.fillStyle = cell.signed >= 0 ? `rgba(37, 99, 235, ${alpha})` : `rgba(220, 38, 38, ${alpha})`;
       ctx.fillRect(x + 1, y + 1, Math.max(2, cellW - 2), Math.max(2, cellH - 2));
     });
+
+    if (historyFallback) {
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('History lanes from recent labeled detections', leftPad, height - 10);
+    }
 
     ctx.fillStyle = '#334155';
     ctx.font = '12px sans-serif';
