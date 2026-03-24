@@ -62,6 +62,26 @@
     return WINDOW_PROFILE[windowKey] || WINDOW_PROFILE['1h'];
   }
 
+  function describeHeaderStatus(state) {
+    const historySource = state.historyPayload?.source;
+    if ((historySource === 'repo-json' || historySource === 'runtime-fallback') && state.mode === 'stale') {
+      return 'HISTORY';
+    }
+    if (state.isFetching && state.payload && state.mode === 'ok') {
+      return 'REFRESHING';
+    }
+    return state.mode.toUpperCase();
+  }
+
+  function describeHeaderUpdated(updatedTs, state) {
+    if (!updatedTs) return '—';
+    const historySource = state.historyPayload?.source;
+    if (historySource === 'repo-json' || historySource === 'runtime-fallback') {
+      return `history ${formatDateTime(updatedTs)}`;
+    }
+    return relativeSeconds(updatedTs);
+  }
+
   function boot() {
     try { localStorage.removeItem('xsic.flowAlert.demoOnly'); } catch { }
     if (typeof appCleanup === 'function') appCleanup();
@@ -726,9 +746,64 @@
     return '';
   }
 
+  function buildHistoryFallbackHeatmap(state) {
+    const recent = Array.isArray(state.historyPayload?.recent) ? state.historyPayload.recent : [];
+    const tail = recent.slice(-Math.max(1, Math.min(recent.length, 12)));
+    const payloadLabels = Array.isArray(state.payload?.heatmap?.labels) ? state.payload.heatmap.labels.filter(Boolean) : [];
+    const eventLabels = [];
+    tail.forEach((row) => {
+      const label = row?.latestEvent?.label;
+      if (label && !eventLabels.includes(label)) eventLabels.push(label);
+    });
+
+    const labels = eventLabels.length
+      ? eventLabels
+      : (payloadLabels.length ? payloadLabels : ['Unknown']);
+
+    const buckets = tail.length
+      ? tail.map((row, index) => row?.timeBucket || row?.latestEvent?.timeBucket || `h${index + 1}`)
+      : ['h1'];
+
+    const matrix = labels.map(() => Array.from({ length: buckets.length }, () => 0));
+    const labelIndex = new Map(labels.map((label, index) => [label, index]));
+
+    tail.forEach((row, col) => {
+      const evt = row?.latestEvent;
+      if (!evt) return;
+      const idx = labelIndex.get(evt.label || 'Unknown');
+      if (idx == null) return;
+      const amount = Number(evt.amountXrp || 0);
+      const signed = evt.dir === 'OUT' ? -amount : amount;
+      matrix[idx][col] = Number.isFinite(signed) ? signed : 0;
+    });
+
+    return {
+      labels,
+      buckets,
+      matrix,
+      unit: 'xrp',
+      derivedFrom: 'history',
+    };
+  }
+
+  function getRenderableHeatmap(state) {
+    const heatmap = state.payload?.heatmap || {};
+    const labels = Array.isArray(heatmap.labels) ? heatmap.labels : [];
+    const buckets = Array.isArray(heatmap.buckets) ? heatmap.buckets : [];
+    const matrix = Array.isArray(heatmap.matrix) ? heatmap.matrix : [];
+    const hasVisiblePayload =
+      labels.length > 1 &&
+      buckets.length > 0 &&
+      matrix.some((row) => Array.isArray(row) && row.some((value) => Number(value || 0) !== 0));
+
+    if (hasVisiblePayload) return heatmap;
+    return buildHistoryFallbackHeatmap(state);
+  }
+
   function buildHeatmapCells(state) {
-    const labels = state.payload?.heatmap?.labels || [];
-    const matrix = state.payload?.heatmap?.matrix || [];
+    const heatmap = getRenderableHeatmap(state);
+    const labels = heatmap?.labels || [];
+    const matrix = heatmap?.matrix || [];
     const cols = Math.max(0, ...(matrix.map((row) => row.length)));
     const cells = [];
 
@@ -748,7 +823,7 @@
     const payload = state.payload;
     const history = state.historyPayload;
     const liveError = getLiveError(payload, state.demoOnly);
-    const statusLabel = state.isFetching && payload ? 'REFRESHING' : state.mode.toUpperCase();
+    const statusLabel = describeHeaderStatus(state);
     safeText(refs.statusMeta, statusLabel);
     refs.staleNote.hidden = state.mode !== 'stale';
 
@@ -858,7 +933,7 @@
     const updatedTs = history?.historyMeta?.newestTs ?? latest?.ts ?? payload?.ts ?? state.lastRefreshMs;
     safeText(refs.snapshot.updated, formatDateTime(updatedTs));
     safeText(refs.snapshot.subUpdated, `history newest: ${history?.historyMeta?.newestTs ? formatDateTime(history.historyMeta.newestTs) : '—'}`);
-    safeText(refs.refreshMeta, relativeSeconds(updatedTs));
+    safeText(refs.refreshMeta, describeHeaderUpdated(updatedTs, state));
 
     const pillClass = pressure === 'HIGH' ? 'high' : pressure === 'MEDIUM' ? 'medium' : pressure === 'QUIET' ? 'quiet' : 'low';
     safeText(refs.signal.statusPill, pressure);
@@ -968,8 +1043,9 @@
 
     if (!state.payload || (state.mode !== 'ok' && state.mode !== 'stale')) return;
 
-    const labels = state.payload.heatmap.labels || [];
-    const cols = Math.max(1, state.payload.heatmap.buckets?.length || 1);
+    const renderHeatmapData = getRenderableHeatmap(state);
+    const labels = renderHeatmapData?.labels || [];
+    const cols = Math.max(1, renderHeatmapData?.buckets?.length || 1);
     const leftPad = 92;
     const topPad = 18;
     const chartW = width - leftPad - 14;
