@@ -871,7 +871,14 @@
     safeText(refs.signal.observed, `Scanned ${metrics?.paymentsScanned ?? payload?.debug?.paymentsCount ?? 0} payments across ${metrics?.ledgersScanned ?? payload?.debug?.ledgersScanned ?? 0} ledgers.`);
     safeText(refs.signal.ctxPreset, `target: ${state.preset || 'unset'}`);
     safeText(refs.signal.ctxWindow, `window: ${latest?.window || payload.window || state.window}`);
-    safeText(refs.signal.ctxSource, `source: ${sourceLabel}`);
+    safeText(
+      refs.signal.ctxSource,
+      history?.source === 'repo-json'
+        ? 'source: history(primary)'
+        : history?.source === 'runtime-fallback'
+          ? 'source: history(fallback)'
+          : `source: ${sourceLabel}`
+    );
 
     const oldest = history?.historyMeta?.oldestTs ? formatDateTime(history.historyMeta.oldestTs) : '—';
     const newest = history?.historyMeta?.newestTs ? formatDateTime(history.historyMeta.newestTs) : '—';
@@ -881,6 +888,8 @@
       `recent: ${recentCount ?? 0} snapshots (${oldest} → ${newest})`,
       `latest: ${formatSignedXrp(netXrp)} / previous: ${previous ? formatSignedXrp(prevNetXrp) : '—'} / Δ ${Number.isFinite(deltaNetXrp) ? formatSignedCompactXrp(deltaNetXrp) : '—'}`,
     ];
+    if (history?.source === 'repo-json') contextLines.push('primary read: repo history');
+    if (history?.source === 'runtime-fallback') contextLines.push('primary read: runtime fallback history');
     if (!PRIMARY_HISTORY_WINDOWS.has(state.window)) contextLines.push('history mode: supplemental-live (5m assist)');
     if (latest?.stale || payload.stale) contextLines.push('stale: true');
     if (latest?.partial || payload?.partial) contextLines.push('partial: true');
@@ -900,11 +909,12 @@
 
   function resolveSourceLabel(history, payload, demoOnly, selectedWindow) {
     if (demoOnly) return 'demo';
-    if (history?.source === 'repo-json') return 'repo-json(primary)';
+    if (history?.source === 'repo-json') return 'history(primary)';
+    if (history?.source === 'runtime-fallback') return 'history(runtime-fallback)';
     if (!PRIMARY_HISTORY_WINDOWS.has(selectedWindow || '1h')) return 'live-supplemental(5m)';
-    if (history?.source === 'runtime-fallback') return 'runtime';
     if (payload?.source === 'cache' || payload?.staleReason === 'cached') return 'cache';
-    return payload?.source === 'cache' ? 'cache' : 'runtime';
+    if (payload?.source) return payload.source;
+    return 'runtime';
   }
 
   function formatXrpOrUsd(xrpValue, usdValue, useUsd) {
