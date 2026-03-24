@@ -372,14 +372,109 @@
     const escrowUrl = `/api/xrpl/escrow-watch?window=${encodeURIComponent(escrowWindow)}&limit=${escrowLimit}`;
     const historyUrl = `/api/xrpl/flow-history?preset=${encodeURIComponent(state.preset)}&window=${encodeURIComponent(state.window)}&limit=24`;
 
-    const [flow, escrow] = await Promise.all([
-      fetchFlowPayload(flowUrl, state, signal),
-      fetchEscrowPayload(escrowUrl, escrowWindow, signal),
+    const [historyResult, flowResult, escrowResult] = await Promise.allSettled([
+      fetchHistoryPayload(historyUrl, signal),
+      withClientTimeout(fetchFlowPayload(flowUrl, state, signal), 4200, 'flow'),
+      withClientTimeout(fetchEscrowPayload(escrowUrl, escrowWindow, signal), 4200, 'escrow'),
     ]);
 
-    const history = await fetchHistoryPayload(historyUrl, signal);
+    const history = historyResult.status === 'fulfilled'
+      ? historyResult.value
+      : buildHistoryFetchFallback(historyResult.reason);
+
+    const flow = flowResult.status === 'fulfilled'
+      ? flowResult.value
+      : buildFlowFetchFallback(state, flowResult.reason);
+
+    const escrow = escrowResult.status === 'fulfilled'
+      ? escrowResult.value
+      : buildEscrowFetchFallback(escrowWindow, escrowResult.reason);
 
     return { flow, escrow, history };
+  }
+
+  function withClientTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        const timer = setTimeout(() => {
+          clearTimeout(timer);
+          reject(new Error(`${label}_client_timeout`));
+        }, ms);
+      }),
+    ]);
+  }
+
+  function buildFlowFetchFallback(state, reason) {
+    const message = reason instanceof Error ? reason.message : 'unknown';
+    return {
+      ok: false,
+      ts: Date.now(),
+      source: 'xrpl:rpc',
+      stale: true,
+      window: state.window,
+      priceXrpUsd: null,
+      summary: { inflowXrp: 0, outflowXrp: 0, netXrp: 0, inflowUsd: null, outflowUsd: null, netUsd: null },
+      heatmap: { labels: ['Unknown'], buckets: [], matrix: [], unit: 'xrp' },
+      events: [],
+      summaryReason: 'Unable to fetch live data.',
+      staleReason: 'fetch_error',
+      debug: {
+        endpointsTried: [],
+        ledgersScanned: 0,
+        paymentsCount: 0,
+        cacheHit: false,
+        warnings: [`fetch_error:${message}`],
+        durationMs: 0,
+        rpcCalls: 0,
+        lastValidatedLedger: null,
+        degradeLevel: 'D',
+        strategy: 'fetch_failed',
+        lastError: message,
+      },
+    };
+  }
+
+  function buildEscrowFetchFallback(window, reason) {
+    const message = reason instanceof Error ? reason.message : 'unknown';
+    return {
+      ok: false,
+      ts: Date.now(),
+      source: 'xrpl:rpc',
+      stale: true,
+      window,
+      next: null,
+      recent: [],
+      stats: { sumXrp: 0, count: 0, avgXrp: 0, maxXrp: 0 },
+      pattern: [{ label: 'unavailable', note: 'Escrow watcher unavailable. Showing fallback payload.' }],
+      staleReason: 'cached',
+      debug: {
+        endpointsTried: [],
+        ledgersScanned: 0,
+        txCount: 0,
+        cacheHit: false,
+        warnings: [`fetch_error:${message}`],
+        durationMs: 0,
+        rpcCalls: 0,
+        lastValidatedLedger: null,
+        degradeLevel: 'D',
+        strategy: 'fetch_failed',
+      },
+    };
+  }
+
+  function buildHistoryFetchFallback(reason) {
+    const message = reason instanceof Error ? reason.message : 'unknown';
+    return {
+      ok: false,
+      source: 'unavailable',
+      latest: null,
+      previous: null,
+      recent: [],
+      deltaSummary: { netXrpDelta: null },
+      historyMeta: { count: 0 },
+      debug: { warnings: [`fetch_error:${message}`] },
+    };
   }
 
   async function fetchFlowPayload(url, state, signal) {
