@@ -61,7 +61,7 @@
             </label>
             <div class="flow-toggle-group">
               <label><input id="flow-lite-toggle" type="checkbox" /> Lite mode</label>
-              <label><input id="flow-demo-toggle" type="checkbox" checked /> Demo only</label>
+              <label><input id="flow-demo-toggle" type="checkbox" /> Demo only</label>
             </div>
             <button id="flow-refresh-button" class="flow-button" type="button">Refresh</button>
             <div class="flow-status-inline">Status: <span data-flow-meta="status">LOADING</span></div>
@@ -199,24 +199,10 @@
           </div>
         </section>
 
-        <section class="card flow-debug-card">
-          <details>
-            <summary>Debug (collapsed, release readiness)</summary>
-            <div class="flow-debug-buttons">
-              <button type="button" class="flow-button" data-flow-force="loading">Force Loading</button>
-              <button type="button" class="flow-button" data-flow-force="ok">Force OK</button>
-              <button type="button" class="flow-button" data-flow-force="empty">Force Empty</button>
-              <button type="button" class="flow-button" data-flow-force="error">Force Error</button>
-              <button type="button" class="flow-button" data-flow-force="stale">Force Stale</button>
-            </div>
-            <p id="flowStatus" class="flow-debug-status">Status: waiting for initialization…</p>
-            <p id="flowDebugLine" class="flow-debug-status flow-debug-mono">FLOW_DEBUG pending</p>
-          </details>
-        </section>
       </main>
       <div data-global-footer></div>
     </div>
     <script defer src="/shared/nav.js"></script>
-    <script defer src="/apps/flow-alert/flow-alert.js"></script>
+    <script defer src="/apps/flow-alert/flow-alert.js?v=fa-release-clean-91bc63b"></script>
   </body>
 </html>
