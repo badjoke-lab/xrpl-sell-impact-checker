@@ -1,470 +1,715 @@
-# Flow Alert 完成版仕様書
+# Flow Alert 改訂版仕様書
 
-## 1. 目的
-
-Flow Alert は、XRPL 上のラベル付きフローを **単発の瞬間表示ではなく、履歴付きで観測する状態ダッシュボード** である。
-
-主な目的は次の3点。
-
-1. いまの状態を素早く把握する
-2. 直前との差分と最近の傾向を読む
-3. 必要に応じて recent detections / heatmap / escrow / debug で根拠を掘る
-
-本ページは「イベント一覧ページ」ではない。主役は上段の Signal / Metrics であり、一覧は補助である。
+**対象ルート**: `/apps/flow-alert/`
+**ページ名**: `Flow Alert — XSIC`
+**位置づけ**: XSIC 内の **ラベル付きフロー監視ページ**
+**設計思想**: **history-first + live-inclusive**
+**前提**: 履歴を土台にするが、**live whale-flow と escrow-watch を絶対に消さない**。live が弱い時ほど、その状態を明示する。
 
 ---
 
-## 2. ページの位置づけ
+## 1. このページの役割
 
-- 製品名: XSIC（XRPL Signal & Insight Console）
-- アプリ名: Flow Alert
-- 役割: ラベル付きフロー観測ダッシュボード
-- 主対象: XRPL 上の exchange / whale / ripple 関連フロー
-- UX方針:
-  - 上段で判断
-  - 中段で傾向確認
-  - 下段で詳細確認
+このページは、XRPL 上の特定プリセットについて、次の問いに答えるためのページとする。
 
----
+* 最近、ラベル付きフローは起きたか
+* そのフローはどのラベルで起きたか
+* IN / OUT / XFER のどれか
+* 直近 snapshot の trend は強まっているか、静かか
+* 今見えている情報は **history が主なのか / live assist が主なのか**
+* escrow 周りに意味のある動きはあるか
 
-## 3. データソース
-
-### 3.1 ライブ集計
-- `/api/xrpl/whale-flow`
-- `/api/xrpl/escrow-watch`
-
-### 3.2 履歴データ
-- `/api/xrpl/flow-history?preset=...&window=...&limit=...`
-- 正データは repo 内の `data/flow-history/*.json`
-- 更新主体は GitHub Actions
-
-### 3.3 価格
-- XRP→USD は複数ソース fallback 方式
-- USD取得失敗時は XRP 表示にフォールバック
-
-### 3.4 表示優先順位
-1. history JSON（repo-json）
-2. live API
-3. fallback / cached
+このページは、**履歴しか見えないページ**にも、**live だけを装うページ**にもしてはいけない。
+完成形は、**履歴を安定基盤にしながら、live assist を上に重ねる監視ページ**である。
 
 ---
 
-## 4. レイアウト構成
+## 2. このページで提供する価値
 
-ページは次の順で構成する。
+このページの価値は、単なるダッシュボードではなく、**「最近のラベル付きフローの証拠」と「いまの live 補助圧」を同時に見ること**にある。
 
-1. Header / Title
-2. Controls
-3. Signal Card
-4. Metrics / Snapshot
-5. Main Visualization（Heatmap）
-6. Sparkline / History Strip
-7. Reason / Context
-8. Recent Flows
-9. Escrow / Unlock Watch
-10. Debug
+ユーザーがこのページで得る価値は以下。
 
-モックHTML準拠を基本とし、既存UI都合で崩さない。
+* 直近で何が起きたかが分かる
+* 最近の trend が上向きか下向きか分かる
+* live が今どの程度見えているか分かる
+* escrow が補助材料として生きているか分かる
+* 他ページで見た異常の裏付けを取れる
+
+このページは、**単独主役ページというより、XSIC 全体の補助証拠ページ**として成立させる。
 
 ---
 
-## 5. Controls 仕様
+## 3. データソース優先順位
 
-### 5.1 項目
-- Preset
-- Window
-- Lite mode
-- Demo only
-- Refresh 状態表示
+### 3-1. Primary
 
-### 5.2 Preset
-- `exchanges`
-- `whales`
-- `ripple`
+`flow-history`
 
-### 5.3 Window
-- `5m`: 短期補助窓
-- `1h`: 標準観測窓（初期値）
-- `24h`: 主観測窓
-- `7d`: 傾向確認窓
+* `1h / 24h / 7d` は history を主読みにする
+* repo JSON があれば最優先
+* repo JSON が無ければ runtime fallback history
 
-### 5.4 初期値
-- 初期 window は `1h`
-- localStorage に保存値がある場合はそれを優先
+### 3-2. Live assist
 
-### 5.5 Lite mode
-- 描画・表示密度を下げる軽量モード
-- mobile / low-power 環境を想定
+`whale-flow`
 
-### 5.6 Demo only
-- ON: ダミーデータ表示
-- OFF: 履歴JSON優先 + live補助
+* live 取得が成功した場合、現在圧として visualizer と summary に反映する
+* 失敗してもページ全体は成立する
+* ただし、失敗を隠してはいけない
 
----
+### 3-3. Secondary live context
 
-## 6. Signal Card 仕様
+`escrow-watch`
 
-### 6.1 表示項目
-- Status
-- Net Impact
-- Why now
-- Context
+* 補助情報として残す
+* 主役にはしない
+* 成功時は意味のある補助情報として表示
+* 失敗時は unavailable を明示
 
-### 6.2 データソース
-- `flow-history.latest`
-- `flow-history.previous`
-- `flow-history.deltaSummary`
-- `flow-history.recent`
-- fallback 時のみ live payload
+### 3-4. Source priority summary
 
-### 6.3 Status
-取り得る値:
-- `HIGH`
-- `MEDIUM`
-- `LOW`
-- `QUIET`
+表示の組み立て順は以下。
 
-### 6.4 判定思想
-- 最新値のみでなく、previous / delta / recent activity を加味
-- 「quiet」は“何も取れない”ではなく“取った上で大きなラベル付き流れが無い”状態を意味する
-
-### 6.5 Net Impact
-- USDが取得できれば USD 優先
-- 無ければ XRP 表示
-- signed 表示とする
-
-### 6.6 Why now
-優先順位:
-1. latestEvent.reason
-2. 静穏説明文
-3. previous / recent 補助文
-
-例:
-- No major labeled flow detected in this window.
-- Previous snapshot showed exchange inflow.
-- Recent detections remain low.
-
-### 6.7 Context
-含める内容:
-- source
-- stale / partial / sampled
-- recent count
-- latest snapshot 時刻
-- 必要に応じて window-specific note
+1. history
+2. live whale-flow assist
+3. escrow live context
 
 ---
 
-## 7. Metrics / Snapshot 仕様
+## 4. Window ごとの役割
 
-### 7.1 表示項目
-- Inflow
-- Outflow
-- Net
-- Payments scanned
-- Ledgers scanned
-- Matched events
-- Source
-- Updated
+### 5m
 
-### 7.2 追加補助情報
-各メトリクスに必要に応じて小さく表示:
-- previous
-- delta
-- recent count / recent total
+* **live assist window**
+* short-window 補助観測
+* sparse でも許容
+* 履歴は補助
 
-### 7.3 表示ルール
-- 値が0でも `0` として出す
-- 欠損時のみ `—`
-- 小さい XRP 値は小数表示で潰さない
-- USD が無い時は XRP のまま表示
+### 1h
 
-### 7.4 意味
-このブロックは「最新値の一覧」ではなく、
-**観測量 + 差分 + 更新状態** を読むためのものとする。
+* **standard observation window**
+* 最もバランスが良い基準 window
+
+### 24h
+
+* **primary comparison window**
+* このページの標準比較軸
+
+### 7d
+
+* **trend confirmation window**
+* 短期 alert ではなく、長めの傾向確認用
 
 ---
 
-## 8. Main Visualization（Heatmap）仕様
+## 5. ページ全体構成
 
-### 8.1 役割
-- latest snapshot のフロー断面可視化
-- ラベル × 時間バケットの密度を見る
+改訂後のページは次の構成とする。
 
-### 8.2 表示条件
-- matrix があれば表示
-- event が 0 でも描画を維持
-- preset未選択か本当の取得失敗時のみ空状態扱い
-
-### 8.3 Tooltip
-- label
-- signed amount
-- 小さいXRP値も丸め潰さない
-
-### 8.4 意味
-Heatmap は「最近の履歴全体」ではなく、
-**現在断面の視覚化** として扱う。
-履歴全体の流れは sparkline 側が補う。
+1. Header
+2. Hero
+3. Controls
+4. Availability / Source status strip
+5. Primary signal card
+6. Main Visualizer
+7. Latest labeled event card
+8. Recent detections list
+9. Snapshot trend summary
+10. Escrow assist panel
+11. Notes / degraded state footnote
 
 ---
 
-## 9. Sparkline / History Strip 仕様
+## 6. Header / Hero
 
-### 9.1 役割
-- recent history の流れを一目で補助する
-- 主役ではない
+### Header
 
-### 9.2 系列
-最低2系列:
-- recent net flow
-- recent matched events
+* XSIC 共通ヘッダー
+* グローバルナビあり
 
-### 9.3 表示方針
-- 小型
-- 相対スケール
-- recent history が少ない場合は `History building…` 等で自然にfallback
+### Hero
 
-### 9.4 意味
-ページを「現在値だけ」から
-**現在値 + 最近の流れ** に引き上げる補助可視化。
+* タイトル: `Flow Alert`
+* サブタイトル:
+  `Monitor recent labeled XRPL flows with history baseline and live assist overlay.`
+
+Hero の時点で、
+**このページは history も live も両方見るページ**であることを明示する。
 
 ---
 
-## 10. Reason / Context Panel 仕様
+## 7. Controls 仕様
 
-### 10.1 役割
-文章で状態を補足する。
+### Preset
 
-### 10.2 主な内容
-- quiet時の説明
-- partial/sample の説明
-- scanned counts の説明
-- try 24h など window導線
-- recent履歴の要約
+選択肢を維持する。
 
-### 10.3 必須要件
-- event が無い時でも意味を出す
-- overlayで潰さず、カードの中で説明する
+* `exchanges`
+* `whales`
+* `ripple`
+* `unset`
 
----
+### Window
 
-## 11. Recent Flows 仕様
+選択肢を維持する。
 
-### 11.1 役割
-“現在windowの event 一覧” ではなく、
-**履歴上の最近の検出イベント** を出す補助欄。
+* `5m`
+* `1h`
+* `24h`
+* `7d`
 
-### 11.2 データソース優先順位
-1. `flow-history.recent` から抽出した recent detections
-2. current-window events
-3. 空状態文
+### Toggle
 
-### 11.3 表示項目
-- time
-- label
-- dir
-- amountXrp / amountUsd
-- reason
-- 必要に応じて source snapshot 情報
+* `Lite mode`
+* `Demo only`
 
-### 11.4 件数
-- desktop: 5〜8件
-- mobile / lite: 3〜5件
+### Button
 
-### 11.5 空状態
-- No recent labeled detection yet.
-- History exists, but no labeled event has been recorded.
+* `Refresh`
+
+### 保存
+
+現在の localStorage 保存方針を維持する。
+
+* liteMode
+* demoOnly.v2
+* targetPreset
+* window
 
 ---
 
-## 12. Escrow / Unlock Watch 仕様
+## 8. Availability / Source status strip
 
-### 12.1 役割
-flow だけでは見えない供給イベント文脈を補う。
+Controls の直下に、**このページで最も重要な状態表示帯**を置く。
 
-### 12.2 表示項目
-- next unlock
-- stats
-- pattern notes
-- recent unlocks
+### 表示項目
 
-### 12.3 位置づけ
-補助ブロック。Flow Alert全体の主役ではない。
+* Primary source
+* Live assist
+* Escrow
+* Freshness
+* Window role
 
----
+### 表示例
 
-## 13. Debug 仕様
+* `Primary: flow-history (repo history)`
+* `Live assist: degraded (timeout)`
+* `Escrow: unavailable`
+* `Freshness: history 2026-03-24 23:40`
+* `Window role: primary comparison`
 
-### 13.1 役割
-- source判定
-- fallback状況
-- historyが使われているか
-- price取得経路
-- errors / warnings の確認
+### ルール
 
-### 13.2 確認項目例
-- repo-json / runtime / cache
-- lastError
-- warnings
-- strategy
-- degradeLevel
-- price_primary_failed
-- price_fallback_used
-
-### 13.3 位置づけ
-通常ユーザー向け主機能ではないが、運用確認に必須。
+* live が死んでいても strip は必ず出す
+* 「history は生きている / live は死んでいる」を同時に見せる
+* ここで誤魔化しは禁止
 
 ---
 
-## 14. 分類仕様
+## 9. 状態モデル
 
-### 14.1 Preset
-- exchanges
-- whales
-- ripple
+このページの page-state は次の6種類。
 
-### 14.2 分類の考え方
-- `unknown -> exchange` = IN（売り圧候補）
-- `exchange -> unknown` = OUT（引き出し候補）
-- `exchange -> exchange` = XFER（内部移動候補）
-- ripple 関連は独自文脈で分類
-- whales は閾値ルールベース
+* `LOADING`
+* `HISTORY`
+* `LIVE`
+* `HYBRID`
+* `ERROR`
+* `EMPTY`
 
-### 14.3 reason / labelSource
-各検出は、少なくとも以下が読めること。
-- なぜその分類になったか
-- どの label / preset に一致したか
-- XFER は内部移動候補であること
+### LOADING
 
-### 14.4 スコア
-- amount + rank ベース
-- XFER は HIGH になりすぎないよう cap を持つ
+* 初回取得中
+* history も live も未確定
 
----
+### HISTORY
 
-## 15. Window別仕様
+* history で成立
+* live assist は unavailable / degraded
+* ただしページは使える
 
-### 15.1 5m
-- 短期補助窓
-- 空でも異常ではない
-- 主画面ではない
+### LIVE
 
-### 15.2 1h
-- 標準観測窓
-- 初期表示
-- 最も安定して意味を出す窓
+* 5m などで live assist が主
+* history は補助
 
-### 15.3 24h
-- 主観測窓
-- recent detections や履歴比較の主軸
+### HYBRID
 
-### 15.4 7d
-- 傾向確認窓
-- sample前提でもよい
+* history と live assist の両方が成立
+* このページの理想状態
 
-### 15.5 文言
-windowごとに自然な quiet/guide 文言を出す。
-例:
-- 5m: short window, low signal density is normal
-- 24h: no major labeled flow across a broader window
+### ERROR
+
+* history も最低限成立せず、ページ全体が意味を持たない
+
+### EMPTY
+
+* preset 未設定、または表示対象なし
 
 ---
 
-## 16. 履歴仕様
+## 10. Status / Updated の表示ルール
 
-### 16.1 保存先
-- `data/flow-history/*.json`
-- 例:
-  - exchanges-1h.json
-  - exchanges-24h.json
-  - exchanges-7d.json
+### Status
 
-### 16.2 更新主体
-- GitHub Actions
+* `LOADING`
+* `HISTORY`
+* `LIVE`
+* `HYBRID`
+* `ERROR`
+* `EMPTY`
 
-### 16.3 取得API
-- `/api/xrpl/flow-history`
+### 判定基準
 
-### 16.4 構造
-最低限:
-- latest
-- previous
-- recent
-- deltaSummary
-- historyMeta
+* history ok && live degraded → `HISTORY`
+* history ok && live ok → `HYBRID`
+* history weak && live ok → `LIVE`
+* 両方弱い → `ERROR`
+* 初回取得中 → `LOADING`
+* preset unset → `EMPTY`
 
-### 16.5 UIでの使い方
-- 上段は履歴JSON優先
-- live は fallback
+### Updated
 
----
-
-## 17. 価格仕様
-
-### 17.1 目的
-- XRP→USD 換算の安定化
-
-### 17.2 方針
-- primary + fallback の複数ソース
-- 失敗時は XRP 表示にフォールバック
-- cache を利用
-
-### 17.3 UIルール
-- USDが取れたら USD 優先
-- 無ければ XRP
-- 価格未取得でページ全体が壊れないこと
+* history 主読時 → `history {timestamp}`
+* live 主読時 → `{n}s ago`
+* hybrid 時 → `history {timestamp} / live {n}s ago`
+* データ無し → `—`
 
 ---
 
-## 18. リフレッシュ仕様
+## 11. Primary signal card
 
-### 18.1 ルール
-- 更新中でも既存表示を消さない
-- REFRESHING / STALE を表示しつつ保持
-- 一瞬表示されて白紙へ戻る挙動は禁止
+このカードはページ最上部の summary であり、最も重要。
 
-### 18.2 source
-- repo-json 優先
-- live補助
+### 構成
+
+* Status pill
+* Net impact
+* Why now
+* Context
+
+### Status pill
+
+候補:
+
+* `QUIET`
+* `LOW`
+* `MEDIUM`
+* `HIGH`
+
+### 判定材料
+
+* latest netXrp
+* previous との差分
+* matchedEvents
+* recentCount
+* live current pressure
+* window profile
+
+### Why now
+
+以下を優先順で採用。
+
+1. latest labeled event の reason
+2. history delta と recent detections の組み合わせ説明
+3. live assist が強い場合の current pressure explanation
+4. quiet / empty hint
+
+### Context chips
+
+* `target`
+* `window`
+* `primary source`
+* `live assist state`
+* `escrow state`
+
+### Context line
+
+* recent snapshot 数
+* oldest → newest
+* latest / previous / Δ
+* stale / sampled / cache fallback
+* window role
 
 ---
 
-## 19. 空状態 / エラー状態
+## 12. Main Visualizer（必須）
 
-### 19.1 空状態
-- preset未選択
-- history未生成
-- recent detections なし
+**全ページに visualizer を置くルールに従い、このページにも必ず置く。**
+ただし、現行の弱い heatmap ではなく、**history base + live overlay** の混成 visualizer に変える。
 
-### 19.2 エラー状態
-- 本当の取得失敗時のみ error overlay
-- partial / sampled / cached は error にしない
+### 12-1. Main Viz の目的
 
-### 19.3 quiet状態
-- 取得できない quiet ではなく、取得した上で major labeled flow が少ない quiet を目指す
+一目で以下が分かること。
+
+* 最近、どのラベルでイベントがあったか
+* IN / OUT の偏り
+* recent snapshots の trend
+* live assist が今どう見えているか
+
+### 12-2. 構成
+
+Main Viz は3層構造にする。
+
+#### A. History base layer
+
+* recent snapshots の trend
+* labeled event lanes
+* net XRP line
+* matched events / payments bars
+
+#### B. Live overlay layer
+
+* current live pressure marker
+* current inflow / outflow bias
+* live success 時のみ強調
+* live degraded 時は薄く＋ badge
+
+#### C. Escrow marker layer
+
+* meaningful な next unlock がある場合のみ小さく重ねる
+* 主役にはしない
 
 ---
 
-## 20. 完成条件
+## 13. Main Viz の表示仕様
 
-Flow Alert 完成版の定義は次の通り。
+### 13-1. Event lanes
 
-1. eventが少ない時間帯でもページとして意味がある
-2. latest だけでなく previous / delta / recent が読める
-3. recent detections が空欄になりにくい
-4. heatmap と sparkline が補助として機能する
-5. repo-json 履歴が主ソースとして使われる
-6. USDが取れない時も XRP fallback で成立する
-7. 5m/1h/24h/7d の役割が揃っている
-8. quiet が「何も取れない」ではなく「取った上で quiet」に近い
+* 行 = ラベル
+* 列 = recent detections / recent snapshots
+* 色:
+
+  * IN = blue
+  * OUT = red
+  * XFER = neutral/slate
+* 強さ = amountXrp の大きさ
+* latest detection は outline 強調
+
+### 13-2. Net trend line
+
+* x軸 = snapshots
+* y軸 = netXrp
+* 0ラインを常設
+* latest point を強調
+* previous と latest の差が視覚で分かる
+
+### 13-3. Activity bars
+
+* payments scanned
+* matched events
+* latest vs recent average が分かるようにする
+
+### 13-4. Live overlay
+
+* live whale-flow success 時のみ表示
+* current live signal を右端 overlay に重ねる
+* 表示要素:
+
+  * current live direction
+  * current live net estimate
+  * live freshness badge
+* degraded 時は
+
+  * overlay を薄く
+  * `degraded` / `timeout` badge を付与
+
+### 13-5. History-only fallback
+
+live が死んでいる場合でも、Main Viz は成立する。
+ただしその場合は必ず、
+
+* `History baseline`
+* `Live assist unavailable`
+
+の両方を visualizer 内または head で明示する。
+
+### 13-6. 禁止事項
+
+* 空白塗りつぶし
+* `Unknown` 1行だけの fake heatmap
+* 何を見せているか分からない抽象表示
 
 ---
 
-## 21. 今後の改善候補
+## 14. Main Viz head
 
-- 価格取得の本番確認と fallback 実運用確認
-- exchange / ripple ラベル辞書の追加強化
-- quiet判定のさらなる精度改善
-- Escrow 側の履歴強化
-- sparkline の見た目改善
-- recent history の window横断要約
+Main Viz の head には必ず次を出す。
+
+* title: `Main Viz`
+* note: `History baseline with live assist overlay`
+* chips:
+
+  * `history base`
+  * `live assist: ok / degraded / unavailable`
+  * `escrow: ok / unavailable`
+
+---
+
+## 15. Latest labeled event card
+
+Main Viz の下に、**現在このページで最重要な1件**を置く。
+
+### 表示項目
+
+* Time
+* Label
+* Direction
+* Amount
+* Reason
+* Source type
+* Snapshot window
+
+### 取得順
+
+1. latest snapshot の latestEvent
+2. previous/latest/history から最も新しい detected event
+3. payload events fallback
+4. 無ければ `No recent labeled event`
+
+### 役割
+
+このカードだけ見れば、
+**「最近の最重要イベントは何か」**が分かること。
+
+---
+
+## 16. Recent detections list
+
+### 表示内容
+
+直近 5〜10 件を縦一覧で出す。
+
+各 row:
+
+* time
+* label
+* dir
+* amount
+* short reason
+* source type（history / payload / live assist）
+* source snapshot time
+* source window
+
+### 並び順
+
+* 新しい順
+
+### dedupe
+
+* txHash
+* time
+* label
+* dir
+* amountXrp
+  で重複除去
+
+### empty 時
+
+* `No recent labeled detection yet in this window.`
+* ただし history はある / live だけ弱い、などの状態を補足表示
+
+---
+
+## 17. Snapshot trend summary
+
+### 表示項目
+
+* Latest snapshot
+* Net delta vs previous
+* Recent history count
+* Last detected event
+* Live assist freshness
+* Live assist status
+
+### 役割
+
+Main Viz が視覚、ここが数字の補助。
+
+---
+
+## 18. Escrow assist panel
+
+**Escrow は残す。消さない。**
+ただし主役にはしない。
+
+### 表示項目
+
+* Next
+* Stats
+* Pattern
+* Recent
+* Escrow source state
+
+### 状態
+
+#### Escrow available
+
+* next unlock あり
+* stats 埋まる
+* pattern note あり得る
+* recent list が出る
+
+#### Escrow degraded
+
+* panel は残す
+* head に `degraded` badge
+* unavailable reason を出す
+* fallback であることを明示
+
+#### Escrow unavailable
+
+* panel は縮約表示
+* `Escrow assist unavailable`
+* 直近 meaning が無いなら最小表示
+
+### ルール
+
+* 完全削除はしない
+* ただし dead な巨大箱にしない
+* Flow Alert の主役を奪わない
+
+---
+
+## 19. Demo mode
+
+Demo only ON の時は、**理想状態の完成版見本**を出す。
+
+### 必須
+
+* history base が成立
+* live overlay も成立
+* latest event が強く表示
+* recent detections が複数
+* escrow も meaningful
+* Main Viz が完成形で読める
+
+### 禁止
+
+* demo なのに degraded fallback 風に見せること
+
+---
+
+## 20. 失敗時の扱い
+
+### 20-1. history ok / live fail
+
+* page state: `HISTORY`
+* page は成立
+* live assist unavailable を明示
+* escrow は別途 state を出す
+
+### 20-2. history ok / live ok
+
+* page state: `HYBRID`
+* 理想状態
+* history base + live overlay 両方出す
+
+### 20-3. history weak / live ok
+
+* page state: `LIVE`
+* 5m で起こりうる
+* live を強く、history を補助に回す
+
+### 20-4. history fail / live fail
+
+* `ERROR`
+* Main Viz に error overlay
+* source status card に失敗理由
+* Retry あり
+
+### 20-5. preset unset
+
+* `EMPTY`
+* empty overlay
+* preset 復帰導線あり
+
+---
+
+## 21. コピー方針
+
+### 原則
+
+* live が死んでるのに成功っぽく見せない
+* history 主読なのに live 顔をしない
+* degraded を隠さない
+* sampled / cached / fallback を隠さない
+
+### 禁止
+
+* `source: runtime` のような雑な表現
+* 何が primary か分からない文
+* 空白をそれっぽく言い換えること
+
+### 推奨表現
+
+* `Primary: history (repo)`
+* `Live assist: degraded (timeout)`
+* `Escrow: unavailable`
+* `History baseline active`
+* `Live overlay not available`
+
+---
+
+## 22. モバイル挙動
+
+### 必須
+
+* 360px 幅で崩れない
+* Main Viz は縦優先
+* latest event は1カードで読める
+* recent detections は1列
+* source status strip は折り返しても読める
+* escrow は縮約状態でも意味が分かる
+
+### Main Viz mobile
+
+* lanes + trend を1 canvas に詰め込みすぎない
+* 必要なら
+
+  * 上: event lanes
+  * 下: trend
+    で縦積み
+
+---
+
+## 23. パフォーマンス / 更新ルール
+
+### polling
+
+* Lite mode ON: 12s
+* Lite mode OFF: 8s
+
+### visibilitychange
+
+* hidden で止める
+* visible で再開
+
+### fastpath
+
+* history を先に使う
+* live は assist として timeout 付き
+* live の遅延で page 全体を LOADING に貼り付けない
+
+---
+
+## 24. 実装上の明確な完成条件
+
+この改訂版 Flow Alert が完成と見なせる条件は以下。
+
+1. **履歴が土台として安定して読める**
+2. **live assist が消えず、成功/失敗が明示される**
+3. **Main Viz が history base + live overlay として読める**
+4. **latest event が一目で分かる**
+5. **recent detections list が証拠として使える**
+6. **escrow が残るが、主役面しない**
+7. **ページ全体を見て「今何が分かるか」が明確**
+8. **今のように“このゴミページ見て何が楽しいの？”とはならない**
+
+---
+
+## 25. 一文要約
+
+**改訂後の Flow Alert は、flow-history を安定基盤にしつつ、whale-flow の live assist と escrow-watch の補助情報を重ねて表示する、history-first / live-inclusive の labeled flow monitor であり、必ずビジュアライザーを持ち、latest event・trend・live state・escrow state を同時に読めるページとする。**
 
