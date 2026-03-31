@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Exit Coverage Map — XSIC</title>
+    <meta
+      name="description"
+      content="Check whether issuer tokens have XRP exit routes through book, AMM, both, or neither."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/apps/sell-impact/sell-impact.css" />
+    <link rel="stylesheet" href="/apps/exit-coverage-map/exit-coverage-map.css" />
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/exit-coverage-map/" />
+    <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+  </head>
+  <body class="is-explain" data-nav-key="apps">
+    <noscript><p class="error-banner">JavaScript is required to use this tool.</p></noscript>
+    <div class="app page console-page exit-coverage-page">
+      <p class="error-banner" id="page-error-banner" hidden></p>
+
+            <header class="app__header global-header">
+        <div class="app__header-top">
+          <a href="/" class="brand-link" aria-label="XSIC Home">
+            <div class="app__brand">
+              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+              <h1 class="app__title">XSIC</h1>
+            </div>
+          </a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+          <div data-global-nav></div>
+        </div>
+      </header>
+
+      <main class="page__content">
+        <section class="hero-head">
+          <p class="eyebrow">Exit route coverage / sell handoff</p>
+          <h2 class="page-title">Exit Coverage Map</h2>
+          <p class="page-subtitle">
+            Check whether issuer tokens have an XRP exit route through book, AMM, both, or neither.
+            Route availability only. Execution depth and receive quality belong to Sell Impact.
+          </p>
+        </section>
+
+        <section class="card controls-card" aria-label="Controls">
+<div class="controls-grid coverage-controls-grid">
+            <label class="field">
+              Issuer
+              <input id="issuer-input" autocomplete="off" placeholder="Issuer address" />
+            </label>
+
+            <label class="field">
+              Proof preset
+              <select id="preset-select">
+                <option value="baseline">Baseline (EUR / USD / BTC / ARMY)</option>
+                <option value="expanded" selected>Expanded mixed proof</option>
+                <option value="bookOnly">Book-only proof</option>
+                <option value="ammOnly">AMM-only proof</option>
+                <option value="invalid">Invalid issuer</option>
+                <option value="empty">Empty issuer</option>
+              </select>
+            </label>
+
+            <button class="button button--ghost secondary-button" type="button" id="reset-button">Reset</button>
+            <button class="button button--primary primary-button" type="button" id="run-button">Run coverage check</button>
+            <div class="status-inline status">Status: <strong id="run-status">READY</strong></div>
+          </div>
+
+          <div class="meta-chip-row coverage-proof-row">
+            <span class="meta-chip" id="proof-chip">proof: fixed 4 states confirmed</span>
+            <span class="meta-chip" id="ledger-chip">ledger: 103197813</span>
+            <span class="meta-chip" id="source-chip">source: local proof scaffold</span>
+            <span class="meta-chip" id="issuer-chip">issuer: —</span>
+          </div>
+        </section>
+
+        <section class="card note-card">
+          <div class="flow-note flow-note--quiet">
+            Coverage only: this page checks whether an XRP exit route exists through book, AMM, both, or neither.
+            Use the row-level Sell Impact link for receive, impact, and execution-quality reasoning.
+          </div>
+        </section>
+
+        <section class="coverage-summary-grid">
+          <article class="card metric-card metric-card--highlight">
+            <p class="metric-label">Total</p>
+            <p class="metric-value" id="summary-total">—</p>
+            <p class="metric-sub">candidate rows</p>
+          </article>
+          <article class="card metric-card">
+            <p class="metric-label">Dual</p>
+            <p class="metric-value" id="summary-dual">—</p>
+            <p class="metric-sub">book + AMM</p>
+          </article>
+          <article class="card metric-card">
+            <p class="metric-label">Book only</p>
+            <p class="metric-value" id="summary-book-only">—</p>
+            <p class="metric-sub">orderbook exit only</p>
+          </article>
+          <article class="card metric-card">
+            <p class="metric-label">AMM only</p>
+            <p class="metric-value" id="summary-amm-only">—</p>
+            <p class="metric-sub">AMM exit only</p>
+          </article>
+          <article class="card metric-card">
+            <p class="metric-label">None</p>
+            <p class="metric-value" id="summary-none">—</p>
+            <p class="metric-sub">no XRP exit observed</p>
+          </article>
+          <article class="card metric-card">
+            <p class="metric-label">Issuer check</p>
+            <p class="metric-value" id="summary-issuer-check">—</p>
+            <p class="metric-sub" id="summary-issuer-note">waiting</p>
+          </article>
+        </section>
+
+        <section class="card mainviz-card">
+          <div class="section-head">
+            <div>
+              <h3 class="section-title">Coverage</h3>
+              <p class="section-note">
+                Route availability only. Select a row to bind detail.
+              </p>
+            </div>
+          </div>
+
+          <div class="coverage-layout">
+            <div class="coverage-table-card">
+              <div class="coverage-table-head">
+                <span class="signal-label">Route coverage</span>
+                <span class="section-note" id="table-head-note">Waiting for coverage run.</span>
+              </div>
+
+              <div class="coverage-table-wrap">
+                <table class="coverage-table" aria-label="Exit coverage rows">
+                  <thead>
+                    <tr>
+                      <th>State</th>
+                      <th>Currency</th>
+                      <th>Issuer</th>
+                      <th>Book</th>
+                      <th>AMM</th>
+                      <th>Open</th>
+                    </tr>
+                  </thead>
+                  <tbody id="coverage-rows"></tbody>
+                </table>
+              </div>
+
+              <div class="coverage-empty" id="coverage-empty">
+                Run a preset or input a known issuer to populate the rows.
+              </div>
+            </div>
+
+            <aside class="coverage-detail-card">
+              <div class="coverage-detail-head">
+                <span class="signal-label">Selected row</span>
+                <span class="coverage-state-badge state-none" id="detail-state-badge">No selection</span>
+              </div>
+
+              <h4 class="side-title" id="detail-title">Coverage detail</h4>
+              <p class="side-copy" id="detail-subtitle">Choose a row to inspect route evidence and hand off to Sell Impact.</p>
+
+              <div class="coverage-detail-grid">
+                <div class="detail-line">
+                  <span class="detail-key">Currency</span>
+                  <span class="detail-value" id="detail-currency">—</span>
+                </div>
+                <div class="detail-line">
+                  <span class="detail-key">Issuer</span>
+                  <span class="detail-value mono" id="detail-issuer">—</span>
+                </div>
+                <div class="detail-line">
+                  <span class="detail-key">Book</span>
+                  <span class="detail-value" id="detail-book">—</span>
+                </div>
+                <div class="detail-line">
+                  <span class="detail-key">AMM</span>
+                  <span class="detail-value" id="detail-amm">—</span>
+                </div>
+                <div class="detail-line">
+                  <span class="detail-key">Key</span>
+                  <span class="detail-value mono" id="detail-key">—</span>
+                </div>
+              </div>
+
+              <div class="coverage-proof-box">
+                <div class="signal-label">Evidence</div>
+                <p class="side-copy" id="detail-explanation">No row selected.</p>
+                <ul class="why-list" id="detail-evidence-list">
+                  <li>Waiting for row selection.</li>
+                </ul>
+              </div>
+
+              <div class="coverage-actions">
+                <a class="button button--primary" id="sell-impact-link" href="/apps/sell-impact/" target="_blank" rel="noopener">Open Sell Impact</a>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="snapshot-notes-grid coverage-lower-grid">
+          <article class="card snapshot-note-card">
+            <div class="signal-label">Coverage states</div>
+            <ul class="snapshot-note-list">
+              <li><strong>Dual</strong>: both route families exist.</li>
+              <li><strong>Book only</strong>: orderbook exit only.</li>
+              <li><strong>AMM only</strong>: AMM exit only.</li>
+              <li><strong>None</strong>: no XRP exit observed.</li>
+            </ul>
+          </article>
+
+          <article class="card snapshot-note-card">
+            <div class="signal-label">Why this page exists</div>
+            <ul class="snapshot-note-list">
+              <li>Coverage first.</li>
+              <li>Execution quality belongs to Sell Impact.</li>
+              <li>Use the row-level deep link to continue.</li>
+            </ul>
+          </article>
+        </section>
+
+        <section class="card debug-card" id="debug-panel">
+          <details>
+            <summary>Debug (collapsed, release readiness)</summary>
+            <p class="debug-status mono">Preset: <span id="debug-preset">—</span></p>
+            <p class="debug-status mono">Issuer: <span id="debug-issuer">—</span></p>
+            <p class="debug-status mono">Ledger: <span id="debug-ledger">E549C50B6C88925669DC7C67FC768E49B118E4EB4F1708CD995E7EFE4596A4C5 / 103197813</span></p>
+            <pre class="debug-status mono" id="debug-json">—</pre>
+          </details>
+        </section>
+      </main>
+
+      <div data-global-footer></div>
+    </div>
+
+    <script src="/shared/nav.js"></script>
+    <script type="module" src="/apps/exit-coverage-map/exit-coverage-map.js"></script>
+  </body>
+</html>
