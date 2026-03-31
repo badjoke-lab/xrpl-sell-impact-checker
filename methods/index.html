@@ -10,7 +10,7 @@
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="XSIC" />
   <meta property="og:title" content="XSIC Methods | Inputs, Outputs, Interpretation, Limits" />
-  <meta property="og:description" content="Operational method reference for Sell Impact, Liquidity Pulse, Flow Alert, and Exposure Graph." />
+  <meta property="og:description" content="Operational method reference for Sell Impact, Liquidity Pulse, Exit Coverage Map, and Exposure Graph." />
   <meta property="og:url" content="https://xsic.badjoke-lab.com/methods/" />
   <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -70,13 +70,13 @@
         </ul>
       </section>
 
-      <section class="card" aria-labelledby="flow-alert-methods">
-        <h3 id="flow-alert-methods">Flow Alert</h3>
+      <section class="card" aria-labelledby="exit-coverage-map-methods">
+        <h3 id="exit-coverage-map-methods">Exit Coverage Map</h3>
         <ul class="info-list">
-          <li><strong>Input:</strong> labeled exchange/whale transfer history, snapshot aggregates, and configured windows.</li>
-          <li><strong>Output:</strong> directional pressure cues, alert states, and supporting flow context.</li>
-          <li><strong>How to read:</strong> treat alerts as pressure regime hints and cross-check with liquidity + impact before action.</li>
-          <li><strong>Limits:</strong> labeling quality and ingestion delay can produce temporary false positives/negatives.</li>
+          <li><strong>Input:</strong> issuer account, candidate token set, and current XRP exit-route checks for book and AMM coverage.</li>
+          <li><strong>Output:</strong> row-level coverage state labels: dual, book-only, amm-only, or none, plus Sell Impact handoff links.</li>
+          <li><strong>How to read:</strong> confirm that the token still has an XRP exit route before trusting any size or impact assumption.</li>
+          <li><strong>Limits:</strong> coverage presence is not execution quality; use Sell Impact for receive, depth, and route-quality reasoning.</li>
         </ul>
       </section>
 
