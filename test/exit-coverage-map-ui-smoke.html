@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Exit Coverage Map UI Smoke</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --good: #0f9d58;
+      --warn: #b7791f;
+      --bad: #d93025;
+      --neutral: #6b7280;
+      --accent: #2563eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .hero h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+    }
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) auto auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .field input {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--text);
+    }
+    button {
+      padding: 11px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .status-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #f3f4f6;
+      color: var(--text);
+      border: 1px solid var(--line);
+      font-size: 12px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 12px;
+    }
+    .summary-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: #fff;
+    }
+    .summary-card .k {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .summary-card .v {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+      gap: 16px;
+    }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+    }
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      font-size: 12px;
+      color: var(--muted);
+      background: #fafafa;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    tr.token-row {
+      cursor: pointer;
+    }
+    tr.token-row:hover {
+      background: #f8fbff;
+    }
+    tr.token-row.is-active {
+      background: #eef5ff;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 88px;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 12px;
+      border: 1px solid transparent;
+    }
+    .badge.dual { color: var(--good); background: rgba(15,157,88,.10); border-color: rgba(15,157,88,.18); }
+    .badge.book-only, .badge.amm-only { color: var(--warn); background: rgba(183,121,31,.10); border-color: rgba(183,121,31,.18); }
+    .badge.none { color: var(--bad); background: rgba(217,48,37,.10); border-color: rgba(217,48,37,.18); }
+    .badge.invalid, .badge.unknown { color: var(--neutral); background: rgba(107,114,128,.12); border-color: rgba(107,114,128,.18); }
+
+    .bool {
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .bool.ok { color: var(--good); }
+    .bool.no { color: var(--bad); }
+
+    .detail {
+      display: grid;
+      gap: 12px;
+    }
+    .detail h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+    .detail .sub {
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .kv .k { color: var(--muted); }
+    .detail-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .error {
+      color: var(--bad);
+      font-weight: 600;
+    }
+    .empty {
+      color: var(--muted);
+      padding: 20px 4px;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (max-width: 880px) {
+      .controls { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Exit Coverage Map — UI Smoke</h1>
+      <p>Issuer → token candidates → book / AMM coverage → detail panel → Sell Impact deep link</p>
+    </section>
+
+    <section class="panel">
+      <div class="controls">
+        <div class="field">
+          <label for="issuerInput">Issuer</label>
+          <input id="issuerInput" value="rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq" />
+        </div>
+        <button id="loadBtn" class="primary">Load coverage</button>
+        <button id="badBtn">Load invalid issuer</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div id="statusStrip" class="status-strip"></div>
+    </section>
+
+    <section class="panel">
+      <div class="summary">
+        <div class="summary-card"><div class="k">Dual coverage</div><div id="sumDual" class="v">0</div></div>
+        <div class="summary-card"><div class="k">Book only</div><div id="sumBookOnly" class="v">0</div></div>
+        <div class="summary-card"><div class="k">AMM only</div><div id="sumAmmOnly" class="v">0</div></div>
+        <div class="summary-card"><div class="k">No visible path</div><div id="sumNone" class="v">0</div></div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <section class="panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Book</th>
+                <th>AMM</th>
+                <th>Overall</th>
+                <th>Interpretation</th>
+              </tr>
+            </thead>
+            <tbody id="matrixBody"></tbody>
+          </table>
+        </div>
+        <div id="matrixEmpty" class="empty" hidden>No visible token candidates were found for this issuer.</div>
+      </section>
+
+      <aside class="panel detail">
+        <h2 id="detailTitle">Select a token</h2>
+        <div id="detailSub" class="sub">The right panel will show the selected row.</div>
+
+        <div class="kv"><div class="k">Coverage</div><div id="detailCoverage">—</div></div>
+        <div class="kv"><div class="k">Book status</div><div id="detailBook">—</div></div>
+        <div class="kv"><div class="k">AMM status</div><div id="detailAmm">—</div></div>
+        <div class="kv"><div class="k">Interpretation</div><div id="detailInterpretation">—</div></div>
+        <div class="kv"><div class="k">Sample trustline</div><div id="detailTrustline">—</div></div>
+
+        <div class="detail-actions">
+          <a id="sellImpactLink" href="/apps/sell-impact/" target="_blank" rel="noreferrer">
+            <button>Open Sell Impact</button>
+          </a>
+        </div>
+        <div class="hint">This smoke page proves row click, detail binding, and Sell Impact deep link.</div>
+        <div id="issuerError" class="error"></div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const issuerInput = document.getElementById('issuerInput');
+    const loadBtn = document.getElementById('loadBtn');
+    const badBtn = document.getElementById('badBtn');
+    const statusStrip = document.getElementById('statusStrip');
+    const matrixBody = document.getElementById('matrixBody');
+    const matrixEmpty = document.getElementById('matrixEmpty');
+
+    const sumDual = document.getElementById('sumDual');
+    const sumBookOnly = document.getElementById('sumBookOnly');
+    const sumAmmOnly = document.getElementById('sumAmmOnly');
+    const sumNone = document.getElementById('sumNone');
+
+    const detailTitle = document.getElementById('detailTitle');
+    const detailSub = document.getElementById('detailSub');
+    const detailCoverage = document.getElementById('detailCoverage');
+    const detailBook = document.getElementById('detailBook');
+    const detailAmm = document.getElementById('detailAmm');
+    const detailInterpretation = document.getElementById('detailInterpretation');
+    const detailTrustline = document.getElementById('detailTrustline');
+    const sellImpactLink = document.getElementById('sellImpactLink');
+    const issuerError = document.getElementById('issuerError');
+
+    function chip(text) {
+      const el = document.createElement('span');
+      el.className = 'chip';
+      el.textContent = text;
+      return el;
+    }
+
+    async function getJson(url, opts = {}) {
+      const res = await fetch(url, opts);
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { ok: false, raw: text };
+      }
+      data.__httpStatus = res.status;
+      return data;
+    }
+
+    async function postJson(url, body) {
+      return getJson(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+
+    function normalizeCurrency(v) {
+      return String(v || '').trim().toUpperCase();
+    }
+
+    function accountDataFromInfo(info) {
+      return (
+        info?.result?.account_data ||
+        info?.result?.result?.account_data ||
+        info?.account_data ||
+        null
+      );
+    }
+
+    function linesFromRpc(res) {
+      return (
+        res?.result?.lines ||
+        res?.result?.result?.lines ||
+        res?.lines ||
+        []
+      );
+    }
+
+    function buildCandidates(lines, issuer) {
+      const seen = new Set();
+      const rows = [];
+      for (const line of lines) {
+        const currency = normalizeCurrency(line.currency);
+        if (!currency || currency === 'XRP') continue;
+        const key = `${currency}|${issuer}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rows.push({
+          currency,
+          issuer,
+          sampleBalance: line.balance ?? null,
+          sampleAccount: line.account ?? null,
+        });
+      }
+      const manual = ['USD', 'EUR', 'BTC', 'ARMY'];
+      for (const currency of manual) {
+        const key = `${currency}|${issuer}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rows.push({
+          currency,
+          issuer,
+          sampleBalance: null,
+          sampleAccount: null,
+        });
+      }
+      return rows;
+    }
+
+    function verdictFromCoverage(bookOk, ammOk) {
+      if (bookOk && ammOk) return 'dual';
+      if (bookOk) return 'book-only';
+      if (ammOk) return 'amm-only';
+      return 'none';
+    }
+
+    function interpretationFor(verdict) {
+      if (verdict === 'dual') return 'Two visible exit paths are present right now.';
+      if (verdict === 'book-only') return 'Visible on orderbook only. AMM support was not detected.';
+      if (verdict === 'amm-only') return 'AMM support is visible, but no book depth was detected.';
+      return 'No visible bounded exit path was detected right now.';
+    }
+
+    function resetSummary() {
+      sumDual.textContent = '0';
+      sumBookOnly.textContent = '0';
+      sumAmmOnly.textContent = '0';
+      sumNone.textContent = '0';
+    }
+
+    function setSummary(rows) {
+      const summary = { dual: 0, 'book-only': 0, 'amm-only': 0, none: 0 };
+      for (const row of rows) summary[row.verdict] += 1;
+      sumDual.textContent = String(summary.dual);
+      sumBookOnly.textContent = String(summary['book-only']);
+      sumAmmOnly.textContent = String(summary['amm-only']);
+      sumNone.textContent = String(summary.none);
+    }
+
+    function bindDetail(row) {
+      detailTitle.textContent = row.currency;
+      detailSub.textContent = row.issuer;
+      detailCoverage.innerHTML = `<span class="badge ${row.verdict}">${row.verdict}</span>`;
+      detailBook.innerHTML = row.bookOk
+        ? `<span class="bool ok">available</span> (${row.bookCount} offers)`
+        : `<span class="bool no">none</span>`;
+      detailAmm.innerHTML = row.ammOk
+        ? `<span class="bool ok">available</span>`
+        : `<span class="bool no">none</span>`;
+      detailInterpretation.textContent = row.interpretation;
+      detailTrustline.textContent = row.sampleAccount
+        ? `${row.sampleAccount} · balance ${row.sampleBalance}`
+        : 'No sampled trustline row in current extraction.';
+      sellImpactLink.href =
+        `/apps/sell-impact/?currency=${encodeURIComponent(row.currency)}&issuer=${encodeURIComponent(row.issuer)}`;
+    }
+
+    function renderRows(rows) {
+      matrixBody.innerHTML = '';
+      matrixEmpty.hidden = rows.length > 0;
+
+      let activeTr = null;
+
+      rows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'token-row';
+        tr.innerHTML = `
+          <td><strong>${row.currency}</strong><div class="mono" style="color:#6b7280;font-size:12px;">${row.issuer}</div></td>
+          <td>${row.bookOk ? `<span class="bool ok">yes</span> (${row.bookCount})` : `<span class="bool no">no</span>`}</td>
+          <td>${row.ammOk ? `<span class="bool ok">yes</span>` : `<span class="bool no">no</span>`}</td>
+          <td><span class="badge ${row.verdict}">${row.verdict}</span></td>
+          <td>${row.interpretation}</td>
+        `;
+        tr.addEventListener('click', () => {
+          if (activeTr) activeTr.classList.remove('is-active');
+          activeTr = tr;
+          tr.classList.add('is-active');
+          bindDetail(row);
+        });
+        matrixBody.appendChild(tr);
+
+        if (idx === 0) {
+          tr.click();
+        }
+      });
+    }
+
+    async function loadCoverage(issuer) {
+      issuerError.textContent = '';
+      statusStrip.innerHTML = '';
+      matrixBody.innerHTML = '';
+      matrixEmpty.hidden = true;
+      resetSummary();
+
+      statusStrip.appendChild(chip(`Issuer: ${issuer}`));
+      statusStrip.appendChild(chip('Loading account info...'));
+
+      const info = await getJson(`/api/xrpl/account-info?issuer=${encodeURIComponent(issuer)}`);
+      const accountData = accountDataFromInfo(info);
+
+      statusStrip.innerHTML = '';
+      statusStrip.appendChild(chip(`Issuer: ${issuer}`));
+
+      if (!accountData) {
+        issuerError.textContent = `Invalid or unavailable issuer (${info.__httpStatus || 'n/a'} / ${info.error || 'unknown_error'})`;
+        statusStrip.appendChild(chip(`Issuer check: failed`));
+        matrixEmpty.hidden = false;
+        detailTitle.textContent = 'Invalid issuer';
+        detailSub.textContent = 'No coverage probe executed.';
+        detailCoverage.textContent = '—';
+        detailBook.textContent = '—';
+        detailAmm.textContent = '—';
+        detailInterpretation.textContent = 'Enter a valid XRPL issuer address.';
+        detailTrustline.textContent = '—';
+        sellImpactLink.href = '/apps/sell-impact/';
+        return;
+      }
+
+      statusStrip.appendChild(chip(`Flags: ${accountData.Flags ?? 'n/a'}`));
+      statusStrip.appendChild(chip(`Issuer check: ok`));
+      statusStrip.appendChild(chip('Loading account_lines...'));
+
+      const linesRpc = await postJson('/api/xrpl', {
+        method: 'account_lines',
+        params: [{ account: issuer, ledger_index: 'validated', limit: 60 }]
+      });
+
+      const lines = linesFromRpc(linesRpc);
+      const candidates = buildCandidates(lines, issuer);
+      statusStrip.innerHTML = '';
+      statusStrip.appendChild(chip(`Issuer: ${issuer}`));
+      statusStrip.appendChild(chip(`Flags: ${accountData.Flags ?? 'n/a'}`));
+      statusStrip.appendChild(chip(`Candidates: ${candidates.length}`));
+
+      const rows = [];
+      let bookOkCount = 0;
+      let ammOkCount = 0;
+
+      for (const token of candidates) {
+        const [book, amm] = await Promise.all([
+          getJson(`/api/book-offers?currency=${encodeURIComponent(token.currency)}&issuer=${encodeURIComponent(token.issuer)}&limit=30`),
+          getJson(`/api/amm-info?currency=${encodeURIComponent(token.currency)}&issuer=${encodeURIComponent(token.issuer)}`)
+        ]);
+
+        const offers = Array.isArray(book.offers) ? book.offers : [];
+        const bookOk = Boolean(book.ok && offers.length);
+        const ammOk = Boolean(amm.ok);
+        if (bookOk) bookOkCount += 1;
+        if (ammOk) ammOkCount += 1;
+
+        rows.push({
+          ...token,
+          bookOk,
+          bookCount: offers.length,
+          ammOk,
+          verdict: verdictFromCoverage(bookOk, ammOk),
+          interpretation: interpretationFor(verdictFromCoverage(bookOk, ammOk)),
+        });
+      }
+
+      statusStrip.appendChild(chip(`Book coverage rows: ${bookOkCount}`));
+      statusStrip.appendChild(chip(`AMM coverage rows: ${ammOkCount}`));
+      statusStrip.appendChild(chip(`Updated: ${new Date().toLocaleTimeString()}`));
+
+      setSummary(rows);
+      renderRows(rows);
+    }
+
+    loadBtn.addEventListener('click', () => loadCoverage(issuerInput.value.trim()));
+    badBtn.addEventListener('click', () => {
+      issuerInput.value = 'not_an_issuer';
+      loadCoverage('not_an_issuer');
+    });
+
+    loadCoverage(issuerInput.value.trim());
+  </script>
+</body>
+</html>
