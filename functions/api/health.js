@@ -1,7 +1,9 @@
+import { getPopularPairs } from './_popular_pairs.js';
+
 const XRPL_ENDPOINTS = [
-  "https://xrplcluster.com/",
-  "https://s1.ripple.com:51234/",
-  "https://s2.ripple.com:51234/",
+  'https://xrplcluster.com/',
+  'https://s1.ripple.com:51234/',
+  'https://s2.ripple.com:51234/',
 ];
 
 const UPSTREAM_TIMEOUT_MS = 4000;
@@ -10,10 +12,18 @@ function jsonResponse(payload) {
   return new Response(JSON.stringify(payload), {
     status: 200,
     headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'access-control-allow-origin': '*',
     },
   });
+}
+
+function detectBindings(env) {
+  return {
+    d1_bound: Boolean(env?.XSIC_DB || env?.DB),
+    kv_bound: Boolean(env?.XSIC_CACHE || env?.CACHE_KV || env?.KV),
+  };
 }
 
 async function fetchRpcHealth(endpoint) {
@@ -23,9 +33,9 @@ async function fetchRpcHealth(endpoint) {
 
   try {
     const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ method: "server_info", params: [{}] }),
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ method: 'server_info', params: [{}] }),
       signal: controller.signal,
     });
 
@@ -42,8 +52,8 @@ async function fetchRpcHealth(endpoint) {
     const complete = Boolean(
       response.ok &&
         info &&
-        typeof info.server_state === "string" &&
-        typeof info.validated_ledger?.seq === "number"
+        typeof info.server_state === 'string' &&
+        typeof info.validated_ledger?.seq === 'number'
     );
 
     return {
@@ -53,6 +63,8 @@ async function fetchRpcHealth(endpoint) {
       complete,
       hasResult: Boolean(parsed?.result),
       isJson: Boolean(parsed),
+      ledgerIndex: info?.validated_ledger?.seq ?? null,
+      serverState: info?.server_state ?? null,
     };
   } catch (error) {
     return {
@@ -62,15 +74,19 @@ async function fetchRpcHealth(endpoint) {
       complete: false,
       hasResult: false,
       isJson: false,
-      error: error instanceof Error ? error.message : "fetch_failed",
+      ledgerIndex: null,
+      serverState: null,
+      error: error instanceof Error ? error.message : 'fetch_failed',
     };
   } finally {
     clearTimeout(timeout);
   }
 }
 
-export async function onRequestGet() {
+export async function onRequestGet({ env }) {
   const checkedAt = new Date().toISOString();
+  const bindings = detectBindings(env);
+  const popularPairs = getPopularPairs();
 
   try {
     let sawPartial = false;
@@ -82,17 +98,33 @@ export async function onRequestGet() {
         endpoint: attempt.endpoint,
         http_status: attempt.httpStatus,
         latency_ms: attempt.latencyMs,
+        ledger_index: attempt.ledgerIndex,
+        server_state: attempt.serverState,
         error: attempt.error || null,
       });
 
       if (attempt.complete) {
         return jsonResponse({
-          status: "ok",
+          status: 'ok',
           checked_at: checkedAt,
           details: {
             endpoint: attempt.endpoint,
             latency_ms: attempt.latencyMs,
             http_status: attempt.httpStatus,
+            ledger_index: attempt.ledgerIndex,
+            server_state: attempt.serverState,
+          },
+          service_health: {
+            upstream_latency_ms: attempt.latencyMs,
+            last_successful_quote_age_ms: null,
+            cache_freshness: bindings.kv_bound ? 'kv-ready' : 'cache-api-only',
+            degraded_mode: false,
+          },
+          foundation: {
+            bindings,
+            popular_pairs_count: popularPairs.length,
+            precompute_registry_ready: popularPairs.length > 0,
+            quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
           },
         });
       }
@@ -103,21 +135,45 @@ export async function onRequestGet() {
     }
 
     return jsonResponse({
-      status: sawPartial ? "stale" : "down",
+      status: sawPartial ? 'stale' : 'down',
       checked_at: checkedAt,
       details: {
-        reason: sawPartial ? "partial_upstream_response" : "upstream_unreachable",
+        reason: sawPartial ? 'partial_upstream_response' : 'upstream_unreachable',
         timeout_ms: UPSTREAM_TIMEOUT_MS,
         attempts,
+      },
+      service_health: {
+        upstream_latency_ms: null,
+        last_successful_quote_age_ms: null,
+        cache_freshness: bindings.kv_bound ? 'kv-ready' : 'cache-api-only',
+        degraded_mode: true,
+      },
+      foundation: {
+        bindings,
+        popular_pairs_count: popularPairs.length,
+        precompute_registry_ready: popularPairs.length > 0,
+        quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
       },
     });
   } catch {
     return jsonResponse({
-      status: "down",
+      status: 'down',
       checked_at: checkedAt,
       details: {
-        reason: "health_check_failed",
+        reason: 'health_check_failed',
         timeout_ms: UPSTREAM_TIMEOUT_MS,
+      },
+      service_health: {
+        upstream_latency_ms: null,
+        last_successful_quote_age_ms: null,
+        cache_freshness: bindings.kv_bound ? 'kv-ready' : 'cache-api-only',
+        degraded_mode: true,
+      },
+      foundation: {
+        bindings,
+        popular_pairs_count: popularPairs.length,
+        precompute_registry_ready: popularPairs.length > 0,
+        quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
       },
     });
   }
