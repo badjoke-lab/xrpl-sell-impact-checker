@@ -1,5 +1,9 @@
 const {
   normalizeCurrencyInput,
+  normalizeIssuerInput,
+  buildPairKey,
+  buildFreshnessMeta,
+  nowIso,
   hedgedRpcCall,
   jsonResponse,
   cacheGet,
@@ -25,16 +29,14 @@ exports.onRequestGet = async (context) => {
   const url = new URL(request.url);
 
   const currency = url.searchParams.get("currency") || "";
-  const issuer = url.searchParams.get("issuer") || "";
+  const issuer = normalizeIssuerInput(url.searchParams.get("issuer") || "");
   const limitRaw = Number(url.searchParams.get("limit") || "200");
   const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 200)) : 200;
 
   const normalized = normalizeCurrencyInput(currency);
   const currencyNormalized = normalized.currencyNormalized;
+  const pairKey = buildPairKey({ currencyNormalized, issuer });
 
-
-  // Special-case: This tool estimates selling an IOU into XRP.
-  // "currency=XRP" alone is not a valid sell target here.
   {
     const u = new URL(context.request.url);
     const cur = (u.searchParams.get("currency") || "").trim();
@@ -46,12 +48,16 @@ exports.onRequestGet = async (context) => {
         elapsedMs: 0,
         currencyInput: cur,
         currencyNormalized: "XRP",
+        issuer: "",
+        pairKey: "",
         offersCount: 0,
         bidsCount: 0,
         asksCount: 0,
         error: "xrp_not_supported",
         message: "XRP is the settlement asset. Enter an IOU token (currency + issuer) to estimate selling into XRP.",
         attempts: [],
+        observedAt: nowIso(),
+        freshness: buildFreshnessMeta({ observedAt: nowIso(), source: "runtime", isStale: false }),
         cached: false,
         isStale: false
       };
@@ -66,8 +72,8 @@ exports.onRequestGet = async (context) => {
     }
   }
 
-  // basic validation
   if (!currencyNormalized || !issuer) {
+    const observedAt = nowIso();
     return jsonResponse(
       {
         ok: false,
@@ -75,11 +81,15 @@ exports.onRequestGet = async (context) => {
         elapsedMs: 0,
         currencyInput: normalized.currencyInput,
         currencyNormalized,
+        issuer,
+        pairKey,
         offersCount: 0,
         bidsCount: 0,
         asksCount: 0,
         error: "missing_params",
         attempts: [],
+        observedAt,
+        freshness: buildFreshnessMeta({ observedAt, source: "runtime", isStale: false }),
         cached: false,
         isStale: false,
       },
@@ -87,7 +97,6 @@ exports.onRequestGet = async (context) => {
     );
   }
 
-  // cache
   const cached = await cacheGet(request);
   if (cached) {
     return cached;
@@ -102,8 +111,7 @@ exports.onRequestGet = async (context) => {
   });
 
   const elapsedMs = Math.round(performance.now() - start);
-
-  // XRPL sometimes returns 200 with {"error":...}
+  const observedAt = nowIso();
   const rpcResult = result?.json?.result;
   const rpcError = result?.json?.error || rpcResult?.error || result?.json?.result?.error;
   const offers = Array.isArray(rpcResult?.offers) ? rpcResult.offers : [];
@@ -114,12 +122,16 @@ exports.onRequestGet = async (context) => {
     elapsedMs,
     currencyInput: normalized.currencyInput,
     currencyNormalized,
+    issuer,
+    pairKey,
     offers,
     offersCount: offers.length,
     bidsCount: offers.length,
     asksCount: offers.length,
     error: rpcError || result?.error || null,
     attempts,
+    observedAt,
+    freshness: buildFreshnessMeta({ observedAt, cacheTtlSeconds: CACHE_TTL_SECONDS, source: endpointUsed || "runtime", isStale: false }),
     cached: false,
     isStale: false,
   };
@@ -137,7 +149,6 @@ exports.onRequestGet = async (context) => {
   return resp;
 };
 
-// accept POST as well (debug / scripts)
 exports.onRequestPost = async (context) => {
   const { request } = context;
   const url = new URL(request.url);
