@@ -1,4 +1,5 @@
 import { getPopularPairs } from './_popular_pairs.js';
+import { getPairPrecomputeStats } from '../../shared/pair-precompute-store.js';
 
 const XRPL_ENDPOINTS = [
   'https://xrplcluster.com/',
@@ -87,6 +88,7 @@ export async function onRequestGet({ env }) {
   const checkedAt = new Date().toISOString();
   const bindings = detectBindings(env);
   const popularPairs = getPopularPairs();
+  const precomputeStats = await getPairPrecomputeStats(env);
 
   try {
     let sawPartial = false;
@@ -124,6 +126,9 @@ export async function onRequestGet({ env }) {
             bindings,
             popular_pairs_count: popularPairs.length,
             precompute_registry_ready: popularPairs.length > 0,
+            precompute_current_count: precomputeStats.count,
+            precompute_latest_success_at: precomputeStats.latestSuccessAt,
+            precompute_stale_count: precomputeStats.staleCount,
             quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
           },
         });
@@ -152,6 +157,9 @@ export async function onRequestGet({ env }) {
         bindings,
         popular_pairs_count: popularPairs.length,
         precompute_registry_ready: popularPairs.length > 0,
+        precompute_current_count: precomputeStats.count,
+        precompute_latest_success_at: precomputeStats.latestSuccessAt,
+        precompute_stale_count: precomputeStats.staleCount,
         quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
       },
     });
@@ -173,6 +181,9 @@ export async function onRequestGet({ env }) {
         bindings,
         popular_pairs_count: popularPairs.length,
         precompute_registry_ready: popularPairs.length > 0,
+        precompute_current_count: precomputeStats.count,
+        precompute_latest_success_at: precomputeStats.latestSuccessAt,
+        precompute_stale_count: precomputeStats.staleCount,
         quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
       },
     });
