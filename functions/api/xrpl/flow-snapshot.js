@@ -18,7 +18,7 @@ function normalizeWindow(rawWindow) {
   return '1h';
 }
 
-export async function onRequestGet({ request }) {
+export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const preset = url.searchParams.get('preset') || 'exchanges';
   const window = normalizeWindow(url.searchParams.get('window'));
@@ -28,8 +28,8 @@ export async function onRequestGet({ request }) {
   const escrowRequest = new Request(`https://local/api/xrpl/escrow-watch?window=${encodeURIComponent(window)}&limit=10`);
 
   const [flowResponse, escrowResponse] = await Promise.all([
-    whaleFlowHandler({ request: flowRequest }),
-    escrowWatchHandler({ request: escrowRequest }),
+    whaleFlowHandler({ request: flowRequest, env }),
+    escrowWatchHandler({ request: escrowRequest, env }),
   ]);
 
   const flow = await flowResponse.json();
@@ -37,8 +37,13 @@ export async function onRequestGet({ request }) {
   const snapshot = normalizeFlowAlertSnapshot({ flow, escrow, preset, window });
 
   if (persist) {
-    await appendSnapshot(snapshot);
+    await appendSnapshot(snapshot, env);
   }
 
-  return json({ ok: true, snapshot, persisted: persist });
+  return json({
+    ok: true,
+    snapshot,
+    persisted: persist,
+    persistenceMode: env?.XSIC_DB ? 'd1' : 'runtime-fallback',
+  });
 }
