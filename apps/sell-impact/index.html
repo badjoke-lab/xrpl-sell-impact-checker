@@ -6,499 +6,290 @@
     <title>Sell Impact — XSIC</title>
     <meta
       name="description"
-      data-i18n-content="app.description"
       content="Estimate sell impact and receive amounts before you trade."
     />
     <link rel="stylesheet" href="/styles.css" />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/">
-  <meta property="og:site_name" content="XSIC">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta property="og:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta name="twitter:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <link rel="icon" href="/favicon.png">
-  <link rel="apple-touch-icon" href="/favicon.png">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0D84H0D66W"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-0D84H0D66W');
-  </script>
-</head>
-  <body data-nav-key="apps">
+    <link rel="stylesheet" href="/apps/sell-impact/sell-impact.css" />
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/sell-impact/" />
+    <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+  </head>
+  <body class="is-explain" data-nav-key="apps">
     <noscript><p class="error-banner">JavaScript is required to use this tool.</p></noscript>
-    <div class="app">
+    <div class="app page console-page sell-impact-page">
       <p class="error-banner" id="i18n-error-banner" hidden></p>
-      <header class="app__header">
+
+            <header class="app__header global-header">
         <div class="app__header-top">
-          <a href="/" class="brand-link" aria-label="Home"><div class="app__brand" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <img class="app__logo" src="/xsic_logo.png" alt="XRPL Sell Impact Checker logo" width="36" height="36" />
-            <h1 class="app__title" style="word-break: keep-all;">XRPL SELL IMPACT CHECKER</h1>
-          </div></a>
-          <button
-            class="ghost-button"
-            type="button"
-            data-i18n="header.wallet_not_required"
-            hidden
-          ></button>
-          <div
-            class="lang-switch"
-            role="group"
-            aria-label="Language"
-            data-i18n-aria-label="language.label"
-          >
-            <span class="lang-switch__label" data-i18n="language.label"></span>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="en"
-              aria-pressed="false"
-            >
-              EN
-            </button>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="ja"
-              aria-pressed="false"
-            >
-              JA
-            </button>
-          </div>
+          <a href="/" class="brand-link" aria-label="XSIC Home">
+            <div class="app__brand">
+              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+              <h1 class="app__title">XSIC</h1>
+            </div>
+          </a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+          <div data-global-nav></div>
         </div>
-        <p class="app__catchcopy" data-i18n="header.tagline"></p>
-        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-        <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
-        <div data-global-nav></div>
       </header>
 
-      <main class="app__main">
-        <div id="mobile-jump" class="mobile-jump" aria-label="Jump">
-          <a class="mobile-jump__btn" href="#inputs-section" data-i18n="mobile.jump_inputs"></a>
-          <a class="mobile-jump__btn" href="#results-section" data-i18n="mobile.jump_results"></a>
-        </div>
-        <section class="card" aria-label="Shared UI state mount">
-          <div class="ui-mount" data-ui-mount="sell-impact"></div>
+      <main class="page__content">
+        <section class="hero-head">
+          <p class="eyebrow">Execution quality / route reasoning</p>
+          <h2 class="page-title">Sell Impact</h2>
+          <p class="page-subtitle">
+            Estimate receive, impact, depth stress, and route quality before execution. This page is decision-first: the top answers what happens now, and the lower sections explain why.
+          </p>
         </section>
-<section class="card" id="inputs-section" aria-labelledby="inputs-heading">
-<div class="card__header">
-            <h2 id="inputs-heading" data-i18n="sections.inputs"></h2>
-            <div class="pill-group">
-              <span class="pill pill--active" data-i18n="modes.simple"></span>
-              <span class="pill" data-i18n="modes.advanced"></span>
-            </div>
-          </div>
 
-          <div class="grid two-column">
-            <label class="field field--suggestions">
-              <span class="field__label" data-i18n="fields.currency.label"></span>
-              <input
-                id="currency-input"
-                type="text"
-                data-i18n-placeholder="fields.currency.placeholder"
-                aria-describedby="currency-error"
-                autocomplete="off"
-              />
+        <section class="card controls-card" aria-labelledby="controls-heading">
+          <h3 id="controls-heading" class="section-title">Controls</h3>
+          <div class="controls-grid">
+            <label class="field">Side
+              <select id="trade-side-select">
+                <option value="sell" selected>Sell</option>
+                <option value="buy">Buy</option>
+              </select>
+            </label>
+            <label class="field">Pair · token
+              <input id="currency-input" autocomplete="off" placeholder="RLUSD" aria-describedby="currency-error" />
               <ul id="token-suggestions" class="suggestions" role="listbox" hidden></ul>
-
               <p class="field__error" id="currency-error" data-error-for="currency" hidden></p>
             </label>
-            <label class="field">
-              <span class="field__label" data-i18n="fields.issuer.label"></span>
-              <input
-                id="issuer-input"
-                type="text"
-                data-i18n-placeholder="fields.issuer.placeholder"
-                aria-describedby="issuer-help issuer-error"
-              />
-              <p class="field__help" id="issuer-help" data-i18n="fields.issuer.helper"></p>
+            <label class="field">Pair · issuer
+              <input id="issuer-input" placeholder="Issuer address" aria-describedby="issuer-error" />
               <p class="field__error" id="issuer-error" data-error-for="issuer" hidden></p>
             </label>
-            <label class="field">
-              <span class="field__label" data-i18n="fields.amount.label"></span>
-              <input
-                id="sell-amount-input"
-                type="number"
-                min="0"
-                step="any"
-                data-i18n-placeholder="fields.amount.placeholder"
-                aria-describedby="amount-error"
-              />
+            <label class="field">Amount
+              <input id="sell-amount-input" type="number" min="0" step="any" placeholder="150000" aria-describedby="amount-error" />
               <p class="field__error" id="amount-error" data-error-for="amount" hidden></p>
             </label>
-            
-            <label class="field">
-              <span class="field__label" data-i18n="fields.orderbook_limit.label"></span>
-              <input
-                id="limit-input"
-                type="number"
-                min="1"
-                step="1"
-                value="50"
-                data-i18n-placeholder="fields.orderbook_limit.placeholder"
-                aria-describedby="limit-error limit-note"
-              />
+            <div class="field">Mode
+              <div class="mode-group" role="group" aria-label="Estimation mode">
+                <button class="mode-chip" id="mode-quick" data-mode="quick" type="button" aria-pressed="false">Quick</button>
+                <button class="mode-chip is-active" id="mode-explain" data-mode="explain" type="button" aria-pressed="true">Explain</button>
+              </div>
+            </div>
+            <label class="field">Orderbook limit
+              <input id="limit-input" type="number" min="1" step="1" value="50" aria-describedby="limit-error" />
               <p class="field__error" id="limit-error" data-error-for="limit" hidden></p>
-              <p class="field__note" id="limit-note" hidden></p>
             </label>
+            <button class="button button--ghost secondary-button" type="button" id="reset-inputs">Reset</button>
+            <button class="button button--primary primary-button" type="button">Estimate</button>
+            <div class="status-inline status">Status: <strong>READY · EXPLAIN</strong></div>
           </div>
-
-          <details class="advanced">
-            <summary data-i18n="sections.advanced_controls"></summary>
-            <div class="grid two-column">
-              <label class="field">
-                <span class="field__label" data-i18n="fields.impact_threshold.label"></span>
-                <select id="impact-threshold-select" aria-describedby="impact-threshold-help">
-                  <option value="1" data-i18n="fields.impact_threshold.option_1"></option>
-                  <option value="2" data-i18n="fields.impact_threshold.option_2"></option>
-                  <option value="5" data-i18n="fields.impact_threshold.option_5" selected></option>
-                  <option value="10" data-i18n="fields.impact_threshold.option_10"></option>
-                  <option value="20" data-i18n="fields.impact_threshold.option_20"></option>
-                </select>
-                <p
-                  class="field__help"
-                  id="impact-threshold-help"
-                  data-i18n="fields.impact_threshold.helper"
-                ></p>
-              </label>
-              <label class="field">
-                <span class="field__label" data-i18n="fields.thin_cutoff.label"></span>
-                <input
-                  id="thin-cutoff-input"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value="20"
-                  data-i18n-placeholder="fields.thin_cutoff.placeholder"
-                  aria-describedby="thin-cutoff-help"
-                />
-                <p
-                  class="field__help"
-                  id="thin-cutoff-help"
-                  data-i18n="fields.thin_cutoff.helper"
-                ></p>
-              </label>
-              <label class="field">
-                <span class="field__label" data-i18n="fields.fiat_currency.label"></span>
-                <select id="fiat-currency-select" aria-describedby="fiat-currency-help">
-                  <option value="USD" data-i18n="fields.fiat_currency.option_usd" selected></option>
-                  <option value="JPY" data-i18n="fields.fiat_currency.option_jpy"></option>
-                </select>
-                <p
-                  class="field__help"
-                  id="fiat-currency-help"
-                  data-i18n="fields.fiat_currency.helper"
-                ></p>
-              </label>
-            </div>
-          </details>
-
-          <div class="actions">
-  <div class="action-row" aria-label="Actions">
-    <div class="action-row__left">      <button class="secondary-button" type="button" id="reset-inputs" data-i18n="actions.reset">Reset</button>
-      <button class="secondary-button" type="button" id="copy-link" data-i18n="actions.copy_link">Copy link</button>
-    </div>
-    <div class="action-row__right">
-      <button class="primary-button" type="button" data-i18n="actions.estimate">Estimate</button>
-    </div>
-  </div>            <p class="status status--notice" id="example-status" hidden></p>
-            
-            
-            <p class="status status--notice" id="share-load-note" data-i18n="status.loaded_from_link" hidden></p>
-            <p class="status status--success" id="share-toast" aria-live="polite" hidden></p>
-            
-            <div class="progress-bar" id="estimate-progress" role="progressbar" aria-label="Estimating" hidden>
-              <span class="progress-bar__fill"></span>
-            </div>
-            <p class="error-banner" hidden></p>
-            <p class="status" data-i18n="status.waiting"></p>
-            <p class="status-endpoint" hidden></p>
-</div>
+          <div class="meta-chip-row" style="margin-top: 10px;">
+            <span class="meta-chip" data-result="data-fetched">snapshot: --</span>
+            <span class="meta-chip" data-result="pair-label">pair: XRP / ...</span>
+            <span class="meta-chip" data-result="endpoint-details">source: --</span>
+            <span class="meta-chip" data-result="pair-meta">state: waiting</span>
+          </div>
+          <input id="impact-threshold-select" type="hidden" value="5" />
+          <input id="thin-cutoff-input" type="hidden" value="20" />
+          <select id="fiat-currency-select" hidden><option value="USD" selected>USD</option><option value="JPY">JPY</option></select>
+          <p id="limit-note" hidden></p>
+          <p id="impact-threshold-help" hidden></p>
+          <button id="copy-link" hidden type="button">Copy link</button>
+          <p id="share-load-note" hidden></p>
+          <p id="share-toast" hidden></p>
+          <p id="estimate-progress" hidden></p>
+          <p id="example-status" hidden></p>
+          <button id="try-example" hidden type="button">Example</button>
         </section>
 
-<section id="results-section" class="results" aria-label="Results">
-  <nav class="results-tabs" aria-label="Results tabs">
-    <a class="tab" data-tab="summary" href="#summary-block">Summary</a>
-    <a class="tab" data-tab="details" href="#details-block">Details</a>
-<a class="tab" data-tab="debug" href="#debug-panel"  >Debug</a>
-  </nav>
-
-
-        <section class="grid two-column">
-          <article id="summary-block" class="card" aria-labelledby="result-summary" data-pane="summary">
-            <div class="card__header">
-              <h2 id="result-summary" data-i18n="sections.results_summary"></h2>
-            </div>
-            <div class="result-stack">
-              <div class="result-row">
-                <p class="label" data-i18n="results.sellability.label"></p>
-                <p class="value" data-result="sellability" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="filled-line" data-i18n="common.placeholder"></p>
-              </div>
-              <div class="result-row">
-                <p class="label" data-i18n="results.freshness.label"></p>
-                <p class="subvalue" data-result="data-fetched" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="endpoint" data-i18n="common.placeholder"></p>
-              </div>
-              <div class="result-row">
-                <p class="label" data-i18n="results.used_venue.label"></p>
-                <p class="value" data-result="used-venue-summary" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="used-venue-note"></p>
-              </div>
-              <div class="result-row">
-                <p class="label" data-i18n="results.receive.label"></p>
-                <p class="value" data-result="receive" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="fiat-rate" data-i18n="results.receive.fiat_pending"></p>
-              </div>
-              <p class="warning-banner" data-result="fiat-warning" hidden></p>
-              <div class="result-row">
-                <p class="label" data-i18n="results.slippage.label"></p>
-                <p class="value" data-result="slippage" data-i18n="common.placeholder"></p>
-                <p class="help" data-result="slippage-help" data-i18n="results.slippage.help"></p>
-              </div>
-              <div class="result-row">
-                <p class="label" data-result="max-sell-label"></p>
-                <p class="value" data-result="max-sell-value" data-i18n="common.placeholder"></p>
-                <p class="subvalue" data-result="max-sell-note"></p>
-              </div>
-            </div>
-            <p class="why-line" data-result="why"></p>
-            <p class="warning-banner" data-result="warning" hidden></p>
-          </article>
-
-          <article id="details-block" class="card" aria-labelledby="result-details" data-pane="details">
-            <div class="card__header">
-              <h2 id="result-details" data-i18n="sections.execution_details"></h2>
-            </div>
-            <ul class="list">
-              <li>
-                <span data-i18n="details.order_count"></span>:
-                <span data-result="order-count" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.best_price"></span>:
-                <span data-result="best-price" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.worst_price"></span>:
-                <span data-result="worst-price" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-result="liquidity-split-label" data-i18n="common.placeholder"></span>:
-                <span data-result="liquidity-split" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.amm_reserves"></span>:
-                <span data-result="amm-reserves" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.amm_fee"></span>:
-                <span data-result="amm-fee" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.used_venue"></span>:
-                <span data-result="used-venue-details" data-i18n="common.placeholder"></span>
-              </li>
-              <li>
-                <span data-i18n="details.endpoint_tried"></span>:
-                <span data-result="endpoint-details" data-i18n="common.placeholder"></span>
-              </li>
-            </ul>
-          
-
-<section id="charts-block" class="grid two-column">
-          <article class="card" aria-labelledby="graph-depth">
-            <div class="card__header">
-              <h2 id="graph-depth" data-i18n="sections.depth_curve"></h2>
-            </div>
-            <p class="chart__help" data-i18n="graphs.depth.helper"></p>
-            <div class="chart" data-chart="depth">
-              <svg
-                id="depth-chart"
-                class="chart__svg"
-                viewBox="0 0 320 200"
-                preserveAspectRatio="none"
-                data-i18n-aria-label="graphs.depth.aria_label"
-                role="img"
-              ></svg>
-            </div>
-            <p class="chart__note" data-result="depth-note" hidden></p>
-            <p class="chart__summary" data-result="depth-summary"></p>
-          </article>
-
-          <article class="card" aria-labelledby="graph-impact">
-            <div class="card__header">
-              <h2 id="graph-impact" data-i18n="sections.impact_curve"></h2>
-            </div>
-            <p class="chart__help" data-i18n="graphs.impact.helper"></p>
-            <div class="chart" data-chart="impact">
-              <svg
-                id="impact-chart"
-                class="chart__svg"
-                viewBox="0 0 320 200"
-                preserveAspectRatio="none"
-                data-i18n-aria-label="graphs.impact.aria_label"
-                role="img"
-              ></svg>
-            </div>
-            <p class="chart__note" data-result="impact-note" hidden></p>
-            <p class="chart__summary" data-result="impact-summary"></p>
-          </article>
-        </section>
-</article>
+        <section class="card note-card">
+          <div class="flow-note" data-result="warning">Partial explain snapshot shown. Quick estimate is usable; route-comparison details may lag behind the latest book edge.</div>
+          <div class="flow-note flow-note--quiet">State guide: stale / partial keeps the latest readable estimate, empty means no executable route was found, and error means estimation is currently unavailable.</div>
         </section>
 
-        <details class="card debug-panel" id="debug-panel" hidden data-pane="debug">
-          <summary class="debug-panel__summary">Debug panel</summary>
-          <div class="debug-panel__body">
-            <div class="debug-panel__actions">
-              <button class="secondary-button" type="button" id="debug-copy">Copy debug</button>
-              <p class="status status--success" data-debug="copy-status" hidden></p>
+        <section class="signal-grid">
+          <article class="card signal-card">
+            <div class="signal-label">Estimated receive</div>
+            <div class="hero-value" data-result="receive">—</div>
+            <div class="copy" data-result="fiat-rate">Output at current bounded snapshot.</div>
+            <div class="badge-row">
+              <span class="pill pill--good" data-result="sellability">Tradable</span>
+              <span class="pill pill--primary" data-result="filled-line">Stable read</span>
+              <span class="pill" data-result="fiat-warning" hidden></span>
             </div>
-            <div class="debug-panel__table">
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Last request</span>
-                <span class="debug-panel__value" data-debug="last-request">—</span>
+          </article>
+          <article class="card signal-card">
+            <div class="signal-label">Price impact</div>
+            <div class="hero-value" data-result="slippage">—</div>
+            <div class="copy" data-result="slippage-help">Estimated slippage for current size.</div>
+          </article>
+          <article class="card signal-card">
+            <div class="signal-label">Execution quality</div>
+            <div class="hero-value" data-result="max-sell-value">—</div>
+            <div class="copy" data-result="max-sell-note">Bounded confidence envelope.</div>
+          </article>
+          <article class="card signal-card">
+            <div class="signal-label">Context</div>
+            <div class="copy" data-result="used-venue-summary">—</div>
+            <div class="copy" data-result="used-venue-note">—</div>
+            <div class="copy" data-result="endpoint">—</div>
+          </article>
+        </section>
+
+        <section class="metrics-grid">
+          <article class="card metric-card"><p class="metric-label">Best price</p><p class="metric-value" data-result="best-price">—</p></article>
+          <article class="card metric-card"><p class="metric-label">Worst price</p><p class="metric-value" data-result="worst-price">—</p></article>
+          <article class="card metric-card"><p class="metric-label">Orders used</p><p class="metric-value" data-result="order-count">—</p></article>
+          <article class="card metric-card"><p class="metric-label" data-result="max-sell-label">Max sell</p><p class="metric-value" data-result="mix-summary">—</p></article>
+          <article class="card metric-card"><p class="metric-label" data-result="liquidity-split-label">Liquidity split</p><p class="metric-value" data-result="liquidity-split">—</p></article>
+          <article class="card metric-card"><p class="metric-label">AMM reserves</p><p class="metric-value" data-result="amm-reserves">—</p></article>
+          <article class="card metric-card"><p class="metric-label">AMM fee</p><p class="metric-value" data-result="amm-fee">—</p></article>
+          <article class="card metric-card"><p class="metric-label">Venue detail</p><p class="metric-value" data-result="used-venue-details">—</p></article>
+        </section>
+
+        <section class="card mainviz-card" data-mode-only="explain">
+          <div class="section-head"><div><h3 class="section-title">Execution overview</h3><p class="section-note">Decision-first snapshot: depth posture, execution mix, reasoning, and confidence.</p></div></div>
+          <div class="mainviz-layout">
+            <div class="viz-panel">
+              <div class="depth-shell">
+                <div class="depth-stage">
+                  <div>
+                    <div class="signal-label">Market depth / thinness</div>
+                    <div class="section-note" data-result="depth-summary">Unavailable in this snapshot.</div>
+                  </div>
+                  <div class="depth-bands">
+                    <div class="depth-row"><div class="depth-name">Touch band</div><div class="depth-track"><span class="depth-fill" data-result="depth-touch-bar" style="--w:0%"></span></div><div class="depth-value" data-result="depth-touch-label">Unavailable</div></div>
+                    <div class="depth-row"><div class="depth-name">Inner book</div><div class="depth-track"><span class="depth-fill" data-result="depth-inner-bar" style="--w:0%"></span></div><div class="depth-value" data-result="depth-inner-label">Unavailable</div></div>
+                    <div class="depth-row"><div class="depth-name">AMM support</div><div class="depth-track"><span class="depth-fill depth-fill--warn" data-result="depth-amm-bar" style="--w:0%"></span></div><div class="depth-value" data-result="depth-amm-label">Unavailable</div></div>
+                    <div class="depth-row"><div class="depth-name">Bridge tail</div><div class="depth-track"><span class="depth-fill depth-fill--danger" data-result="depth-bridge-bar" style="--w:0%"></span></div><div class="depth-value" data-result="depth-bridge-label">Unavailable</div></div>
+                  </div>
+                  <div class="depth-caption" data-result="depth-caption">Unavailable in this snapshot.</div>
+                </div>
               </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Requested input</span>
-                <pre class="debug-panel__value debug-panel__pre" data-debug="request-payload">—</pre>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Endpoint used</span>
-                <span class="debug-panel__value" data-debug="endpoint-used">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Upstream status</span>
-                <span class="debug-panel__value" data-debug="upstream-status">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Response status</span>
-                <span class="debug-panel__value" data-debug="status">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Elapsed</span>
-                <span class="debug-panel__value" data-debug="elapsed-ms">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Offers count</span>
-                <span class="debug-panel__value" data-debug="offers-count">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">CLOB max</span>
-                <span class="debug-panel__value" data-debug="clob-max">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">AMM max</span>
-                <span class="debug-panel__value" data-debug="amm-max">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">CLOB share</span>
-                <span class="debug-panel__value" data-debug="clob-share">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Chosen venue</span>
-                <span class="debug-panel__value" data-debug="venue">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Venue reason</span>
-                <span class="debug-panel__value" data-debug="venue-reason">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Error</span>
-                <span class="debug-panel__value" data-debug="error">—</span>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Raw response</span>
-                <details class="debug-panel__value debug-panel__details">
-                  <summary>View response</summary>
-                  <pre class="debug-panel__pre" data-debug="raw-response">—</pre>
-                </details>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Response keys</span>
-                <pre class="debug-panel__value debug-panel__pre" data-debug="response-keys">—</pre>
-              </div>
-              <div class="debug-panel__row">
-                <span class="debug-panel__key">Timings</span>
-                <div class="debug-panel__timings">
-                  <span>validate <strong data-debug="validate-ms">—</strong></span>
-                  <span>network <strong data-debug="network-ms">—</strong></span>
-                  <span>parse <strong data-debug="parse-ms">—</strong></span>
+
+              <div class="mix-card">
+                <div class="signal-label">Execution mix</div>
+                <div class="mix-track" aria-hidden="true">
+                  <span class="mix-segment mix-segment--book" data-result="mix-book-segment" style="width:0%"></span>
+                  <span class="mix-segment mix-segment--amm" data-result="mix-amm-segment" style="width:0%"></span>
+                  <span class="mix-segment mix-segment--bridge" data-result="mix-bridge-segment" style="width:0%"></span>
+                </div>
+                <div class="mix-legend">
+                  <span><i class="mix-dot" style="background: rgba(111,99,194,.92);"></i><span data-result="mix-book">Book 0%</span></span>
+                  <span><i class="mix-dot" style="background: rgba(111,99,194,.46);"></i><span data-result="mix-amm">AMM 0%</span></span>
+                  <span><i class="mix-dot" style="background: rgba(180,83,9,.72);"></i><span data-result="mix-bridge">Bridge 0%</span></span>
                 </div>
               </div>
             </div>
+            <aside class="viz-side">
+              <div>
+                <div class="signal-label">Why this snapshot matters</div>
+                <h4 class="side-title" data-result="snapshot-headline">Unavailable in this snapshot.</h4>
+                <p class="side-copy" data-result="snapshot-body">Run estimate to generate route-specific rationale.</p>
+              </div>
+              <ul class="bottleneck-list" data-result="snapshot-bullets">
+                <li>Unavailable in this snapshot.</li>
+              </ul>
+              <div class="confidence-box" data-result="route-confidence-card" hidden>
+                <div class="confidence-head">
+                  <strong>Route confidence</strong>
+                  <span class="pill pill--primary" data-result="route-confidence-score">0 / 100</span>
+                </div>
+                <div class="confidence-track"><div class="confidence-fill" data-result="route-confidence-bar" style="--w:0%"></div></div>
+                <div class="meta" data-result="route-confidence-summary">Unavailable in this snapshot.</div>
+              </div>
+            </aside>
           </div>
-        </details>
+          <details data-mobile-details="1">
+            <summary>Debug charts (detail)</summary>
+            <div class="chart"><svg id="depth-chart" class="chart__svg" viewBox="0 0 320 200" preserveAspectRatio="none" role="img" aria-label="Depth chart"></svg></div>
+            <p class="section-note" data-result="depth-note" hidden></p>
+            <div class="chart"><svg id="impact-chart" class="chart__svg" viewBox="0 0 320 200" preserveAspectRatio="none" role="img" aria-label="Impact chart"></svg></div>
+            <p class="section-note" data-result="impact-note" hidden></p>
+            <p class="section-note" data-result="impact-summary" hidden>Unavailable in this snapshot.</p>
+          </details>
+        </section>
 
-        
-</details>
-
-</details>
-  </section>
-
-
-
-
-        <section class="card" aria-labelledby="faq-heading">
-          <div class="card__header">
-            <h2 id="faq-heading" data-i18n="sections.faq"></h2>
-          </div>
-          <div class="stack">
-            <p>
-              <strong data-i18n="faq.q1"></strong>
-              <span data-i18n="faq.a1"></span>
-            </p>
-            <p>
-              <strong data-i18n="faq.q2"></strong>
-              <span data-i18n="faq.a2"></span>
-            </p>
+        <section class="card why-card" data-mode-only="explain">
+          <div class="section-head"><div><h3 class="section-title">Why Route?</h3><p class="section-note">Pathfinding + bottleneck + explanation.</p></div></div>
+          <div class="why-layout">
+            <div class="why-panel">
+              <div class="route-svg-wrap">
+                <span class="meta-chip">selected path reasoning</span>
+                <svg class="route-svg" viewBox="0 0 720 220" role="img" aria-label="Selected route path">
+                  <circle cx="72" cy="110" r="22"></circle><circle cx="252" cy="74" r="14"></circle><circle cx="252" cy="146" r="14"></circle><circle cx="460" cy="74" r="14"></circle><circle cx="460" cy="146" r="14"></circle><circle cx="646" cy="110" r="22"></circle>
+                  <path data-route-segment="clob" d="M94 104 C138 88 182 80 236 74"></path><path data-route-segment="amm" class="path path--alt" d="M94 116 C148 130 186 138 236 146"></path><path data-route-segment="clob" d="M266 74 C338 74 382 74 446 74"></path><path data-route-segment="amm" class="path path--alt" d="M266 146 C338 146 382 146 446 146"></path><path data-route-segment="clob" d="M474 74 C546 74 590 86 624 104"></path><path data-route-segment="fallback" class="path path--tail" d="M474 146 C542 146 588 132 624 116"></path>
+                  <text x="72" y="114" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">XRP</text>
+                  <text x="252" y="78" text-anchor="middle" font-size="11" font-weight="700" fill="#4c1d95">Book</text>
+                  <text x="252" y="150" text-anchor="middle" font-size="11" font-weight="700" fill="#4c1d95">AMM</text>
+                  <text x="460" y="78" text-anchor="middle" font-size="11" font-weight="700" fill="#4c1d95">Book</text>
+                  <text x="460" y="150" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">Bridge</text>
+                  <text x="646" y="114" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" data-result="route-target-label">Token</text>
+                </svg>
+                <div class="route-caption"><span>thicker = larger share</span><span>dashed = fallback tail only</span></div>
+              </div>
+            </div>
+            <aside class="why-panel">
+              <div>
+                <div class="signal-label">Why this path</div>
+                <h4 class="side-title" data-result="path-headline">Unavailable in this snapshot.</h4>
+                <p class="side-copy" data-result="why">Unavailable in this snapshot.</p>
+              </div>
+              <div class="bottleneck-map">
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Book refill risk</strong><span data-result="risk-book">Unavailable</span></div><div class="bar"><span data-result="risk-book-bar" style="--w:0%"></span></div></div>
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>AMM drift</strong><span data-result="risk-amm">Unavailable</span></div><div class="bar"><span data-result="risk-amm-bar" style="--w:0%"></span></div></div>
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Bridge dependence</strong><span data-result="risk-bridge">Unavailable</span></div><div class="bar"><span class="warn" data-result="risk-bridge-bar" style="--w:0%"></span></div></div>
+                <div class="bottleneck-row"><div class="bottleneck-head"><strong>Insufficient depth</strong><span data-result="risk-depth">Unavailable</span></div><div class="bar"><span class="danger" data-result="risk-depth-bar" style="--w:0%"></span></div></div>
+              </div>
+              <ul class="why-list" data-result="path-bullets"><li>Unavailable in this snapshot.</li></ul>
+            </aside>
           </div>
         </section>
 
-        <section class="card" aria-labelledby="disclaimer-heading">
-          <div class="card__header">
-            <h2 id="disclaimer-heading" data-i18n="sections.disclaimer"></h2>
+        <section class="card candidates-card" data-mode-only="explain">
+          <div class="section-head"><div><h3 class="section-title">Candidate routes</h3></div></div>
+          <div class="candidates-grid">
+            <article class="card candidate-card is-selected" data-route-card="a"><div class="candidate-head"><h4 class="candidate-title" data-result="candidate-a-title">Route A · Selected</h4><span class="pill pill--primary" data-result="candidate-a-role">Selected</span></div><div class="candidate-grid"><div><div class="route-label">Est. output</div><div class="route-value" data-result="candidate-a-output">Unavailable</div></div><div><div class="route-label">Impact</div><div class="route-value" data-result="candidate-a-impact">Unavailable</div></div><div><div class="route-label">Bottleneck</div><div class="route-subvalue" data-result="candidate-a-bottleneck">Unavailable</div></div><div><div class="route-label" data-result="candidate-a-reason-label">Why chosen</div><div class="route-subvalue" data-result="candidate-a-reason">Unavailable in this snapshot.</div></div></div><div class="route-track"><span data-result="candidate-a-confidence-bar" style="--w:0%"></span></div><div class="route-subvalue" data-result="candidate-a-confidence">Unavailable</div></article>
+            <article class="card candidate-card" data-route-card="b"><div class="candidate-head"><h4 class="candidate-title" data-result="candidate-b-title">Route B · Alternative</h4><span class="pill pill--warn" data-result="candidate-b-role">Alternative</span></div><div class="candidate-grid"><div><div class="route-label">Est. output</div><div class="route-value" data-result="candidate-b-output">Unavailable</div></div><div><div class="route-label">Impact</div><div class="route-value" data-result="candidate-b-impact">Unavailable</div></div><div><div class="route-label">Bottleneck</div><div class="route-subvalue" data-result="candidate-b-bottleneck">Unavailable</div></div><div><div class="route-label" data-result="candidate-b-reason-label">Why not</div><div class="route-subvalue" data-result="candidate-b-reason">Unavailable in this snapshot.</div></div></div><div class="route-track"><span data-result="candidate-b-confidence-bar" style="--w:0%"></span></div><div class="route-subvalue" data-result="candidate-b-confidence">Unavailable</div></article>
+            <article class="card candidate-card" data-route-card="c"><div class="candidate-head"><h4 class="candidate-title" data-result="candidate-c-title">Route C · Fallback</h4><span class="pill pill--danger" data-result="candidate-c-role">Fallback</span></div><div class="candidate-grid"><div><div class="route-label">Est. output</div><div class="route-value" data-result="candidate-c-output">Unavailable</div></div><div><div class="route-label">Impact</div><div class="route-value" data-result="candidate-c-impact">Unavailable</div></div><div><div class="route-label">Bottleneck</div><div class="route-subvalue" data-result="candidate-c-bottleneck">Unavailable</div></div><div><div class="route-label" data-result="candidate-c-reason-label">Why not</div><div class="route-subvalue" data-result="candidate-c-reason">Unavailable in this snapshot.</div></div></div><div class="route-track"><span data-result="candidate-c-confidence-bar" style="--w:0%"></span></div><div class="route-subvalue" data-result="candidate-c-confidence">Unavailable</div></article>
           </div>
-          <p data-i18n="disclaimer.text"></p>
         </section>
 
-        <section class="card" aria-labelledby="sources-heading">
-          <div class="card__header">
-            <h2 id="sources-heading" data-i18n="sections.sources"></h2>
+        <section class="card snapshot-card" data-mode-only="explain">
+          <div class="section-head"><div><h3 class="section-title">Snapshot strips</h3></div></div>
+          <div class="snapshot-grid">
+            <article class="card snapshot-strip"><h4 class="snapshot-title">Estimated output drift</h4><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Estimated output drift"><path data-result="snapshot-strip-output" d="M8 56 L296 56" fill="none" stroke="rgba(111,99,194,0.88)" stroke-width="3" /></svg><div class="snapshot-footer"><span data-result="snapshot-output-note">Waiting for snapshot updates.</span><span class="snapshot-value" data-result="depth-summary">—</span></div></article>
+            <article class="card snapshot-strip"><h4 class="snapshot-title">Impact score trend</h4><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Impact score trend"><path data-result="snapshot-strip-impact" d="M8 56 L296 56" fill="none" stroke="rgba(180,83,9,0.9)" stroke-width="3" /></svg><div class="snapshot-footer"><span data-result="snapshot-impact-note">Waiting for slippage context.</span><span class="snapshot-value" data-result="impact-summary">—</span></div></article>
+            <article class="card snapshot-strip"><h4 class="snapshot-title">Bridge share trend</h4><svg class="sparkline" viewBox="0 0 320 82" role="img" aria-label="Bridge share trend"><path data-result="snapshot-strip-context" d="M8 56 L296 56" fill="none" stroke="rgba(4,120,87,0.9)" stroke-width="3" /></svg><div class="snapshot-footer"><span data-result="snapshot-context-note">Waiting for route selection context.</span><span class="snapshot-value" data-result="endpoint-details">Unavailable</span></div></article>
           </div>
-          <ul class="list">
-            <li data-i18n="sources.xrpl"></li>
-            <li data-i18n="sources.trades"></li>
-            <li data-i18n="sources.feeds"></li>
-          </ul>
+        </section>
+
+        <section class="card snapshot-card" data-mode-only="explain">
+          <div class="section-head"><div><h3 class="section-title">Snapshot notes</h3></div></div>
+          <div class="snapshot-notes-grid" data-result="snapshot-notes">
+            <article class="card snapshot-note-card"><div class="signal-label">Latest snapshot state</div><ul class="snapshot-note-list" data-result="snapshot-note-current"><li>Waiting for estimate.</li></ul></article>
+            <article class="card snapshot-note-card"><div class="signal-label">Previous delta / operator note</div><ul class="snapshot-note-list" data-result="snapshot-note-delta"><li>Run estimate to compare with previous snapshot.</li></ul></article>
+          </div>
+        </section>
+
+        <section class="card debug-card" id="debug-panel">
+          <details>
+            <summary>Debug (collapsed, release readiness)</summary>
+            <div class="debug-buttons">
+              <button type="button" class="button button--ghost secondary-button" id="debug-copy">Copy debug</button>
+              <p class="debug-status" data-debug="copy-status" hidden></p>
+            </div>
+            <p class="debug-status mono">Last request: <span data-debug="last-request">—</span></p>
+            <p class="debug-status mono">Endpoint used: <span data-debug="endpoint-used">—</span> / Upstream: <span data-debug="upstream-status">—</span> / Status: <span data-debug="status">—</span> / Elapsed: <span data-debug="elapsed-ms">—</span></p>
+            <p class="debug-status mono">Offers: <span data-debug="offers-count">—</span> · CLOB max: <span data-debug="clob-max">—</span> · AMM max: <span data-debug="amm-max">—</span> · CLOB share: <span data-debug="clob-share">—</span></p>
+            <p class="debug-status mono">Venue: <span data-debug="venue">—</span> · Reason: <span data-debug="venue-reason">—</span></p>
+            <p class="debug-status mono">Error: <span data-debug="error">—</span></p>
+            <pre class="debug-status mono" data-debug="request-payload">—</pre>
+            <pre class="debug-status mono" data-debug="response-keys">—</pre>
+            <pre class="debug-status mono" data-debug="raw-response">—</pre>
+            <p class="debug-status mono">Timings: validate <span data-debug="validate-ms">—</span> / network <span data-debug="network-ms">—</span> / parse <span data-debug="parse-ms">—</span></p>
+          </details>
         </section>
       </main>
 
       <div data-global-footer></div>
     </div>
 
-    <script src="/shared/ui-kit.js"></script>
     <script src="/shared/nav.js"></script>
-    <script>
-      window.XSICUiKit?.renderErrorState('[data-ui-mount="sell-impact"]', {
-        title: "Sell Impact shared state",
-        body: "Errors can now render in a reusable container without breaking layout.",
-        retryLabel: "Dismiss",
-        onRetry: () => window.XSICUiKit?.renderEmptyState('[data-ui-mount="sell-impact"]', {
-          title: "Ready",
-          body: "Continue with the form below.",
-        }),
-      });
-    </script>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/apps/sell-impact/sell-impact.js"></script>
   </body>
 </html>

@@ -1,0 +1,60 @@
+name: Update Flow Alert History
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_optional:
+        description: 'Include optional targets (whales/ripple 1h)'
+        required: false
+        default: 'false'
+  schedule:
+    - cron: '15 * * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  update-flow-history:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check required history files before update
+        run: |
+          test -f data/flow-history/exchanges-1h.json
+          test -f data/flow-history/exchanges-24h.json
+          test -f data/flow-history/exchanges-7d.json
+
+      - name: Update flow history JSON
+        run: |
+          if [ "${{ github.event.inputs.include_optional || 'false' }}" = "true" ]; then
+            node scripts/update_flow_history.mjs --include-optional
+          else
+            node scripts/update_flow_history.mjs
+          fi
+
+      - name: Validate history payload shape
+        run: |
+          node -e "const fs=require('fs');const req=['latest','previous','recent','deltaSummary','historyMeta'];for (const f of ['data/flow-history/exchanges-1h.json','data/flow-history/exchanges-24h.json','data/flow-history/exchanges-7d.json']){const p=JSON.parse(fs.readFileSync(f,'utf8'));for (const k of req){if(!(k in p)) throw new Error(`${f}: missing ${k}`);}if(!Array.isArray(p.recent)) throw new Error(`${f}: recent not array`);if((p.historyMeta?.count??0)!==p.recent.length) throw new Error(`${f}: count mismatch`);if(p.recent.length>1){for(let i=1;i<p.recent.length;i+=1){if(Number(p.recent[i-1].ts)>=Number(p.recent[i].ts)) throw new Error(`${f}: ts not strictly ascending`);}}}"
+
+      - name: Commit updated history files
+        run: |
+          if git diff --quiet -- data/flow-history; then
+            echo "No flow history changes"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/flow-history
+          git commit -m "chore(flow): update flow history snapshots"
+          git push

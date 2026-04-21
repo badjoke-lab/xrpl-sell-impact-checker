@@ -3,53 +3,211 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/liquidity-pulse/" />
     <title>Liquidity Pulse — XSIC</title>
     <meta
       name="description"
       content="Visualize XRPL AMM and DEX liquidity pulse in near real-time with lightweight state-aware UI."
     />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/liquidity-pulse/" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Liquidity Pulse — XSIC" />
+    <meta property="og:description" content="Visualize XRPL AMM and DEX liquidity pulse in near real-time with lightweight state-aware UI." />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Liquidity Pulse — XSIC" />
+    <meta name="twitter:description" content="Visualize XRPL AMM and DEX liquidity pulse in near real-time with lightweight state-aware UI." />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
   </head>
   <body data-nav-key="apps">
-    <div class="app page console-page liquidity-pulse-page">
-      <header class="app__header global-header">
+    <div class="app page console-page flow-alert-page liquidity-pulse-page">
+            <header class="app__header global-header">
         <div class="app__header-top">
-          <a href="/" class="brand-link" aria-label="Home">
+          <a href="/" class="brand-link" aria-label="XSIC Home">
             <div class="app__brand">
               <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
-              <h1 class="app__title">Liquidity Pulse — XSIC</h1>
+              <h1 class="app__title">XSIC</h1>
             </div>
           </a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
           <div data-global-nav></div>
         </div>
       </header>
 
-      <main class="page__content liquidity-pulse" aria-live="polite">
-        <section class="card">
-          <h2 class="page__title">Liquidity Pulse</h2>
-          <p class="page__lede">Dummy rendering is now active. API integration comes next.</p>
+      <main class="page__content flow-alert liquidity-pulse" aria-live="polite">
+        <section class="flow-hero-head">
+          <h2 class="flow-page-title">Liquidity Pulse</h2>
+          <p class="flow-page-subtitle">
+            Observe XRPL pool liquidity, short-horizon pulse, and data freshness in one lightweight page.
+          </p>
+          <noscript>
+            <p class="flow-note">
+              JavaScript is disabled. Live liquidity pulse updates are unavailable, but the page structure remains readable.
+            </p>
+          </noscript>
         </section>
-        <section class="card" aria-label="Shared UI state mount"><div class="ui-mount" data-ui-mount="liquidity-pulse"></div></section>
+
+        <section id="lpActions" class="card flow-controls-card">
+          <div class="flow-controls-grid">
+            <label class="flow-field">Preset
+              <select class="flow-control" aria-label="Liquidity target preset">
+                <option>XRP / RLUSD</option>
+              </select>
+            </label>
+            <label class="flow-field">Window
+              <select id="lp-window-select" class="flow-control" aria-label="Liquidity trend window">
+                <option value="blend">5m / 1h / 24h blend</option>
+                <option value="1h">1h focus</option>
+                <option value="6h">6h focus</option>
+                <option value="24h">24h focus</option>
+              </select>
+            </label>
+            <div class="flow-toggle-group">
+              <label><input id="lite-mode-toggle" type="checkbox" /> Lite mode</label>
+              <label><input id="demo-mode-toggle" type="checkbox" /> Demo only</label>
+            </div>
+            <button id="retry-button" class="flow-button" type="button">Retry</button>
+                      </div>
+        </section>
+
+        <section class="card">
+          <div data-snapshot="stateNote" id="lpStaleBanner" class="flow-note" hidden>
+            Data may be delayed. Latest known liquidity snapshot is retained while refresh continues.
+          </div>
+          <p class="flow-note flow-note--quiet">
+            State guide: stale keeps the latest readable snapshot, partial means some metrics are unavailable, demo means fallback sample data, and error means live rendering failed.
+          </p>
+        </section>
+
+        <section id="lpSnapshot" class="card flow-signal-card">
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Status</div>
+            <span class="flow-pill" data-snapshot="stateBadge">LOADING</span>
+            <div class="flow-meta" id="lpStatus">Status: waiting for initialization…</div>
+            <div class="flow-meta" data-snapshot="stateHelper">Waiting for initial snapshot.</div>
+          </div>
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Pool</div>
+            <div class="flow-hero-value" data-snapshot="pool">—</div>
+            <div class="flow-meta">current observed pool</div>
+          </div>
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Price</div>
+            <p class="flow-copy" data-snapshot="price">—</p>
+            <div class="flow-meta">latest observed swap price</div>
+          </div>
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Context</div>
+            <span class="flow-context-chip">live / demo mode</span>
+            <span class="flow-context-chip">pool: XRP / RLUSD</span>
+            <span class="flow-context-chip">source in metrics row</span>
+            <div class="flow-context-line">Lite mode reduces update frequency and visual load.</div>
+          </div>
+          <div id="lpTrends" class="flow-history-strip">
+            <div class="flow-history-row">
+              <div class="flow-signal-label">1h pulse</div>
+              <div class="flow-history-bars" role="img" aria-label="1 hour liquidity pulse">
+                <div data-trend="1h" style="height:12%"></div>
+              </div>
+              <div class="flow-meta" data-trend-meta="1h">short pulse view (currently lightweight placeholder)</div>
+            </div>
+            <div class="flow-history-row">
+              <div class="flow-signal-label">6h pulse</div>
+              <div class="flow-history-bars" role="img" aria-label="6 hour liquidity pulse">
+                <div data-trend="6h" style="height:12%"></div>
+              </div>
+              <div class="flow-meta" data-trend-meta="6h">mid pulse view (currently lightweight placeholder)</div>
+            </div>
+            <div class="flow-history-row">
+              <div class="flow-signal-label">24h pulse</div>
+              <div class="flow-history-bars" role="img" aria-label="24 hour liquidity pulse">
+                <div data-trend="24h" style="height:12%"></div>
+              </div>
+              <div class="flow-meta" data-trend-meta="24h">broad pulse view (currently lightweight placeholder)</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="flow-metrics-grid">
+          <article class="card flow-metric-card">
+            <div class="flow-metric-label">Liquidity (USD)</div>
+            <div class="flow-metric-value" data-snapshot="liquidityUsd">—</div>
+          </article>
+          <article class="card flow-metric-card">
+            <div class="flow-metric-label">Swaps (5m, optional)</div>
+            <div class="flow-metric-value" data-snapshot="swaps5m">—</div>
+          </article>
+          <article class="card flow-metric-card flow-metric-card--highlight">
+            <div class="flow-metric-label">Deviation (optional)</div>
+            <div class="flow-metric-value" data-snapshot="deviationBps">—</div>
+          </article>
+          <article class="card flow-metric-card">
+            <div class="flow-metric-label">Source</div>
+            <div class="flow-metric-value flow-metric-value--small" data-snapshot="source">—</div>
+          </article>
+        </section>
+
+        <section id="lpCanvasWrap" class="card flow-mainviz-card">
+          <div class="flow-mainviz-head">
+            <div>
+              <h3 class="flow-section-title">Main Viz</h3>
+              <p class="flow-section-note">Quick visual read of current liquidity state and fallback status.</p>
+            </div>
+            <span class="flow-context-chip">pulse / liquidity</span>
+          </div>
+          <div class="flow-mainviz-body">
+            <div class="flow-viz-panel">
+              <div id="lpVizSnapshot" class="lp-viz-snapshot" aria-live="polite"></div>
+              <canvas id="lpCanvas" aria-label="Liquidity pulse visualization"></canvas>
+              <div data-state-overlay="loading" class="flow-overlay">Loading snapshot…</div>
+              <div data-state-overlay="error" class="flow-overlay" hidden>
+                <p>Could not load live snapshot. Toggle Demo only or Retry.</p>
+              </div>
+              <div data-state-overlay="empty" class="flow-overlay" hidden>
+                <p>No usable liquidity snapshot is available right now for this pool.</p>
+              </div>
+            </div>
+            <aside class="flow-reason-panel">
+              <div class="flow-signal-label">Reason / Context</div>
+              <h4 class="flow-reason-title" data-reason="title">Liquidity read summary</h4>
+              <p class="flow-reason-copy" data-reason="copy">Use this panel to read whether the pool currently looks available, thin, or temporarily unavailable.</p>
+              <ul class="flow-reason-list" data-reason="list">
+                <li>Lite mode lowers update frequency and visual load.</li>
+                <li>Demo mode uses sample data instead of live fetch.</li>
+                <li>Retry refreshes the current mode without changing your selection.</li>
+              </ul>
+            </aside>
+          </div>
+        </section>
+
+        <section class="card flow-flows-card">
+          <div class="flow-mini-head">
+            <h3 class="flow-mini-title">Current read notes</h3>
+            <div class="flow-mini-meta">status / source / interpretation</div>
+          </div>
+          <ul class="flow-escrow-list">
+            <li>Status explains whether the page is using live, stale, partial, demo, or error output.</li>
+            <li>Source stays visible in the metrics row so live and demo reads are not confused.</li>
+            <li>Use Retry to refresh the current mode, or toggle Demo only for a sample fallback view.</li>
+          </ul>
+        </section>
+
+        <section class="card flow-debug-card">
+          <details>
+            <summary>Debug (collapsed, release readiness)</summary>
+            <p class="flow-debug-status">Debug tools for state and selector validation.</p>
+            <p class="flow-debug-status flow-debug-mono">IDs retained: #lpActions #lpCanvasWrap #lpSnapshot #lpTrends #lpStatus</p>
+          </details>
+        </section>
       </main>
       <div data-global-footer></div>
     </div>
-    <script src="/shared/ui-kit.js"></script>
-    <script src="/shared/nav.js"></script>
-    <script>
-      const mount = document.querySelector('[data-ui-mount="liquidity-pulse"]');
-      window.XSICUiKit?.renderLoadingState(mount, { label: 'Rendering Liquidity Pulse demo…' });
-      window.setTimeout(() => {
-        window.XSICUiKit?.renderEmptyState(mount, {
-          title: 'Liquidity Pulse demo view',
-          body: window.XSICUiKit?.getLiteMode()
-            ? 'Lite mode is ON: low-intensity placeholders are enabled.'
-            : 'Lite mode is OFF: standard placeholders are enabled.',
-          actions: [{ label: 'Back to Apps', href: '/apps/' }],
-        });
-      }, 600);
-    </script>
+    <script defer src="/shared/nav.js"></script>
+    <script defer src="/shared/status.js"></script>
+    <script defer src="/apps/liquidity-pulse/liquidity-pulse.js?v=removedebugcd7feaa"></script>
   </body>
 </html>

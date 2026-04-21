@@ -3,50 +3,128 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>XSIC — XRPL Signal & Insight Console</title>
+    <title>XSIC | XRPL Signal & Insight Console</title>
     <meta
       name="description"
-      content="XSIC Console entrance for XRPL Sell Impact, Liquidity Pulse, Flow Alert, and Exposure Graph apps."
+      content="XSIC is an XRPL decision console for sell impact estimation, liquidity pulse checks, exit coverage checks, and exposure mapping before and after execution."
     />
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:title" content="XSIC | XRPL Signal & Insight Console" />
+    <meta
+      property="og:description"
+      content="Use four XSIC apps to validate XRPL execution assumptions with one operational workflow."
+    />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/" />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="XSIC | XRPL Signal & Insight Console" />
+    <meta
+      name="twitter:description"
+      content="Estimate impact, verify liquidity, confirm exit coverage, and inspect structural exposure in one XRPL console."
+    />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="icon" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "XSIC",
+        "url": "https://xsic.badjoke-lab.com/",
+        "description": "XRPL Signal & Insight Console for sell impact, liquidity pulse, flow alert, and exposure graph workflows.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Badjoke-lab"
+        },
+        "hasPart": [
+          {
+            "@type": "WebApplication",
+            "name": "Sell Impact",
+            "url": "https://xsic.badjoke-lab.com/apps/sell-impact/"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "Liquidity Pulse",
+            "url": "https://xsic.badjoke-lab.com/apps/liquidity-pulse/"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "Exit Coverage Map",
+            "url": "https://xsic.badjoke-lab.com/apps/exit-coverage-map/"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "Exposure Graph",
+            "url": "https://xsic.badjoke-lab.com/apps/exposure-graph/"
+          }
+        ]
+      }
+    </script>
   </head>
-  <body data-nav-key="console">
-    <div class="app page console-page">
+  <body data-nav-key="home">
+    <div class="app page console-page static-page">
       <header class="app__header global-header">
         <div class="app__header-top">
-          <a href="/" class="brand-link" aria-label="XSIC Console Home">
+          <a href="/" class="brand-link" aria-label="XSIC Home">
             <div class="app__brand">
               <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
               <h1 class="app__title">XSIC</h1>
             </div>
           </a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
           <div data-global-nav></div>
         </div>
       </header>
 
-      <main class="page__content">
-        <section class="card console-hero">
-          <h2 class="page__title">XRPL Signal &amp; Insight Console</h2>
-          <p class="page__lede">A lightweight entrance to 4 XRPL apps for signal checks, flow tracking, and exposure context.</p>
+      <main class="page__content static-content">
+        <section class="card console-hero" aria-labelledby="hero-heading">
+          <p class="eyebrow">XRPL decision console</p>
+          <h2 id="hero-heading" class="page__title">XSIC aligns pre-trade estimation, live context checks, and structural risk review in one operating flow.</h2>
+          <p class="page__lede">Use XSIC when execution decisions need bounded numbers plus context. Start with route-level impact, confirm that liquidity state is still valid, verify exit route coverage, then review concentration structure before size or timing changes.</p>
         </section>
 
         <section class="console-layout">
           <section class="card" aria-labelledby="apps-heading">
-            <h3 id="apps-heading">Apps</h3>
+            <div class="card__header">
+              <div>
+                <p class="eyebrow">Core tools</p>
+                <h3 id="apps-heading">Four apps, one decision console</h3>
+              </div>
+            </div>
             <div class="apps-grid">
-              <article class="app-card"><h4>Sell Impact</h4><p>Estimate DEX/AMM impact before execution.</p><a class="secondary-button" href="/apps/sell-impact/">Open</a></article>
-              <article class="app-card"><h4>Liquidity Pulse</h4><p>AMM/DEX liquidity pulse at a glance.</p><a class="secondary-button" href="/apps/liquidity-pulse/">Open</a></article>
-              <article class="app-card"><h4>Flow Alert</h4><p>Monitor exchange and whale flows.</p><a class="secondary-button" href="/apps/flow-alert/">Open</a></article>
-              <article class="app-card"><h4>Exposure Graph</h4><p>View issuer and trustline exposure.</p><a class="secondary-button" href="/apps/exposure-graph/">Open</a></article>
+              <article class="app-card">
+                <h4>1) Sell Impact</h4>
+                <p>Estimate expected receive, impact range, and route dependence for a candidate execution size.</p>
+                <a class="secondary-button" href="/apps/sell-impact/">Open app</a>
+              </article>
+              <article class="app-card">
+                <h4>2) Liquidity Pulse</h4>
+                <p>Check whether observable depth posture is stable enough to support the same execution assumptions.</p>
+                <a class="secondary-button" href="/apps/liquidity-pulse/">Open app</a>
+              </article>
+              <article class="app-card">
+                <h4>3) Exit Coverage Map</h4>
+                <p>Check whether issuer tokens still have an XRP exit route through book, AMM, both, or neither before sizing execution.</p>
+                <a class="secondary-button" href="/apps/exit-coverage-map/">Open app</a>
+              </article>
+              <article class="app-card">
+                <h4>4) Exposure Graph</h4>
+                <p>Inspect issuer and trustline concentration to understand structural dependency behind the quoted market.</p>
+                <a class="secondary-button" href="/apps/exposure-graph/">Open app</a>
+              </article>
             </div>
           </section>
 
-          <aside class="card status-card" aria-labelledby="updates-heading" data-status-strip="health">
-            <h3 id="updates-heading">Updates</h3>
+          <aside class="card status-card" aria-labelledby="status-heading" data-status-strip="health">
+            <div class="card__header">
+              <div>
+                <p class="eyebrow">System state</p>
+                <h3 id="status-heading">Current service health</h3>
+              </div>
+            </div>
             <p><strong>API:</strong> <span data-health="status">OK / stale / down</span></p>
             <p><strong>Last refresh:</strong> <span data-health="last-refresh">—</span></p>
             <details>
@@ -55,18 +133,41 @@
             </details>
           </aside>
         </section>
-        <section class="card" aria-label="Shared UI state mount"><div class="ui-mount" data-ui-mount="console"></div></section>
+
+        <section class="card" aria-labelledby="scope-heading">
+          <div class="card__header">
+            <div>
+              <p class="eyebrow">Usage boundary</p>
+              <h3 id="scope-heading">What XSIC does and does not do</h3>
+            </div>
+          </div>
+          <ul class="info-list">
+            <li><strong>XSIC does:</strong> provide estimation and context signals for execution planning and post-check discipline across four connected apps.</li>
+            <li><strong>XSIC does not:</strong> execute orders, guarantee fills, guarantee prices, or replace internal risk governance.</li>
+            <li><strong>Operator baseline:</strong> treat all outputs as decision inputs, not final truth; validate freshness and disagreement across apps before acting.</li>
+          </ul>
+        </section>
+
+        <section class="card" aria-labelledby="links-heading">
+          <div class="card__header">
+            <div>
+              <p class="eyebrow">Reference pages</p>
+              <h3 id="links-heading">Read methods and policy before production use</h3>
+            </div>
+          </div>
+          <p>These pages define interpretation rules, known limits, legal boundaries, and maintenance context for the full XSIC toolset.</p>
+          <ul class="inline-links">
+            <li><a href="/methods/">Methods</a></li>
+            <li><a href="/faq/">FAQ</a></li>
+            <li><a href="/disclaimer/">Disclaimer</a></li>
+            <li><a href="/credits/">Credits</a></li>
+            <li><a href="/donate/">Donate</a></li>
+          </ul>
+        </section>
       </main>
       <div data-global-footer></div>
     </div>
-    <script src="/shared/ui-kit.js"></script>
     <script src="/shared/nav.js"></script>
     <script src="/shared/status.js"></script>
-    <script>
-      window.XSICUiKit?.renderEmptyState('[data-ui-mount="console"]', {
-        title: 'Ready for shared states',
-        body: 'Console can now reuse loading/error/empty components across apps.',
-      });
-    </script>
   </body>
 </html>

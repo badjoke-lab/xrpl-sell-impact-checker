@@ -1,112 +1,84 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Credits | XRPL Sell Impact Checker</title>
-    <meta
-      name="description"
-      content="Credits for data sources, infrastructure, and libraries used by XSIC."
-    />
-    <meta property="og:title" content="Credits | XRPL Sell Impact Checker" />
-    <meta
-      property="og:description"
-      content="Credits for data sources, infrastructure, and libraries used by XSIC."
-    />
-    <link rel="stylesheet" href="/styles.css" />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/credits/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/credits/">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>XSIC Credits | Data Sources, Technology, Operations</title>
+  <meta name="description" content="Credits for XSIC including upstream data sources, implementation stack, and ongoing maintenance ownership." />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="canonical" href="https://xsic.badjoke-lab.com/credits/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="XSIC" />
+  <meta property="og:title" content="XSIC Credits" />
+  <meta property="og:description" content="Source, technology, and maintenance credits for XSIC." />
+  <meta property="og:url" content="https://xsic.badjoke-lab.com/credits/" />
+  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="XSIC Credits" />
+  <meta name="twitter:description" content="See where XSIC data comes from and who maintains the project." />
+  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "XSIC Credits",
+    "url": "https://xsic.badjoke-lab.com/credits/",
+    "description": "Credits for XRPL data sources, software stack, and operations."
+  }
+  </script>
 </head>
-  <body data-nav-key="docs">
-    <div class="app page">
-      <header class="app__header">
-        <div class="app__header-top">
-          <div>
-            <p class="eyebrow" data-i18n="app.eyebrow"></p>
-            <h1 data-i18n="app.title"></h1>
+<body data-nav-key="docs">
+  <div class="app page console-page static-page">
+    <header class="app__header global-header">
+      <div class="app__header-top">
+        <a href="/" class="brand-link" aria-label="XSIC Home">
+          <div class="app__brand">
+            <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+            <h1 class="app__title">XSIC</h1>
           </div>
-          <div
-            class="lang-switch"
-            role="group"
-            aria-label="Language"
-            data-i18n-aria-label="language.label"
-          >
-            <span class="lang-switch__label" data-i18n="language.label"></span>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="en"
-              aria-pressed="false"
-            >
-              EN
-            </button>
-            <button
-              class="ghost-button lang-switch__button"
-              type="button"
-              data-lang-switch="ja"
-              aria-pressed="false"
-            >
-              JA
-            </button>
-          </div>
-        </div>
+        </a>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-        <nav class="site-nav global-nav" id="global-nav" aria-label="Primary">
-          <a href="/" data-nav-item="console">Console</a>
-          <a href="/apps/" data-nav-item="apps">Apps</a>
-          <a href="/methods/" data-nav-item="docs">Docs</a>
-          <a href="/donate/" data-nav-item="donate">Donate</a>
-          <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-nav-item="contact">Contact</a>
-        </nav>
-      </header>
+        <div data-global-nav></div>
+      </div>
+    </header>
 
-      <main class="page__content">
-        <section class="card">
-          <h2 class="page__title" data-i18n="pages.credits.title"></h2>
-          <p class="page__lede" data-i18n="pages.credits.lede"></p>
-        </section>
+    <main class="page__content static-content">
+      <section class="card" aria-labelledby="credits-title">
+        <p class="eyebrow">Project details</p>
+        <h2 id="credits-title" class="page__title">Credits</h2>
+        <p class="page__lede">XSIC is built as an operational XRPL console. This page clarifies where data comes from, what technology is used, and who maintains the service.</p>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.credits.data_title"></h3>
-          <ul class="info-list">
-            <li data-i18n="pages.credits.data_item_1"></li>
-            <li data-i18n="pages.credits.data_item_2"></li>
-            <li data-i18n="pages.credits.data_item_3"></li>
-          </ul>
-        </section>
+      <section class="card" aria-labelledby="credit-data">
+        <h3 id="credit-data">Data sources</h3>
+        <ul class="info-list">
+          <li>XRPL ledger/network endpoints and related market-state interfaces consumed by XSIC server functions.</li>
+          <li>Project-managed derived snapshots and cached summaries where explicitly displayed as such.</li>
+          <li>Timestamp/state labels in each app should be treated as the primary freshness signal for operational use.</li>
+        </ul>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.credits.infra_title"></h3>
-          <ul class="info-list">
-            <li data-i18n="pages.credits.infra_item_1"></li>
-            <li data-i18n="pages.credits.infra_item_2"></li>
-          </ul>
-        </section>
+      <section class="card" aria-labelledby="credit-tech">
+        <h3 id="credit-tech">Technology stack</h3>
+        <ul class="info-list">
+          <li>Vanilla HTML/CSS/JavaScript front-end with shared UI/navigation modules.</li>
+          <li>Serverless API/function layer for XRPL data retrieval, normalization, and response shaping.</li>
+          <li>Package-manifest dependencies and XRPL ecosystem tooling documented in this repository.</li>
+        </ul>
+      </section>
 
-        <section class="card">
-          <h3 data-i18n="pages.credits.libraries_title"></h3>
-          <ul class="info-list">
-            <li data-i18n="pages.credits.libraries_item_1"></li>
-            <li data-i18n="pages.credits.libraries_item_2"></li>
-          </ul>
-        </section>
-      </main>
+      <section class="card" aria-labelledby="credit-ops">
+        <h3 id="credit-ops">Operations and maintenance</h3>
+        <ul class="info-list">
+          <li>Maintained by Badjoke-lab.</li>
+          <li>Release priorities: reliability, clarity, and safe interpretation of model outputs.</li>
+          <li>Feedback and bug reports are reviewed with reproducibility details (URL, timestamp, pair/preset, state label).</li>
+        </ul>
+      </section>
+    </main>
 
-      <footer class="site-footer">
-        <div class="site-footer__brand">
-          <p class="site-footer__title" data-i18n="footer.brand"></p>
-          <p class="site-footer__note" data-i18n="footer.note"></p>
-        </div>
-        <nav class="site-footer__links" aria-label="Footer">
-          <a href="/methods" data-i18n="nav.methods"></a>
-          <a href="/faq" data-i18n="nav.faq"></a>
-          <a href="/disclaimer" data-i18n="nav.disclaimer"></a>
-          <a href="/credits" data-i18n="nav.credits"></a>
-          <a href="/donate" data-i18n="nav.donate"></a>
-        </nav>
-      </footer>
-    </div>
-    <script type="module" src="/src/i18n/page-init.js"></script>
-      <script src="/shared/global-nav.js"></script>
-  </body>
+    <div data-global-footer></div>
+  </div>
+  <script src="/shared/nav.js"></script>
+</body>
 </html>

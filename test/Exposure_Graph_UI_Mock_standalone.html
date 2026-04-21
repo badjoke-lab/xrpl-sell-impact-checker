@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Exposure Graph UI Mock — XSIC</title>
+    <meta
+      name="description"
+      content="Static UI mock for the Exposure Graph app, aligned to the current XSIC / Flow Alert visual direction."
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #fcfcfd;
+        --surface: #ffffff;
+        --surface-soft: #fafafa;
+        --surface-strong: #f4f4f5;
+        --border: #e5e7eb;
+        --border-strong: #d4d4d8;
+        --text: #111827;
+        --text-soft: #6b7280;
+        --text-faint: #9ca3af;
+        --primary: #6f63c2;
+        --primary-strong: #5d52b7;
+        --primary-soft: rgba(111, 99, 194, 0.12);
+        --primary-muted: rgba(111, 99, 194, 0.18);
+        --primary-line: rgba(111, 99, 194, 0.32);
+        --good: #047857;
+        --good-soft: rgba(4, 120, 87, 0.12);
+        --warn: #b45309;
+        --warn-soft: rgba(180, 83, 9, 0.14);
+        --danger: #b91c1c;
+        --danger-soft: rgba(185, 28, 28, 0.12);
+        --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 30px rgba(15, 23, 42, 0.04);
+        --shadow-card-hover: 0 10px 40px rgba(15, 23, 42, 0.08);
+        --radius-card: 18px;
+        --radius-control: 12px;
+        --content-max: 1200px;
+        --mono: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        min-width: 360px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+        line-height: 1.5;
+      }
+
+      .app {
+        width: min(100%, var(--content-max));
+        margin: 0 auto;
+        min-height: 100vh;
+        padding: 24px 20px 64px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .app__header {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .app__header-top {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .brand-link {
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .app__brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .app__logo {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+        flex: 0 0 28px;
+        opacity: 0.96;
+      }
+
+      .app__title {
+        margin: 0;
+        font-size: clamp(1rem, 1.8vw, 1.16rem);
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        font-weight: 650;
+        white-space: nowrap;
+      }
+
+      .nav-toggle {
+        display: none;
+        min-height: 40px;
+        min-width: 40px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+      }
+
+      .global-nav {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .global-nav a {
+        color: var(--text-soft);
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.2;
+        padding: 2px 0;
+      }
+
+      .global-nav a:hover { color: var(--text); }
+      .global-nav a.is-active {
+        color: var(--primary-strong);
+        border-bottom: 2px solid var(--primary-strong);
+      }
+
+      .page__content {
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero-head {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .eyebrow {
+        margin: 0;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+
+      .page-title {
+        margin: 0;
+        font-size: clamp(1.5rem, 5vw, 2.1rem);
+        line-height: 1.02;
+        letter-spacing: -0.05em;
+        font-weight: 770;
+      }
+
+      .page-subtitle {
+        margin: 0;
+        max-width: 760px;
+        color: var(--text-soft);
+        font-size: 14px;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-card);
+      }
+
+      .card:hover { box-shadow: var(--shadow-card-hover); }
+
+      .controls-card {
+        padding: 12px 14px;
+      }
+
+      .controls-grid {
+        display: grid;
+        grid-template-columns: minmax(250px, 1.2fr) minmax(220px, 1fr) minmax(160px, 0.8fr) minmax(150px, 0.7fr) auto auto;
+        gap: 8px 12px;
+        align-items: end;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 10px;
+        color: var(--text-faint);
+        letter-spacing: 0.02em;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .field input,
+      .field select,
+      .button {
+        height: 38px;
+        border-radius: var(--radius-control);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        font-size: 14px;
+        padding: 0 12px;
+        outline: none;
+      }
+
+      .field input:focus,
+      .field select:focus,
+      .button:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px rgba(111, 99, 194, 0.12);
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .button--primary {
+        background: var(--text);
+        border-color: var(--text);
+        color: #fff;
+      }
+
+      .button--ghost {
+        background: var(--surface-soft);
+      }
+
+      .status-inline {
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        font-size: 11px;
+        color: var(--text-soft);
+      }
+
+      .status-inline strong {
+        margin-left: 6px;
+        color: var(--text);
+        font-family: var(--mono);
+        font-weight: 700;
+      }
+
+      .signal-card {
+        padding: 20px;
+        display: grid;
+        grid-template-columns: 180px 1.05fr 1.15fr 240px;
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      .signal-block {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+        padding: 4px 2px;
+      }
+
+      .signal-label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        font-weight: 700;
+      }
+
+      .pill {
+        width: fit-content;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        border: 1px solid transparent;
+      }
+
+      .pill--warn { color: var(--warn); background: var(--warn-soft); border-color: rgba(180, 83, 9, 0.12); }
+      .pill--good { color: var(--good); background: var(--good-soft); border-color: rgba(4, 120, 87, 0.12); }
+      .pill--danger { color: var(--danger); background: var(--danger-soft); border-color: rgba(185, 28, 28, 0.12); }
+      .pill--primary { color: var(--primary-strong); background: var(--primary-soft); border-color: rgba(111, 99, 194, 0.14); }
+
+      .hero-value {
+        font-size: clamp(30px, 5vw, 42px);
+        line-height: 1;
+        letter-spacing: -0.06em;
+        font-weight: 780;
+      }
+
+      .flow-copy,
+      .hero-meta,
+      .context-line,
+      .subcopy,
+      .mono-line {
+        font-size: 13px;
+        color: var(--text-soft);
+      }
+
+      .flow-copy { font-size: 14px; color: var(--text); }
+      .mono-line { font-family: var(--mono); }
+
+      .context-chip-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .context-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        width: fit-content;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--surface-soft);
+        font-size: 12px;
+        color: var(--text);
+        font-family: var(--mono);
+      }
+
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .metric-card {
+        padding: 16px;
+        min-height: 104px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .metric-card--highlight {
+        border-color: rgba(111, 99, 194, 0.22);
+        background: linear-gradient(180deg, rgba(111, 99, 194, 0.04), rgba(111, 99, 194, 0.01));
+      }
+
+      .metric-label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        font-weight: 700;
+      }
+
+      .metric-value {
+        font-size: clamp(1.1rem, 2vw, 1.6rem);
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+        font-weight: 760;
+      }
+
+      .metric-sub {
+        font-size: 12px;
+        color: var(--text-soft);
+        font-family: var(--mono);
+      }
+
+      .tabs-card {
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .tabs {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px;
+        border-radius: 999px;
+        background: var(--surface-soft);
+        border: 1px solid var(--border);
+      }
+
+      .tab {
+        border: 0;
+        background: transparent;
+        color: var(--text-soft);
+        border-radius: 999px;
+        min-height: 36px;
+        padding: 0 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .tab.is-active {
+        background: var(--surface);
+        color: var(--text);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      }
+
+      .tab-copy {
+        font-size: 13px;
+        color: var(--text-soft);
+      }
+
+      .tab-panel { display: none; }
+      .tab-panel.is-active {
+        display: grid;
+        gap: 18px;
+      }
+
+      .mainviz-card,
+      .list-card,
+      .debug-card {
+        padding: 18px 20px;
+      }
+
+      .mainviz-head,
+      .mini-head,
+      .section-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .section-title,
+      .mini-title {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+        font-weight: 740;
+      }
+
+      .section-note,
+      .mini-meta {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: var(--text-soft);
+      }
+
+      .mainviz-body {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.86fr);
+        gap: 16px;
+      }
+
+      .viz-panel,
+      .side-panel,
+      .list-subpanel,
+      .risk-block {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(250, 250, 250, 0.65), rgba(255, 255, 255, 0.98));
+      }
+
+      .viz-panel {
+        min-height: 420px;
+        position: relative;
+        overflow: hidden;
+        padding: 16px;
+      }
+
+      .graph-stage {
+        position: relative;
+        min-height: 388px;
+        border-radius: 14px;
+        border: 1px dashed rgba(111, 99, 194, 0.18);
+        background:
+          radial-gradient(circle at 50% 50%, rgba(111, 99, 194, 0.08), transparent 36%),
+          radial-gradient(circle at 22% 26%, rgba(111, 99, 194, 0.08), transparent 22%),
+          radial-gradient(circle at 82% 34%, rgba(111, 99, 194, 0.08), transparent 24%),
+          linear-gradient(180deg, rgba(250, 250, 250, 0.95), rgba(255, 255, 255, 0.98));
+      }
+
+      svg.graph-svg {
+        display: block;
+        width: 100%;
+        height: 388px;
+      }
+
+      .graph-caption {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .legend,
+      .overlay-note {
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--text-soft);
+        backdrop-filter: blur(12px);
+      }
+
+      .legend {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        display: inline-block;
+      }
+
+      .legend-rule {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .legend-line {
+        width: 24px;
+        height: 2px;
+        border-radius: 999px;
+        background: var(--primary-line);
+      }
+
+      .side-panel {
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .reason-title {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+      }
+
+      .reason-copy,
+      .entity-copy { margin: 0; font-size: 14px; color: var(--text-soft); }
+
+      .reason-list,
+      .evidence-list,
+      .activity-list,
+      .summary-list {
+        margin: 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 8px;
+        color: var(--text-soft);
+        font-size: 13px;
+      }
+
+      .entity-card,
+      .risk-mini-card,
+      .summary-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 14px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .entity-name {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.1;
+        font-weight: 700;
+      }
+
+      .entity-kv {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .kv-label {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        font-weight: 700;
+      }
+
+      .kv-value {
+        margin-top: 4px;
+        font-size: 14px;
+        color: var(--text);
+        font-family: var(--mono);
+      }
+
+      .list-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+        gap: 16px;
+      }
+
+      .list-subpanel {
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .rank-list,
+      .event-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .rank-row,
+      .event-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .rank-index,
+      .event-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--surface-strong);
+        color: var(--text-soft);
+        font-size: 12px;
+        font-weight: 700;
+        flex: 0 0 28px;
+      }
+
+      .rank-main,
+      .event-main { min-width: 0; }
+
+      .rank-title,
+      .event-title {
+        font-size: 14px;
+        color: var(--text);
+        font-weight: 650;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .rank-sub,
+      .event-sub {
+        margin-top: 2px;
+        font-size: 12px;
+        color: var(--text-soft);
+        font-family: var(--mono);
+      }
+
+      .rank-value,
+      .event-value {
+        font-size: 13px;
+        color: var(--text);
+        font-family: var(--mono);
+        font-weight: 700;
+        text-align: right;
+      }
+
+      .risk-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+        gap: 16px;
+      }
+
+      .risk-block {
+        padding: 18px;
+      }
+
+      .radar-wrap {
+        margin-top: 12px;
+        border: 1px dashed rgba(111, 99, 194, 0.2);
+        border-radius: 16px;
+        background:
+          radial-gradient(circle at center, rgba(111, 99, 194, 0.08), transparent 48%),
+          linear-gradient(180deg, rgba(250, 250, 250, 0.8), rgba(255, 255, 255, 0.98));
+        min-height: 420px;
+        display: grid;
+        place-items: center;
+        padding: 12px;
+      }
+
+      svg.radar-svg {
+        display: block;
+        width: 100%;
+        max-width: 480px;
+        height: 380px;
+      }
+
+      .risk-score {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .risk-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 14px;
+        border-radius: 999px;
+        background: var(--warn-soft);
+        color: var(--warn);
+        border: 1px solid rgba(180, 83, 9, 0.14);
+        font-weight: 700;
+      }
+
+      .risk-stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .evidence-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+        background: var(--surface);
+        display: grid;
+        gap: 8px;
+      }
+
+      .evidence-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .evidence-title {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        font-weight: 700;
+      }
+
+      .evidence-meta {
+        font-size: 12px;
+        color: var(--text-soft);
+        font-family: var(--mono);
+      }
+
+      .debug-card details { display: grid; gap: 12px; }
+      .debug-card summary {
+        cursor: pointer;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .debug-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .debug-status {
+        margin: 0;
+        font-size: 13px;
+        color: var(--text-soft);
+      }
+
+      .tag-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: var(--surface-soft);
+        border: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--text-soft);
+      }
+
+      .hidden { display: none !important; }
+
+      @media (max-width: 1199px) {
+        .controls-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .metrics-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .signal-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .mainviz-body,
+        .list-grid,
+        .risk-grid { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 899px) {
+        .app { padding: 20px 16px 48px; }
+        .app__title { white-space: normal; }
+        .controls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .signal-card { grid-template-columns: 1fr; gap: 16px; }
+        .global-nav { gap: 12px; }
+      }
+
+      @media (max-width: 639px) {
+        .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+        .global-nav {
+          width: 100%;
+          justify-content: flex-start;
+          gap: 12px;
+        }
+        .controls-grid { grid-template-columns: 1fr; }
+        .metrics-grid { grid-template-columns: 1fr; }
+        .entity-kv,
+        .rank-row,
+        .event-row { grid-template-columns: 1fr; }
+        .rank-value,
+        .event-value { text-align: left; }
+        .page-title { letter-spacing: -0.045em; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app page console-page exposure-graph-page">
+      <header class="app__header global-header">
+        <div class="app__header-top">
+          <a href="../index.html" class="brand-link" aria-label="Home">
+            <div class="app__brand">
+              <img class="app__logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABAAAAAQACAYAAAB/HSuDAAB82klEQVR4Ae3dC5LkuHIl0NLY7Ecb0hpmMVqDNqQVabqfOrurohgZwSABXLifZzaWlfEh4ceRBHCnzfRv//PH/374HwECBAgQIECAAAECBAgQIFBa4P+Urk5xBAgQIECAAAECBAgQIECAwL8EBAAmAgECBAgQIECAAAECBAgQaCAgAGjQZCUSIECAAAECBAgQIECAAAEBgDlAgAABAgQIECBAgAABAgQaCAgAGjRZiQQIECBAgAABAgQIECBAQABgDhAgQIAAAQIECBAgQIAAgQYCAoAGTVYiAQIECBAgQIAAAQIECBAQAJgDBAgQIECAAAECBAgQIECggYAAoEGTlUiAAAECBAgQIECAAAECBAQA5gABAgQIECBAgAABAgQIEGggIABo0GQlEiBAgAABAgQIECBAgAABAYA5QIAAAQIECBAgQIAAAQIEGggIABo0WYkECBAgQIAAAQIECBAgQEAAYA4QIECAAAECBAgQIECAAIEGAgKABk1WIgECBAgQIECAAAECBAgQEACYAwQIECBAgAABAgQIECBAoIGAAKBBk5VIgAABAgQIECBAgAABAgQEAOYAAQIECBAgQIAAAQIECBBoICAAaNBkJRIgQIAAAQIECBAgQIAAAQGAOUCAAAECBAgQIECAAAECBBoICAAaNFmJBAgQIECAAAECBAgQIEBAAGAOECBAgAABAgQIECBAgACBBgICgAZNViIBAgQIECBAgAABAgQIEBAAmAMECBAgQIAAAQIECBAgQKCBgACgQZOVSIAAAQIECBAgQIAAAQIEBADmAAECBAgQIECAAAECBAgQaCAgAGjQZCUSIECAAAECBAgQIECAAAEBgDlAgAABAgQIECBAgAABAgQaCAgAGjRZiQQIECBAgAABAgQIECBAQABgDhAgQIAAAQIECBAgQIAAgQYCAoAGTVYiAQIECBAgQIAAAQIECBAQAJgDBAgQIECAAAECBAgQIECggYAAoEGTlUiAAAECBAgQIECAAAECBAQA5gABAgQIECBAgAABAgQIEGggIABo0GQlEiBAgAABAgQIECBAgAABAYA5QIAAAQIECBAgQIAAAQIEGggIABo0WYkECBAgQIAAAQIECBAgQEAAYA4QIECAAAECBAgQIECAAIEGAgKABk1WIgECBAgQIECAAAECBAgQEACYAwQIECBAgAABAgQIECBAoIGAAKBBk5VIgAABAgQIECBAgAABAgQEAOYAAQIECBAgQIAAAQIECBBoICAAaNBkJRIgQIAAAQIECBAgQIAAAQGAOUCAAAECBAgQIECAAAECBBoICAAaNFmJBAgQIECAAAECBAgQIEBAAGAOECBAgAABAgQIECBAgACBBgICgAZNViIBAgQIECBAgAABAgQIEBAAmAMECBAgQIAAAQIECBAgQKCBgACgQZOVSIAAAQIECBAgQIAAAQIEBADmAAECBAgQIECAAAECBAgQaCAgAGjQZCUSIECAAAECBAgQIECAAAEBgDlAgAABAgQIECBAgAABAgQaCAgAGjRZiQQIECBAgAABAgQIECBAQABgDhAgQIAAAQIECBAgQIAAgQYCAoAGTVYiAQIECBAgQIAAAQIECBAQAJgDBAgQIECAAAECBAgQIECggYAAoEGTlUiAAAECBAgQIECAAAECBAQA5gABAgQIECBAgAABAgQIEGggIABo0GQlEiBAgAABAgQIECBAgAABAYA5QIAAAQIECBAgQIAAAQIEGggIABo0WYkECBAgQIAAAQIECBAgQEAAYA4QIECAAAECBAgQIECAAIEGAgKABk1WIgECBAgQIECAAAECBAgQEACYAwQIECBAgAABAgQIECBAoIGAAKBBk5VIgAABAgQIECBAgAABAgQEAOYAAQIECBAgQIAAAQIECBBoICAAaNBkJRIgQIAAAQIECBAgQIAAAQGAOUCAAAECBAgQIECAAAECBBoICAAaNFmJBAgQIECAAAECBAgQIEBAAGAOECBAgAABAgQIECBAgACBBgICgAZNViIBAgQIECBAgAABAgQIEBAAmAMECBAgQIAAAQIECBAgQKCBgACgQZOVSIAAAQIECBAgQIAAAQIEBADmAAECBAgQIECAAAECBAgQaCAgAGjQZCUSIECAAAECBAgQIECAAAEBgDlAgAABAgQIECBAgAABAgQaCAgAGjRZiQQIECBAgAABAgQIECBAQABgDhAgQIAAAQIECBAgQIAAgQYCAoAGTVYiAQIECBAgQIAAAQIECBAQAJgDBAgQIECAAAECBAgQIECggYAAoEGTlUiAAAECBAgQIECAAAECBAQA5gABAgQIECBAgAABAgQIEGggIABo0GQlEiBAgAABAgQIECBAgAABAYA5QIAAAQIECBAgQIAAAQIEGggIABo0WYkECBAgQIAAAQIECBAgQEAAYA4QIECAAAECBAgQIECAAIEGAgKABk1WIgECBAgQIECAAAECBAgQEACYAwQIECBAgAABAgQIECBAoIGAAKBBk5VIgAABAgQIECBAgAABAgQEAOYAAQIECBAgQIAAAQIECBBoICAAaNBkJRIgQIAAAQIECBAgQIAAAQGAOUCAAAECBAgQIECAAAECBBoICAAaNFmJBAgQIECAAAECBAgQIEBAAGAOECBAgAABAgQIECBAgACBBgICgAZNViIBAgQIECBAgAABAgQIEBAAmAMECBAgQIAAAQIECBAgQKCBgACgQZOVSIAAAQIECBAgQIAAAQIEBADmAAECBAgQIECAAAECBAgQaCAgAGjQZCUSIECAAAECBAgQIECAAAEBgDlAgAABAgQIECBAgAABAgQaCAgAGjRZiQQIECBAgAABAgQIECBAQABgDhAgQIAAAQIECBAgQIAAgQYCAoAGTVYiAQIECBAgQIAAAQIECBAQAJgDBAgQIECAAAECBAgQIECggYAAoEGTlUiAAAECBAgQIECAAAECBAQA5gABAgQIECBAgAABAgQIEGggIABo0GQlEiBAgAABAgQIECBAgAABAYA5QIAAAQIECBAgQIAAAQIEGggIABo0WYkECBAgQIAAAQIECBAgQEAAYA4QIECAAAECBAgQIECAAIEGAgKABk1WIgECBAgQIECAAAECBAgQEACYAwQIECBAgAABAgQIECBAoIGAAKBBk5VIgAABAgQIECBAgAABAgQEAOYAAQIECBAgQIAAAQIECBBoICAAaNBkJRIgQIAAAQIECBAgQIAAAQGAOUCAAAECBAgQIECAAAECBBoICAAaNFmJBAgQIECAAAECBAgQIEBAAGAOECBAgAABAgQIECBAgACBBgICgAZNViIBAgQIECBAgAABAgQIEBAAmAMECBAgQIAAAQIECBAgQKCBgACgQZOVSIAAAQIECBAgQIAAAQIEBADmAAECBAgQIECAAAECBAgQaCAgAGjQZCUSIECAAAECBAgQIECAAAEBgDlAgAABAgQIECBAgAABAgQaCAgAGjRZiQQIECBAgAABAgQIECBAQABgDhAgQIAAAQIECBAgQIAAgQYCAoAGTVYiAQIECBAgQIAAAQIECBAQAJgDBAgQIECAAAECBAgQIECggYAAoEGTlUiAAAECBAgQIECAAAECBAQA5gABAgQIECBAgAABAgQIEGggIABo0GQlEiBAgAABAgQIECBAgAABAYA5QIAAAQIECBAgQIAAAQIEGggIABo0WYkECBAgQIAAAQIECBAgQEAAYA4QIECAAAECBAgQIECAAIEGAgKABk1WIgECBAgQIECAAAECBAgQEACYAwQIECBAgAABAgQIECBAoIGAAKBBk5VIgAABAgQIECBAgAABAgQEAOYAAQIECBAgQIAAAQIECBBoICAAaNBkJRIgQIAAAQIECBAgQIAAAQGAOUCAAAECBAgQIECAAAECBBoICAAaNFmJBAgQIECAAAECBAgQIEBAAGAOECBAgAABAgQIECBAgACBBgICgAZNViIBAgQIECBAgAABAgQIEBAAmAMECBAgQIAAAQIECBAgQKCBgACgQZOVSIAAAQIECBAgQIAAAQIEBADmAAECBAgQIECAAAECBAgQaCAgAGjQZCUSIECAAAECBAgQIECAAAEBgDlAgAABAgQIECBAgAABAgQaCAgAGjRZiQQIECBAgAABAgQIECBAQABgDhAgQIAAAQIECBAgQIAAgQYCAoAGTVYiAQIECBAgQIAAAQIECBAQAJgDBAgQIECAAAECBAgQIECggYAAoEGTlUiAAAECBAgQIECAAAECBAQA5gABAgQIECBAgAABAgQIEGggIABo0GQlEiBAgAABAgQIECBAgAABAYA5QIAAAQIECBAgQIAAAQIEGggIABo0WYkECBAgQIAAAQIECBAgQEAAYA4QIECAAAECBAgQIECAAIEGAgKABk1WIgECBAgQIECAAAECBAgQEACYAwQIECBAgAABAgQIECBAoIGAAKBBkzuU+P/+4787lKlGAgQIECBAgACBBQL2mgvQ3XKIgABgCKuLzhT4eiB//Zx5b/ciQIAAAQIECBCoLfC1x/z6Wbta1VUXEABU73Dx+h4fxI+/Fy9feQQIECBAgAABAgMFHveWj78PvLVLExgiIAAYwuqiMwSePYCfvT5jTO5BgAABAgQIECBQQ+DZnvLZ6zWqVkV1AQFA9Q4Xre/Vg/fV+0VZlEWAAAECBAgQIHCDwKu95Kv3bxiCSxAYIiAAGMLqoiMF3n3gvvu5kWN1bQIECBAgQIAA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YwEBwLGLVwkQIECAAAECBAgQIECAQCkBAUCpdiqGAAECBAgQIECAAAECBAgcCwgAjl28SoAAAQIECBAgQIAAAQIESgkIAEq1UzEECBAgQIAAAQIECBAgQOBYQABw7OJVAgQIECBAgAABAgQIECBQSkAAUKqdiiFAgAABAgQIECBAgAABAscCAoBjF68SIECAAAECBAgQIECAAIFSAgKAUu1UDAECBAgQIECAAAECBAgQOBYQABy7eJUAAQIECBAgQIAAAQIECJQSEACUaqdiCBAgQIAAAQIECBAgQIDAsYAA4NjFqwQIECBAgAABAgQIECBAoJSAAKBUOxVDgAABAgQIECBAgAABAgSOBQQAxy5eJUCAAAECBAgQIECAAAECpQQEAKXaqRgCBAgQIECAAAECBAgQIHAsIAA4dvEqAQIECBAgQIAAAQIECBAoJSAAKNVOxRAgQIAAAQIECBAgQIAAgWMBAcCxi1cJECBAgAABAgQIECBAgEApAQFAqXYqhgABAgQIECBAgAABAgQIHAsIAI5dvEqAAAECBAgQIECAAAECBEoJCABKtVMxBAgQIECAAAECBAgQIEDgWEAAcOziVQIECBAgQIAAAQIECBAgUEpAAFCqnYohQIAAAQIECBAgQIAAAQLHAgKAYxevEiBAgAABAgQIECBAgACBUgICgFLtVAwBAgQIECBAgAABAgQIEDgWEAAcu3iVAAECBAgQIECAAAECBAiUEhAAlGqnYggQIECAAAECBAgQIECAwLGAAODYxasECBAgQIAAAQIECBAgQKCUgACgVDsVQ4AAAQIECBAgQIAAAQIEjgUEAMcuXiVAgAABAgQIECBAgAABAqUEBACl2qkYAgQIECBAgAABAgQIECBwLCAAOHbxKgECBAgQIECAAAECBAgQKCUgACjVTsUQIECAAAECBAgQIECAAIFjAQHAsYtXCRAgQIAAAQIECBAgQIBAKQEBQKl2KoYAAQIECBAgQIAAAQIECBwLCACOXbxKgAABAgQIECBAgAABAgRKCQgASrVTMQQIECBAgAABAgQIECBA4FhAAHDs4lUCBAgQIECAAAECBAgQIFBKQABQqp2KIUCAAAECBAgQIECAAAECxwICgGMXrxIgQIAAAQIECBAgQIAAgVICAoBS7VQMAQIECBAgQIAAAQIECBA4FhAAHLt4lQABAgQIECBAgAABAgQIlBIQAJRqp2IIECBAgAABAgQIECBAgMCxgADg2MWrBAgQIECAAAECBAgQIECglIAAoFQ7FUOAAAECBAgQIECAAAECBI4FBADHLl4lQIAAAQIECBAgQIAAAQKlBAQApdqpGAIECBAgQIAAAQIECBAgcCwgADh28SoBAgQIECBAgAABAgQIECglIAAo1U7FECBAgAABAgQIECBAgACBYwEBwLGLVwkQIECAAAECBAgQIECAQCkBAUCpdiqGAAECBAgQIECAAAECBAgcCwgAjl28SoAAAQIECBAgQIAAAQIESgkIAEq1UzEECBAgQIAAAQIECBAgQOBYQABw7OJVAgQIECBAgAABAgQIECBQSkAAUKqdiiFAgAABAgQIECBAgAABAscCAoBjF68SIECAAAECBAgQIECAAIFSAgKAUu1UDAECBAgQIECAAAECBAgQOBYQABy7eJUAAQIECBAgQIAAAQIECJQSEACUaqdiCBAgQIAAAQIECBAgQIDAsYAA4NjFqwQIECBAgAABAgQIECBAoJSAAKBUOxVDgAABAgQIECBAgAABAgSOBQQAxy5eJUCAAAECBAgQIECAAAECpQQEAKXaqRgCBAgQIECAAAECBAgQIHAsIAA4dvEqAQIECBAgQIAAAQIECBAoJSAAKNVOxRAgQIAAAQIECBAgQIAAgWMBAcCxi1cJECBAgAABAgQIECBAgEApAQFAqXYqhgABAgQIECBAgAABAgQIHAsIAI5dvEqAAAECBAgQIECAAAECBEoJCABKtVMxBAgQIECAAAECBAgQIEDgWEAAcOziVQIECBAgQIAAAQIECBAgUEpAAFCqnYohQIAAAQIECBAgQIAAAQLHAgKAYxevEiBAgAABAgQIECBAgACBUgICgFLtVAwBAgQIECBAgAABAgQIEDgWEAAcu3iVAAECBAgQIECAAAECBAiUEhAAlGqnYggQIECAAAECBAgQIECAwLGAAODYxasECBAgQIAAAQIECBAgQKCUgACgVDsVQ4AAAQIECBAgQIAAAQIEjgUEAMcuXiVAgAABAgQIECBAgAABAqUEBACl2qkYAgQIECBAgAABAgQIECBwLCAAOHbxKgECBAgQIECAAAECBAgQKCUgACjVTsUQIECAAAECBAgQIECAAIFjAQHAsYtXCRAgQIAAAQIECBAgQIBAKQEBQKl2KoYAAQIECBAgQIAAAQIECBwLCACOXbxKgAABAgQIECBAgAABAgRKCQgASrVTMQQIECBAgAABAgQIECBA4FhAAHDs4lUCBAgQIECAAAECBAgQIFBKQABQqp2KIUCAAAECBAgQIECAAAECxwICgGMXrxIgQIAAAQIECBAgQIAAgVICAoBS7VQMAQIECBAgQIAAAQIECBA4FhAAHLt4lQABAgQIECBAgAABAgQIlBIQAJRqp2IIECBAgAABAgQIECBAgMCxgADg2MWrBAgQIECAAAECBAgQIECglIAAoFQ7FUOAAAECBAgQIECAAAECBI4FBADHLl4lQIAAAQIECBAgQIAAAQKlBAQApdqpGAIECBAgQIAAAQIECBAgcCwgADh28SoBAgQIECBAgAABAgQIECglIAAo1U7FECBAgAABAgQIECBAgACBYwEBwLGLVwkQIECAAAECBAgQIECAQCkBAUCpdiqGAAECBAgQIECAAAECBAgcCwgAjl28SoAAAQIECBAgQIAAAQIESgkIAEq1UzEECBAgQIAAAQIECBAgQOBYQABw7OJVAgQIECBAgAABAgQIECBQSkAAUKqdiiFAgAABAgQIECBAgAABAscCAoBjF68SIECAAAECBAgQIECAAIFSAgKAUu1UDAECBAgQIECAAAECBAgQOBYQABy7eJUAAQIECBAgQIAAAQIECJQSEACUaqdiCBAgQIAAAQIECBAgQIDAsYAA4NjFqwQIECBAgAABAgQIECBAoJSAAKBUOxVDgAABAgQIECBAgAABAgSOBQQAxy5eJUCAAAECBAgQIECAAAECpQQEAKXaqRgCBAgQIECAAAECBAgQIHAsIAA4dvEqAQIECBAgQIAAAQIECBAoJSAAKNVOxRAgQIAAAQIECBAgQIAAgWMBAcCxi1cJECBAgAABAgQIECBAgEApAQFAqXYqhgABAgQIECBAgAABAgQIHAsIAI5dvEqAAAECBAgQIECAAAECBEoJCABKtVMxBAgQIECAAAECBAgQIEDgWEAAcOziVQIECBAgQIAAAQIECBAgUEpAAFCqnYohQIAAAQIECBAgQIAAAQLHAgKAYxevEiBAgAABAgQIECBAgACBUgICgFLtVAwBAgQIECBAgAABAgQIEDgWEAAcu3iVAAECBAgQIECAAAECBAiUEhAAlGqnYggQIECAAAECBAgQIECAwLGAAODYxasECBAgQIAAAQIECBAgQKCUgACgVDsVQ4AAAQIECBAgQIAAAQIEjgUEAMcuXiVAgAABAgQIECBAgAABAqUEBACl2qkYAgQIECBAgAABAgQIECBwLCAAOHbxKgECBAgQIECAAAECBAgQKCUgACjVTsUQIECAAAECBAgQIECAAIFjAQHAsYtXCRAgQIAAAQIECBAgQIBAKQEBQKl2KoYAAQIECBAgQIAAAQIECBwLCACOXbxKgAABAgQIECBAgAABAgRKCQgASrVTMQQIECBAgAABAgQIECBA4FhAAHDs4lUCBAgQIECAAAECBAgQIFBKQABQqp2KIUCAAAECBAgQIECAAAECxwICgGMXrxIgQIAAAQIECBAgQIAAgVICAoBS7VQMAQIECBAgQIAAAQIECBA4FhAAHLt4lQABAgQIECBAgAABAgQIlBIQAJRqp2IIECBAgAABAgQIECBAgMCxgADg2MWrBAgQIECAAAECBAgQIECglIAAoFQ7FUOAAAECBAgQIECAAAECBI4FBADHLl4lQIAAAQIECBAgQIAAAQKlBAQApdqpGAIECBAgQIAAAQIECBAgcCwgADh28SoBAgQIECBAgAABAgQIECglIAAo1U7FECBAgAABAgQIECBAgACBY4H/D/1siVevp412AAAAAElFTkSuQmCC" alt="XSIC logo" width="36" height="36" />
+              <h1 class="app__title">Exposure Graph — XSIC</h1>
+            </div>
+          </a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mock-nav">≡</button>
+          <nav class="global-nav" id="mock-nav" aria-label="Global">
+            <a href="../index.html">Home</a>
+            <a href="../apps/index.html" class="is-active">Apps</a>
+            <a href="#">Methods</a>
+            <a href="#">FAQ</a>
+            <a href="#">Credits</a>
+            <a href="#">Donate</a>
+          </nav>
+        </div>
+      </header>
+
+      <main class="page__content" aria-live="polite">
+        <section class="hero-head">
+          <p class="eyebrow">Issuer exposure / concentration / issuer risk</p>
+          <h2 class="page-title">Exposure Graph</h2>
+          <p class="page-subtitle">
+            Read one issuer in two ways: <strong>Exposure</strong> shows where concentration and dependency live,
+            while <strong>Risk</strong> shows what issuer-side control powers exist and why they matter.
+          </p>
+        </section>
+
+        <section class="card controls-card">
+          <div class="controls-grid">
+            <label class="field">Known issuer preset
+              <select>
+                <option>RLUSD · Ripple USD (default demo)</option>
+                <option>XSGD · StraitsX</option>
+                <option>EURØP · Schuman Financial</option>
+                <option>Custom issuer only</option>
+              </select>
+            </label>
+            <label class="field">Issuer address
+              <input type="text" value="rMxCKbEDwqr76QuheSUMdEGf4B9xJ8m5De" />
+            </label>
+            <label class="field">Currency code
+              <input type="text" value="RLUSD" />
+            </label>
+            <label class="field">Graph mode
+              <select>
+                <option>Clustered (default)</option>
+                <option>Top holders only</option>
+                <option>Raw edges preview</option>
+              </select>
+            </label>
+            <button class="button button--primary" type="button">Refresh</button>
+            <div class="status-inline">Updated:<strong>2026-03-10 00:42 JST</strong></div>
+          </div>
+        </section>
+
+        <section class="card signal-card">
+          <div class="signal-block">
+            <div class="signal-label">Status</div>
+            <span class="pill pill--warn">MEDIUM CONCENTRATION</span>
+            <div class="hero-meta mono-line">risk: medium · dependency: 3 clusters dominate</div>
+          </div>
+          <div class="signal-block">
+            <div class="signal-label">Top concentration</div>
+            <div class="hero-value">63.8%</div>
+            <div class="hero-meta">top 10 visible counterparties / clusters</div>
+          </div>
+          <div class="signal-block">
+            <div class="signal-label">Why this matters</div>
+            <p class="flow-copy">Exposure leans into a few dense clusters. A distribution shift from any one of them would move the trustline picture quickly.</p>
+            <div class="subcopy">Selected view emphasizes exposure size, not market price.</div>
+          </div>
+          <div class="signal-block">
+            <div class="signal-label">Context</div>
+            <div class="context-chip-wrap">
+              <span class="context-chip">issuer: RLUSD</span>
+              <span class="context-chip">view: clustered</span>
+              <span class="context-chip">source: cached</span>
+            </div>
+            <div class="context-line">Risk tab is root-cause / permission view. Exposure tab is structure / concentration view.</div>
+          </div>
+        </section>
+
+        <section class="metrics-grid" aria-label="Overview metrics">
+          <article class="card metric-card"><div class="metric-label">Trustlines visible</div><div class="metric-value">12.4k</div><div class="metric-sub">sampled / clustered</div></article>
+          <article class="card metric-card"><div class="metric-label">Top 1 share</div><div class="metric-value">18.2%</div><div class="metric-sub">single dominant holder</div></article>
+          <article class="card metric-card metric-card--highlight"><div class="metric-label">Top 10 share</div><div class="metric-value">63.8%</div><div class="metric-sub">concentration threshold crossed</div></article>
+          <article class="card metric-card"><div class="metric-label">Active clusters</div><div class="metric-value">7</div><div class="metric-sub">exchange / issuer / treasury / unknown</div></article>
+          <article class="card metric-card"><div class="metric-label">Issuer links</div><div class="metric-value">3.1k</div><div class="metric-sub">direct visible exposure edges</div></article>
+          <article class="card metric-card"><div class="metric-label">Watch badges</div><div class="metric-value">4</div><div class="metric-sub">centralization / issuer powers</div></article>
+          <article class="card metric-card"><div class="metric-label">Clawback</div><div class="metric-value">On</div><div class="metric-sub">see Risk tab evidence</div></article>
+          <article class="card metric-card"><div class="metric-label">RequireAuth</div><div class="metric-value">Off</div><div class="metric-sub">current sampled state</div></article>
+        </section>
+
+        <section class="card tabs-card">
+          <div class="tabs" role="tablist" aria-label="Exposure Graph views">
+            <button class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-exposure" data-tab-target="panel-exposure">Exposure</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-risk" data-tab-target="panel-risk">Risk</button>
+          </div>
+          <div class="tab-copy">Same page shell as Flow Alert, but split into structure view and issuer-control view.</div>
+        </section>
+
+        <section id="panel-exposure" class="tab-panel is-active" role="tabpanel" aria-label="Exposure tab">
+          <section class="card mainviz-card">
+            <div class="mainviz-head">
+              <div>
+                <h3 class="section-title">Main Viz</h3>
+                <p class="section-note">Issuer-centered graph with weighted links, cluster emphasis, and selection-ready entity detail.</p>
+              </div>
+              <span class="context-chip">graph / clustered exposure</span>
+            </div>
+            <div class="mainviz-body">
+              <div class="viz-panel">
+                <div class="graph-stage">
+                  <svg class="graph-svg" viewBox="0 0 760 388" role="img" aria-label="Exposure graph mock">
+                    <defs>
+                      <filter id="soft-glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="8" result="blur" />
+                        <feMerge>
+                          <feMergeNode in="blur" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
+                    </defs>
+
+                    <g opacity="0.88" stroke-linecap="round" fill="none">
+                      <path d="M380 192 C 280 96, 180 94, 126 112" stroke="rgba(111,99,194,.28)" stroke-width="18" />
+                      <path d="M380 192 C 506 84, 608 92, 660 132" stroke="rgba(111,99,194,.24)" stroke-width="15" />
+                      <path d="M380 192 C 252 238, 198 290, 178 328" stroke="rgba(111,99,194,.18)" stroke-width="10" />
+                      <path d="M380 192 C 524 238, 586 266, 622 310" stroke="rgba(111,99,194,.16)" stroke-width="9" />
+                      <path d="M380 192 C 366 104, 392 58, 440 42" stroke="rgba(111,99,194,.14)" stroke-width="7" />
+                      <path d="M380 192 C 322 132, 298 120, 254 158" stroke="rgba(111,99,194,.14)" stroke-width="6" />
+                      <path d="M380 192 C 448 136, 486 132, 540 170" stroke="rgba(111,99,194,.12)" stroke-width="5" />
+                    </g>
+
+                    <g filter="url(#soft-glow)">
+                      <circle cx="380" cy="192" r="48" fill="rgba(111,99,194,.94)" />
+                      <circle cx="126" cy="112" r="32" fill="rgba(111,99,194,.22)" stroke="rgba(111,99,194,.38)" stroke-width="2" />
+                      <circle cx="660" cy="132" r="36" fill="rgba(111,99,194,.18)" stroke="rgba(111,99,194,.34)" stroke-width="2" />
+                      <circle cx="178" cy="328" r="28" fill="rgba(111,99,194,.14)" stroke="rgba(111,99,194,.28)" stroke-width="2" />
+                      <circle cx="622" cy="310" r="26" fill="rgba(111,99,194,.14)" stroke="rgba(111,99,194,.28)" stroke-width="2" />
+                      <circle cx="440" cy="42" r="20" fill="rgba(111,99,194,.12)" stroke="rgba(111,99,194,.24)" stroke-width="2" />
+                      <circle cx="254" cy="158" r="16" fill="rgba(111,99,194,.1)" stroke="rgba(111,99,194,.22)" stroke-width="2" />
+                      <circle cx="540" cy="170" r="15" fill="rgba(111,99,194,.1)" stroke="rgba(111,99,194,.22)" stroke-width="2" />
+                    </g>
+
+                    <g font-family="Inter, system-ui, sans-serif" text-anchor="middle">
+                      <text x="380" y="188" font-size="15" font-weight="800" fill="#ffffff">RLUSD</text>
+                      <text x="380" y="206" font-size="11" font-weight="600" fill="rgba(255,255,255,.86)">Issuer</text>
+
+                      <text x="126" y="116" font-size="12" font-weight="800" fill="#5d52b7">Exchange cluster</text>
+                      <text x="660" y="136" font-size="12" font-weight="800" fill="#5d52b7">Treasury / known</text>
+                      <text x="178" y="332" font-size="11" font-weight="800" fill="#5d52b7">Unknown dense</text>
+                      <text x="622" y="314" font-size="11" font-weight="800" fill="#5d52b7">Custody group</text>
+                      <text x="440" y="45" font-size="10" font-weight="800" fill="#5d52b7">Ops</text>
+                      <text x="254" y="161" font-size="10" font-weight="800" fill="#5d52b7">Bridge</text>
+                      <text x="540" y="173" font-size="10" font-weight="800" fill="#5d52b7">Other</text>
+                    </g>
+                  </svg>
+                  <div class="graph-caption">
+                    <div class="legend">
+                      <span class="legend-rule"><span class="legend-line"></span> thicker = larger exposure</span>
+                      <span class="legend-rule"><span class="legend-dot" style="background: rgba(111,99,194,.9)"></span> issuer</span>
+                      <span class="legend-rule"><span class="legend-dot" style="background: rgba(111,99,194,.28)"></span> cluster / counterparty</span>
+                    </div>
+                    <div class="overlay-note">Mock selection focus: <strong>Exchange cluster</strong> · 18.2% of visible exposure</div>
+                  </div>
+                </div>
+              </div>
+              <aside class="side-panel">
+                <div>
+                  <div class="signal-label">Reason / Context</div>
+                  <h4 class="reason-title">Concentration is meaningful, not extreme</h4>
+                  <p class="reason-copy">The graph is not trying to show every trustline. It is trying to show where dependency becomes operationally meaningful.</p>
+                </div>
+                <ul class="reason-list">
+                  <li>Top 1 cluster is elevated but not dominant enough to call single-point dependence.</li>
+                  <li>Top 10 visible entities exceed 60%, so distribution changes can reshape the picture quickly.</li>
+                  <li>Risk tab should be checked before using concentration alone to judge safety.</li>
+                </ul>
+                <section class="entity-card">
+                  <div class="signal-label">Selected entity</div>
+                  <h5 class="entity-name">Exchange cluster</h5>
+                  <p class="entity-copy">Aggregated exposure group used for first-pass structure reading. This is where most short-interval movement would likely become visible.</p>
+                  <div class="entity-kv">
+                    <div>
+                      <div class="kv-label">Exposure share</div>
+                      <div class="kv-value">18.2%</div>
+                    </div>
+                    <div>
+                      <div class="kv-label">Link weight</div>
+                      <div class="kv-value">heavy</div>
+                    </div>
+                    <div>
+                      <div class="kv-label">Entity type</div>
+                      <div class="kv-value">known / exchange</div>
+                    </div>
+                    <div>
+                      <div class="kv-label">Watch</div>
+                      <div class="kv-value">distribution sensitive</div>
+                    </div>
+                  </div>
+                </section>
+                <section class="summary-card">
+                  <div class="signal-label">Quick read</div>
+                  <ul class="summary-list">
+                    <li>Issuer sits in the middle of several thick paths rather than one overwhelming line.</li>
+                    <li>Known cluster share is high enough to justify a warning badge.</li>
+                    <li>Unknown dense nodes still matter and should not be hidden from the summary.</li>
+                  </ul>
+                </section>
+              </aside>
+            </div>
+          </section>
+
+          <section class="list-grid">
+            <section class="card list-card">
+              <div class="mini-head">
+                <div>
+                  <h3 class="mini-title">Concentration panel</h3>
+                  <p class="mini-meta">Top holders / clusters / dependency summary</p>
+                </div>
+                <span class="context-chip">top 1 / 3 / 5 / 10</span>
+              </div>
+              <div class="list-subpanel">
+                <div class="tag-group">
+                  <span class="tag">Top 1 · 18.2%</span>
+                  <span class="tag">Top 3 · 41.6%</span>
+                  <span class="tag">Top 5 · 54.4%</span>
+                  <span class="tag">Top 10 · 63.8%</span>
+                </div>
+                <div class="rank-list">
+                  <div class="rank-row">
+                    <div class="rank-index">1</div>
+                    <div class="rank-main"><div class="rank-title">Exchange cluster</div><div class="rank-sub">known / routed / high visibility</div></div>
+                    <div class="rank-value">18.2%</div>
+                  </div>
+                  <div class="rank-row">
+                    <div class="rank-index">2</div>
+                    <div class="rank-main"><div class="rank-title">Treasury / known ops</div><div class="rank-sub">issuer-adjacent / operational</div></div>
+                    <div class="rank-value">13.5%</div>
+                  </div>
+                  <div class="rank-row">
+                    <div class="rank-index">3</div>
+                    <div class="rank-main"><div class="rank-title">Unknown dense cluster</div><div class="rank-sub">watch / unlabeled concentration</div></div>
+                    <div class="rank-value">9.9%</div>
+                  </div>
+                  <div class="rank-row">
+                    <div class="rank-index">4</div>
+                    <div class="rank-main"><div class="rank-title">Custody group</div><div class="rank-sub">known / low churn</div></div>
+                    <div class="rank-value">7.8%</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card list-card">
+              <div class="mini-head">
+                <div>
+                  <h3 class="mini-title">Activity / watchlist</h3>
+                  <p class="mini-meta">Context rows that explain why the graph is highlighted this way</p>
+                </div>
+                <span class="context-chip">explain / badges</span>
+              </div>
+              <div class="list-subpanel">
+                <div class="event-list">
+                  <div class="event-row">
+                    <div class="event-icon">!</div>
+                    <div class="event-main"><div class="event-title">Top 10 concentration exceeds soft threshold</div><div class="event-sub">summary / structure warning</div></div>
+                    <div class="event-value">63.8%</div>
+                  </div>
+                  <div class="event-row">
+                    <div class="event-icon">↺</div>
+                    <div class="event-main"><div class="event-title">Issuer powers present on sampled account state</div><div class="event-sub">freeze / clawback checks continue in Risk tab</div></div>
+                    <div class="event-value">2 flags</div>
+                  </div>
+                  <div class="event-row">
+                    <div class="event-icon">◎</div>
+                    <div class="event-main"><div class="event-title">Known cluster visibility is good</div><div class="event-sub">less hidden concentration than empty-label view</div></div>
+                    <div class="event-value">high</div>
+                  </div>
+                  <div class="event-row">
+                    <div class="event-icon">?</div>
+                    <div class="event-main"><div class="event-title">Unknown dense nodes remain meaningful</div><div class="event-sub">cannot conclude safety from labels alone</div></div>
+                    <div class="event-value">watch</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </section>
+        </section>
+
+        <section id="panel-risk" class="tab-panel" role="tabpanel" aria-label="Risk tab">
+          <section class="risk-grid">
+            <section class="card mainviz-card">
+              <div class="mainviz-head">
+                <div>
+                  <h3 class="section-title">Issuer Control Radar</h3>
+                  <p class="section-note">Permissions view with a mandatory evidence list under the graphic. This page should never rely on the radar alone.</p>
+                </div>
+                <span class="context-chip">issuer risk / evidence-backed</span>
+              </div>
+              <div class="risk-block">
+                <div class="risk-score">
+                  <div>
+                    <div class="signal-label">Overall issuer risk</div>
+                    <div class="hero-value">Medium</div>
+                    <div class="hero-meta">Control powers exist, but that does not by itself prove active misuse.</div>
+                  </div>
+                  <div class="risk-badge">Evidence present · 4 checks</div>
+                </div>
+                <div class="radar-wrap">
+                  <svg class="radar-svg" viewBox="0 0 420 360" role="img" aria-label="Issuer control radar mock">
+                    <g transform="translate(210 180)">
+                      <g fill="none" stroke="rgba(111,99,194,.14)">
+                        <polygon points="0,-120 103,-60 103,60 0,120 -103,60 -103,-60" />
+                        <polygon points="0,-90 77,-45 77,45 0,90 -77,45 -77,-45" />
+                        <polygon points="0,-60 52,-30 52,30 0,60 -52,30 -52,-30" />
+                        <polygon points="0,-30 26,-15 26,15 0,30 -26,15 -26,-15" />
+                      </g>
+                      <g stroke="rgba(111,99,194,.16)" stroke-width="1">
+                        <line x1="0" y1="0" x2="0" y2="-130" />
+                        <line x1="0" y1="0" x2="112" y2="-65" />
+                        <line x1="0" y1="0" x2="112" y2="65" />
+                        <line x1="0" y1="0" x2="0" y2="130" />
+                        <line x1="0" y1="0" x2="-112" y2="65" />
+                        <line x1="0" y1="0" x2="-112" y2="-65" />
+                      </g>
+                      <polygon points="0,-104 82,-48 98,56 0,78 -46,26 -52,-30" fill="rgba(111,99,194,.22)" stroke="rgba(111,99,194,.72)" stroke-width="3" />
+                    </g>
+                    <g fill="#6b7280" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="700">
+                      <text x="210" y="24" text-anchor="middle">Freeze</text>
+                      <text x="355" y="100" text-anchor="middle">GlobalFreeze</text>
+                      <text x="356" y="272" text-anchor="middle">Clawback</text>
+                      <text x="210" y="344" text-anchor="middle">RequireAuth</text>
+                      <text x="60" y="272" text-anchor="middle">NoFreeze</text>
+                      <text x="56" y="100" text-anchor="middle">Other ops</text>
+                    </g>
+                  </svg>
+                </div>
+              </div>
+            </section>
+
+            <aside class="risk-stack">
+              <section class="card list-card">
+                <div class="mini-head">
+                  <div>
+                    <h3 class="mini-title">Root cause summary</h3>
+                    <p class="mini-meta">Readable summary before the raw evidence cards</p>
+                  </div>
+                  <span class="context-chip">low / medium / high</span>
+                </div>
+                <div class="list-subpanel">
+                  <ul class="summary-list">
+                    <li>Freeze-related control is present in the sampled issuer state.</li>
+                    <li>Clawback capability appears enabled and therefore raises central control risk.</li>
+                    <li>RequireAuth does not appear active in this mock state.</li>
+                    <li>Evidence is machine-derived and should be shown alongside any score.</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section class="card list-card">
+                <div class="mini-head">
+                  <div>
+                    <h3 class="mini-title">Evidence list</h3>
+                    <p class="mini-meta">Each control needs a visible reason, not just a colored dot</p>
+                  </div>
+                  <span class="context-chip">flags / account state / tx hints</span>
+                </div>
+                <div class="list-subpanel">
+                  <div class="evidence-card">
+                    <div class="evidence-head">
+                      <h4 class="evidence-title">Freeze capability</h4>
+                      <span class="pill pill--warn">present</span>
+                    </div>
+                    <div class="evidence-meta">source: account flags · sampled ledger state</div>
+                    <ul class="evidence-list">
+                      <li>Freeze-related issuer control appears enabled in the current state.</li>
+                      <li>This means individual balances or relationships may be centrally affected depending on implementation details.</li>
+                    </ul>
+                  </div>
+                  <div class="evidence-card">
+                    <div class="evidence-head">
+                      <h4 class="evidence-title">Clawback capability</h4>
+                      <span class="pill pill--warn">present</span>
+                    </div>
+                    <div class="evidence-meta">source: account flags / tx history if available</div>
+                    <ul class="evidence-list">
+                      <li>Clawback materially increases issuer-side intervention power.</li>
+                      <li>Presence alone does not prove usage, but it should raise a control-risk badge.</li>
+                    </ul>
+                  </div>
+                  <div class="evidence-card">
+                    <div class="evidence-head">
+                      <h4 class="evidence-title">RequireAuth</h4>
+                      <span class="pill pill--good">not observed</span>
+                    </div>
+                    <div class="evidence-meta">source: sampled account state</div>
+                    <ul class="evidence-list">
+                      <li>No RequireAuth flag is surfaced in this mock state.</li>
+                      <li>If live fetch fails, the app should say Unknown rather than treat this as false.</li>
+                    </ul>
+                  </div>
+                </div>
+              </section>
+            </aside>
+          </section>
+        </section>
+
+        <section class="card debug-card">
+          <details>
+            <summary>Debug / notes (collapsed)</summary>
+            <div class="debug-buttons">
+              <button type="button" class="button button--ghost">Force Exposure</button>
+              <button type="button" class="button button--ghost">Force Risk</button>
+              <button type="button" class="button button--ghost">Force Empty</button>
+              <button type="button" class="button button--ghost">Force Error</button>
+            </div>
+            <p class="debug-status">Status: static mock only. No live data or graph layout engine attached yet.</p>
+            <p class="debug-status mono-line">EG_DEBUG · shell aligned to Flow Alert, exposure/risk split, static weighted graph + evidence-backed radar.</p>
+          </details>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      (() => {
+        const tabs = Array.from(document.querySelectorAll('[data-tab-target]'));
+        const panels = Array.from(document.querySelectorAll('.tab-panel'));
+
+        function setActive(targetId) {
+          tabs.forEach((tab) => {
+            const active = tab.dataset.tabTarget === targetId;
+            tab.classList.toggle('is-active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+          });
+
+          panels.forEach((panel) => {
+            panel.classList.toggle('is-active', panel.id === targetId);
+          });
+        }
+
+        tabs.forEach((tab) => {
+          tab.addEventListener('click', () => setActive(tab.dataset.tabTarget));
+        });
+      })();
+    </script>
+  </body>
+</html>

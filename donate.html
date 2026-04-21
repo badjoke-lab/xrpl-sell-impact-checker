@@ -3,143 +3,136 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>XSIC – Donate</title>
-  <meta name="description" content="Support XSIC development." />
+  <title>Support XSIC | Donation Policy and Usage</title>
+  <meta name="description" content="Support XSIC maintenance. See why donations help, where funds are used, and important cautions before sending." />
   <link rel="stylesheet" href="/styles.css" />
-  <link rel="canonical" href="https://xsic.badjoke-lab.com/donate/">
-  <meta property="og:url" content="https://xsic.badjoke-lab.com/donate/">
-  <meta property="og:site_name" content="XSIC">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta property="og:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="XRPL Sell Impact Checker (XSIC)">
-  <meta name="twitter:description" content="Estimate sell impact and receive amounts before you trade.">
-  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png">
-  <link rel="icon" href="/favicon.png">
-  <link rel="apple-touch-icon" href="/favicon.png">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0D84H0D66W"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-0D84H0D66W');
+  <link rel="canonical" href="https://xsic.badjoke-lab.com/donate/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="XSIC" />
+  <meta property="og:title" content="Support XSIC" />
+  <meta property="og:description" content="Donation purpose, fund usage, and caution notes for supporting XSIC." />
+  <meta property="og:url" content="https://xsic.badjoke-lab.com/donate/" />
+  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Support XSIC" />
+  <meta name="twitter:description" content="Help keep XSIC reliable and transparent." />
+  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "DonateAction",
+    "name": "Support XSIC",
+    "recipient": {"@type": "Organization", "name": "Badjoke-lab"},
+    "target": "https://xsic.badjoke-lab.com/donate/"
+  }
   </script>
 </head>
-<body>
-  <header class="page-header">
-    <div class="page-header__row">
-      <a href="/" class="brand-link" aria-label="Home"><div class="page-header__brand" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <img class="page-header__logo" src="/xsic_logo.png" alt="XRPL Sell Impact Checker logo" width="36" height="36" />
-</div></a>
-      <div
-        class="lang-switch"
-        role="group"
-        aria-label="Language"
-        data-i18n-aria-label="language.label"
-      >
-        <span class="lang-switch__label" data-i18n="language.label"></span>
-        <button
-          class="ghost-button lang-switch__button"
-          type="button"
-          data-lang-switch="en"
-          aria-pressed="false"
-        >
-          EN
-        </button>
-        <button
-          class="ghost-button lang-switch__button"
-          type="button"
-          data-lang-switch="ja"
-          aria-pressed="false"
-        >
-          JA
-        </button>
+<body data-nav-key="donate">
+  <div class="app page console-page static-page">
+    <header class="app__header global-header">
+      <div class="app__header-top">
+        <a href="/" class="brand-link" aria-label="XSIC Home">
+          <div class="app__brand">
+            <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+            <h1 class="app__title">XSIC</h1>
+          </div>
+        </a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+        <div data-global-nav></div>
       </div>
-    </div>
-    <p class="page-header__catchcopy" data-i18n="header.tagline"></p>
-    <nav class="site-nav" aria-label="Primary">
-      <a href="/methods/" data-i18n="nav.methods"></a>
-      <a href="/faq/" data-i18n="nav.faq"></a>
-      <a href="/disclaimer/" data-i18n="nav.disclaimer"></a>
-      <a href="/credits/" data-i18n="nav.credits"></a>
-      <a href="/donate/" data-i18n="nav.donate"></a>
-      <a href="https://docs.google.com/forms/d/e/1FAIpQLScdv3WFVHmQO_mz-p4_HJv1RyJItghrG6A0SGQ5ec4R2NBNOw/viewform?usp=pp_url&entry.148248220=XSIC" target="_blank" rel="noopener" data-i18n="nav.contact"></a>
-        </nav>
-  </header>
+    </header>
 
-  <main class="page">
-    <h1 class="page__title" data-i18n="pages.donate.title"></h1>
-    <p data-i18n="pages.donate.lede_short"></p>
+    <main class="page__content static-content">
+      <section class="card" aria-labelledby="donate-title">
+        <p class="eyebrow">Community support</p>
+        <h2 id="donate-title" class="page__title">Donate</h2>
+        <p class="page__lede">Donations are optional and help sustain XSIC as a four-app public decision console. Support is used to keep data paths, docs quality, and operational reliability in working condition.</p>
+      </section>
 
-    <div class="donate-box">
-      <code id="donate-addr">rsMuUUdLC1wxrJ2DvQnTrnKGRhVxoLrhEj</code>
-      <button id="copy-donate" class="btn" type="button" data-i18n="pages.donate.copy_button"></button>
-    </div>
+      <section class="card" aria-labelledby="donate-purpose">
+        <h3 id="donate-purpose">Support purpose</h3>
+        <ul class="info-list">
+          <li>Keep XSIC available as a practical pre/post execution checking toolset rather than a one-off demo.</li>
+          <li>Fund reliability work that benefits all four apps, not a single feature surface.</li>
+          <li>Maintain documentation so output interpretation stays aligned with real service behavior.</li>
+        </ul>
+      </section>
 
-    <p class="donate-status" id="donate-status" aria-live="polite"></p>
-  </main>
+      <section class="card" aria-labelledby="donate-use">
+        <h3 id="donate-use">What donations help cover</h3>
+        <ul class="info-list">
+          <li>Hosting, function runtime, and traffic-related infrastructure costs.</li>
+          <li>Endpoint monitoring, incident handling, and data pipeline maintenance.</li>
+          <li>App/docs updates that improve cross-app consistency, safety messaging, and operator usability.</li>
+        </ul>
+      </section>
 
-  <footer class="page-footer">
-    <nav class="page-links">
-      <a href="/methods/" data-i18n="nav.methods"></a>
-      <a href="/faq/" data-i18n="nav.faq"></a>
-      <a href="/disclaimer/" data-i18n="nav.disclaimer"></a>
-      <a href="/credits/" data-i18n="nav.credits"></a>
-    </nav>
-  </footer>
+      <section class="card" aria-labelledby="donate-address">
+        <h3 id="donate-address">Donation address (XRP)</h3>
+        <div class="address-card">
+          <code id="donate-addr">rsMuUUdLC1wxrJ2DvQnTrnKGRhVxoLrhEj</code>
+          <button id="copy-donate" class="secondary-button" type="button">Copy address</button>
+          <p class="status" id="donate-status" aria-live="polite"></p>
+        </div>
+      </section>
 
-<script type="module">
-  import { initI18nPage } from "/src/i18n/page.js";
-  import { t } from "/src/i18n/index.js";
+      <section class="card" aria-labelledby="donate-notes">
+        <h3 id="donate-notes">Address and transfer notes</h3>
+        <ul class="info-list">
+          <li><strong>Address verification:</strong> verify the full address string on this page immediately before each transfer.</li>
+          <li><strong>Destination tag:</strong> no destination tag is required for this donation address.</li>
+          <li><strong>Safety note:</strong> do not trust addresses copied from screenshots, reposts, or unofficial mirrors.</li>
+          <li><strong>Expectation setting:</strong> donations do not purchase trading advice, custody, execution services, or guaranteed uptime.</li>
+        </ul>
+      </section>
+    </main>
 
-  const i18nReady = initI18nPage();
-  const addressNode = document.getElementById("donate-addr");
-  const button = document.getElementById("copy-donate");
-  const status = document.getElementById("donate-status");
+    <div data-global-footer></div>
+  </div>
 
-  const setStatus = (key, ok) => {
-    status.textContent = t(key);
-    status.className = `donate-status ${ok ? "ok" : "ng"}`;
+<script>
+  const addressNode = document.getElementById('donate-addr');
+  const button = document.getElementById('copy-donate');
+  const status = document.getElementById('donate-status');
+
+  const setStatus = (message, ok) => {
+    status.textContent = message;
+    status.className = `status ${ok ? 'status--success' : 'error'}`;
   };
 
   const fallbackCopy = (text) => {
-    const textarea = document.createElement("textarea");
+    const textarea = document.createElement('textarea');
     textarea.value = text;
-    textarea.style.position = "fixed";
-    textarea.style.left = "-9999px";
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
     document.body.appendChild(textarea);
     textarea.focus();
     textarea.select();
-    const ok = document.execCommand("copy");
+    const ok = document.execCommand('copy');
     document.body.removeChild(textarea);
     return ok;
   };
 
-  const handleCopy = async () => {
-    await i18nReady;
+  button.addEventListener('click', async () => {
     const text = addressNode?.textContent?.trim();
     if (!text) {
-      setStatus("pages.donate.address_unavailable", false);
+      setStatus('Address unavailable.', false);
       return;
     }
 
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
-        setStatus("pages.donate.copy_success", true);
+        setStatus('Address copied.', true);
         return;
       }
       const ok = fallbackCopy(text);
-      setStatus(ok ? "pages.donate.copy_success" : "pages.donate.copy_failed", ok);
+      setStatus(ok ? 'Address copied.' : 'Copy failed. Please copy manually.', ok);
     } catch (error) {
-      setStatus("pages.donate.copy_failed", false);
+      setStatus('Copy failed. Please copy manually.', false);
     }
-  };
-
-  button.addEventListener("click", handleCopy);
+  });
 </script>
+<script src="/shared/nav.js"></script>
 </body>
 </html>

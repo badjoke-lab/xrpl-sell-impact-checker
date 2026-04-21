@@ -3,36 +3,206 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/flow-alert/" />
     <title>Flow Alert — XSIC</title>
+    <meta name="description" content="Visualize exchange/whale in/out flows as actionable signals." />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/flow-alert/" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Flow Alert — XSIC" />
+    <meta property="og:description" content="Visualize exchange/whale in/out flows as actionable signals." />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Flow Alert — XSIC" />
+    <meta name="twitter:description" content="Visualize exchange/whale in/out flows as actionable signals." />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
   </head>
   <body data-nav-key="apps">
-    <div class="app page console-page">
-      <header class="app__header global-header">
+    <div class="app page console-page flow-alert-page">
+            <header class="app__header global-header">
         <div class="app__header-top">
-          <a href="/" class="brand-link"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><h1 class="app__title">XSIC</h1></div></a>
+          <a href="/" class="brand-link" aria-label="XSIC Home">
+            <div class="app__brand">
+              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+              <h1 class="app__title">XSIC</h1>
+            </div>
+          </a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
           <div data-global-nav></div>
         </div>
       </header>
-      <main class="page__content">
-        <section class="card">
-          <h2 class="page__title">Flow Alert</h2>
-          <p class="page__lede">Coming soon. Shared states are ready for this app.</p>
+
+      <main class="page__content flow-alert" aria-live="polite">
+        <section class="flow-hero-head">
+          <h2 class="flow-page-title">Flow Alert</h2>
+          <p class="flow-page-subtitle">Live state dashboard for signal, metrics, heatmap, context, and supporting recent flow evidence.</p>
         </section>
-        <section class="card" aria-label="Shared UI state mount"><div class="ui-mount" data-ui-mount="flow-alert"></div></section>
+
+        <section class="card flow-controls-card">
+          <div class="flow-controls-grid">
+            <label class="flow-field">Preset
+              <select id="flow-target-preset" class="flow-control">
+                <option value="exchanges">Exchanges (default)</option>
+                <option value="whales">Whales (default)</option>
+                <option value="ripple">Ripple / Escrow</option>
+                <option value="">Unset (empty state demo)</option>
+              </select>
+            </label>
+            <label class="flow-field">Window
+              <select id="flow-window" class="flow-control">
+                <option value="5m">5m (live assist)</option>
+                <option value="1h">1h</option>
+                <option value="24h">24h</option>
+                <option value="7d">7d</option>
+              </select>
+            </label>
+            <div class="flow-toggle-group">
+              <label><input id="flow-lite-toggle" type="checkbox" /> Lite mode</label>
+              <label><input id="flow-demo-toggle" type="checkbox" /> Demo only</label>
+            </div>
+            <button id="flow-refresh-button" class="flow-button" type="button">Refresh</button>
+            <div class="flow-status-inline">Status: <span data-flow-meta="status">LOADING</span></div>
+            <div class="flow-status-inline">Updated: <span data-flow-meta="refresh">—</span></div>
+          </div>
+          <div id="flowStaleNote" class="flow-note" hidden>Stale or sampled payload: keeping latest snapshot while refresh continues.</div>
+          <p class="flow-note flow-note--quiet">State guide: stale/partial keeps last readable snapshot, empty means no labeled detections, and error means live fetch failed.</p>
+        </section>
+
+        <section class="card flow-signal-card">
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Status</div>
+            <span class="flow-pill" data-flow-signal="status-pill">LOW</span>
+            <div class="flow-meta" data-flow-signal="severity">severity: — · pressure: —</div>
+          </div>
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Net Impact</div>
+            <div class="flow-hero-value" data-flow-signal="impact">—</div>
+            <div class="flow-meta">current net impact over active window</div>
+          </div>
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Why now</div>
+            <p class="flow-copy" data-flow-signal="why">No major labeled flow detected in this window.</p>
+            <div class="flow-meta" data-flow-signal="observed">Scanned — payments across — ledgers.</div>
+          </div>
+          <div class="flow-signal-block">
+            <div class="flow-signal-label">Context</div>
+            <span class="flow-context-chip" data-flow-signal="ctx-preset">target: exchanges</span>
+            <span class="flow-context-chip" data-flow-signal="ctx-window">window: 1h</span>
+            <span class="flow-context-chip" data-flow-signal="ctx-source">source: demo</span>
+            <div class="flow-context-line" data-flow-signal="context">Partial live data (timeout-limited). Try 24h for broader coverage.</div>
+          </div>
+          <div class="flow-history-strip" data-flow-history-strip hidden>
+            <div class="flow-history-row">
+              <div class="flow-signal-label">Recent net</div>
+              <svg class="flow-history-sparkline" data-flow-history="net-svg" viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label="Recent net flow"></svg>
+              <div class="flow-meta" data-flow-history="net-compare">latest vs oldest: —</div>
+            </div>
+            <div class="flow-history-row">
+              <div class="flow-signal-label">Recent detections</div>
+              <div class="flow-history-bars" data-flow-history="matched-bars" role="img" aria-label="Recent matched events"></div>
+              <div class="flow-meta" data-flow-history="matched-compare">latest vs oldest: —</div>
+            </div>
+            <div class="flow-meta" data-flow-history="status" hidden>History building…</div>
+          </div>
+        </section>
+
+        <section class="flow-metrics-grid">
+          <article class="card flow-metric-card"><div class="flow-metric-label">Inflow</div><div class="flow-metric-value" data-flow-snapshot="inflow">—</div></article>
+          <article class="card flow-metric-card"><div class="flow-metric-label">Outflow</div><div class="flow-metric-value" data-flow-snapshot="outflow">—</div></article>
+          <article class="card flow-metric-card flow-metric-card--highlight"><div class="flow-metric-label">Net</div><div class="flow-metric-value" data-flow-snapshot="net">—</div><div class="flow-meta" data-flow-snapshot-sub="net">prev: — / Δ —</div></article>
+          <article class="card flow-metric-card"><div class="flow-metric-label">Payments scanned</div><div class="flow-metric-value" data-flow-snapshot="payments">—</div></article>
+          <article class="card flow-metric-card"><div class="flow-metric-label">Ledgers scanned</div><div class="flow-metric-value" data-flow-snapshot="ledgers">—</div></article>
+          <article class="card flow-metric-card"><div class="flow-metric-label">Matched events</div><div class="flow-metric-value" data-flow-snapshot="matched">—</div><div class="flow-meta" data-flow-snapshot-sub="matched">prev: — / recent: —</div></article>
+          <article class="card flow-metric-card"><div class="flow-metric-label">Source</div><div class="flow-metric-value flow-metric-value--small" data-flow-snapshot="source">—</div></article>
+          <article class="card flow-metric-card"><div class="flow-metric-label">Updated</div><div class="flow-metric-value" data-flow-snapshot="updated">—</div><div class="flow-meta" data-flow-snapshot-sub="updated">history newest: —</div></article>
+        </section>
+
+        <section class="card flow-mainviz-card" id="flowCanvasWrap">
+          <div class="flow-mainviz-head">
+            <div>
+              <h3 class="flow-section-title">Main Viz</h3>
+              <p class="flow-section-note">Flow intensity heatmap by tracked entity and bucket.</p>
+            </div>
+            <span class="flow-context-chip">heatmap / intensity</span>
+          </div>
+          <div class="flow-mainviz-body">
+            <div class="flow-viz-panel">
+              <canvas id="flowCanvas" aria-label="Flow heatmap"></canvas>
+              <div id="flowTooltip" class="flow-tooltip" hidden></div>
+              <div data-flow-state="loading" class="flow-overlay">Loading heatmap…</div>
+              <div data-flow-state="error" class="flow-overlay" hidden>
+                <p>Could not prepare the heatmap.</p>
+                <button id="flow-retry-button" class="flow-button" type="button">Retry</button>
+              </div>
+              <div data-flow-state="empty" class="flow-overlay" hidden>
+                <p>No target preset selected.</p>
+                <button id="flow-empty-button" class="flow-button" type="button">Use Exchanges preset</button>
+              </div>
+            </div>
+            <aside class="flow-reason-panel">
+              <div class="flow-signal-label">Reason / Context</div>
+              <h4 id="flowReasonTitle" class="flow-reason-title">No dominant pressure</h4>
+              <p id="flowReasonCopy" class="flow-reason-copy">No major labeled flow detected in this window.</p>
+              <ul id="flowReasonList" class="flow-reason-list"></ul>
+            </aside>
+          </div>
+        </section>
+
+        <section class="card flow-flows-card">
+          <div class="flow-mini-head">
+            <h3 class="flow-mini-title">Snapshot history (beta)</h3>
+            <div class="flow-mini-meta">latest / previous delta / recent count / last event</div>
+          </div>
+          <ul class="flow-escrow-list">
+            <li>Latest snapshot: <span id="flowHistoryLatestTs">—</span></li>
+            <li>Net delta vs previous: <span id="flowHistoryNetDelta">—</span></li>
+            <li>Recent history count: <span id="flowHistoryRecentCount">—</span></li>
+            <li>Last detected event: <span id="flowHistoryLastEvent">—</span></li>
+          </ul>
+        </section>
+
+
+        <section class="card flow-flows-card">
+          <div class="flow-mini-head">
+            <h3 class="flow-mini-title">Recent flows</h3>
+            <div class="flow-mini-meta">recent detections from history (current window is fallback)</div>
+          </div>
+          <div id="flowEventsEmptyState" class="flow-note" hidden>No recent labeled detection yet.</div>
+          <div id="flowRecentFlows" class="flow-recent-list"></div>
+        </section>
+
+        <section class="card flow-escrow-card">
+          <div class="flow-mini-head">
+            <h3 class="flow-mini-title">Escrow watch</h3>
+            <div class="flow-mini-meta">next / stats / pattern / recent</div>
+          </div>
+          <div class="flow-escrow-grid">
+            <div class="flow-subpanel">
+              <h4>Next</h4>
+              <p id="flowEscrowNext" class="flow-escrow-main">No upcoming unlock found</p>
+            </div>
+            <div class="flow-subpanel">
+              <h4>Stats</h4>
+              <p id="flowEscrowStats" class="flow-escrow-meta">sum: — / count: — / avg: — / max: —</p>
+            </div>
+            <div class="flow-subpanel">
+              <h4>Pattern</h4>
+              <ul id="flowEscrowPattern" class="flow-escrow-list"></ul>
+            </div>
+            <div class="flow-subpanel">
+              <h4>Recent</h4>
+              <ul id="flowEscrowRecent" class="flow-escrow-list"></ul>
+            </div>
+          </div>
+        </section>
+
       </main>
       <div data-global-footer></div>
     </div>
-    <script src="/shared/ui-kit.js"></script>
-    <script src="/shared/nav.js"></script>
-    <script>
-      window.XSICUiKit?.renderEmptyState('[data-ui-mount="flow-alert"]', {
-        title: 'Flow Alert placeholder',
-        body: 'This screen now shares the same empty/error/loading UI kit.',
-      });
-    </script>
+    <script defer src="/shared/nav.js"></script>
+    <script defer src="/apps/flow-alert/flow-alert.js?v=fa-history-fastpath-5a064e7"></script>
   </body>
 </html>

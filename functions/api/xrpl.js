@@ -1,165 +1,99 @@
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
 const XRPL_ENDPOINTS = [
-  "https://s1.ripple.com:51234/",
-  "https://s2.ripple.com:51234/",
+  'https://s1.ripple.com:51234/',
+  'https://s2.ripple.com:51234/',
+  'https://xrplcluster.com/',
 ];
-const TIMEOUT_MS = 12_000;
-const MAX_BODY_BYTES = 25 * 1024;
-const ALLOWED_METHODS = new Set(["server_info", "book_offers", "account_lines"]);
 
-function jsonResponse(status, payload) {
+const REQUEST_TIMEOUT_MS = 4500;
+
+function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
-      "Content-Type": "application/json",
-      ...CORS_HEADERS,
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'access-control-allow-origin': '*',
     },
   });
 }
 
-function errorPayload(base, message, details = null) {
+function errorPayload(error, endpoint = null) {
   return {
     ok: false,
-    endpointUsed: null,
-    httpStatus: null,
-    elapsedMs: base.elapsedMs,
-    result: null,
-    error: {
-      message,
-      details,
-    },
+    endpointUsed: endpoint,
+    error: error?.message || 'upstream_unreachable',
   };
 }
 
-async function fetchWithTimeout(url, options, timeoutMs) {
+async function postRpc(endpoint, payload) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetch(url, {
-      ...options,
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    return response;
+    if (!response.ok) {
+      throw new Error(`http_${response.status}`);
+    }
+    return await response.json();
   } finally {
     clearTimeout(timer);
   }
 }
 
-export async function onRequest({ request }) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
-  }
+async function fetchFromAnyEndpoint(payload) {
+  let lastError = null;
+  let timeoutSeen = false;
 
-  if (request.method !== "POST") {
-    return new Response("Method Not Allowed", {
-      status: 405,
-      headers: CORS_HEADERS,
-    });
-  }
-
-  const startTime = Date.now();
-  const contentType = request.headers.get("content-type") || "";
-  if (!contentType.toLowerCase().includes("application/json")) {
-    return jsonResponse(400, errorPayload({ elapsedMs: 0 }, "Content-Type must be application/json"));
-  }
-
-  const contentLength = Number(request.headers.get("content-length") || 0);
-  if (contentLength && contentLength > MAX_BODY_BYTES) {
-    return jsonResponse(413, errorPayload({ elapsedMs: 0 }, "Request body too large"));
-  }
-
-  let bodyText = "";
-  try {
-    bodyText = await request.text();
-  } catch {
-    return jsonResponse(400, errorPayload({ elapsedMs: 0 }, "Unable to read request body"));
-  }
-
-  if (bodyText.length > MAX_BODY_BYTES) {
-    return jsonResponse(413, errorPayload({ elapsedMs: 0 }, "Request body too large"));
-  }
-
-  let payload;
-  try {
-    payload = JSON.parse(bodyText);
-  } catch {
-    return jsonResponse(400, errorPayload({ elapsedMs: 0 }, "Invalid JSON body"));
-  }
-
-  const rpcMethod = payload?.method;
-  if (!rpcMethod || !ALLOWED_METHODS.has(rpcMethod)) {
-    return jsonResponse(
-      400,
-      errorPayload({ elapsedMs: 0 }, "Method not allowed", {
-        allowed: Array.from(ALLOWED_METHODS),
-        received: rpcMethod ?? null,
-      })
-    );
-  }
-
-  const failures = [];
   for (const endpoint of XRPL_ENDPOINTS) {
-    let response;
     try {
-      response = await fetchWithTimeout(
-        endpoint,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-        TIMEOUT_MS
-      );
+      const body = await postRpc(endpoint, payload);
+      return { body, endpoint };
     } catch (error) {
-      failures.push({
-        endpoint,
-        error: error instanceof Error ? error.message : "Fetch failed",
-      });
-      continue;
+      lastError = error;
+      if (error?.name === 'AbortError') timeoutSeen = true;
     }
+  }
 
-    const elapsedMs = Date.now() - startTime;
-    if (!response.ok) {
-      failures.push({
-        endpoint,
-        httpStatus: response.status,
-      });
-      continue;
-    }
+  const err = new Error(timeoutSeen ? 'upstream_timeout' : (lastError?.message || 'upstream_unreachable'));
+  throw err;
+}
 
-    let resultJson;
-    try {
-      resultJson = await response.json();
-    } catch (error) {
-      failures.push({
-        endpoint,
-        httpStatus: response.status,
-        error: error instanceof Error ? error.message : "Invalid JSON response",
-      });
-      continue;
-    }
+export async function onRequestOptions() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'POST, OPTIONS',
+      'access-control-allow-headers': 'content-type',
+      'cache-control': 'no-store',
+    },
+  });
+}
 
-    return jsonResponse(response.status, {
+export async function onRequestPost({ request }) {
+  let payload = null;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ ok: false, error: 'invalid_json' }, 400);
+  }
+
+  if (!payload || typeof payload !== 'object' || !payload.method) {
+    return json({ ok: false, error: 'missing_method' }, 400);
+  }
+
+  try {
+    const { body, endpoint } = await fetchFromAnyEndpoint(payload);
+    return json({
+      ...body,
       ok: true,
       endpointUsed: endpoint,
-      httpStatus: response.status,
-      elapsedMs,
-      result: resultJson,
-      error: null,
     });
+  } catch (error) {
+    return json(errorPayload(error), error?.message === 'upstream_timeout' ? 504 : 502);
   }
-
-  return jsonResponse(
-    502,
-    errorPayload(
-      { elapsedMs: Date.now() - startTime },
-      "Upstream XRPL RPC unreachable",
-      { failures }
-    )
-  );
 }

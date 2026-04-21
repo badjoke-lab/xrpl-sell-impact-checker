@@ -3,37 +3,144 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/exposure-graph/" />
     <title>Exposure Graph — XSIC</title>
+    <meta name="description" content="Read issuer exposure concentration and issuer-control risk in one static shell." />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/exposure-graph/" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Exposure Graph — XSIC" />
+    <meta property="og:description" content="Read issuer exposure concentration and issuer-control risk in one static shell." />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Exposure Graph — XSIC" />
+    <meta name="twitter:description" content="Read issuer exposure concentration and issuer-control risk in one static shell." />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/apps/exposure-graph/exposure-graph.css" />
     <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
   </head>
   <body data-nav-key="apps">
-    <div class="app page console-page">
-      <header class="app__header global-header">
+    <div class="app page console-page exposure-graph-page">
+            <header class="app__header global-header">
         <div class="app__header-top">
-          <a href="/" class="brand-link"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><h1 class="app__title">XSIC</h1></div></a>
+          <a href="/" class="brand-link" aria-label="XSIC Home">
+            <div class="app__brand">
+              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+              <h1 class="app__title">XSIC</h1>
+            </div>
+          </a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          <button class="secondary-button lite-mode-toggle" type="button" data-lite-mode-toggle aria-pressed="false">Lite mode: OFF</button>
           <div data-global-nav></div>
         </div>
       </header>
-      <main class="page__content">
-        <section class="card">
-          <h2 class="page__title">Exposure Graph</h2>
-          <p class="page__lede">Coming soon. Shared states are ready for this app.</p>
+
+      <main class="page__content eg-shell" aria-live="polite">
+        <section class="eg-hero-head">
+          <p class="eyebrow">Issuer exposure / concentration / issuer risk</p>
+          <h2 class="eg-page-title">Exposure Graph</h2>
+          <p class="eg-page-subtitle">Read one issuer in two ways: <strong>Exposure</strong> for structure and concentration, and <strong>Risk</strong> for issuer controls with evidence.</p>
         </section>
-        <section class="card" aria-label="Shared UI state mount"><div class="ui-mount" data-ui-mount="exposure-graph"></div></section>
+
+        <section class="card eg-controls-card">
+          <div class="eg-controls-grid">
+            <label class="eg-field">Issuer
+              <input id="egIssuerInput" type="text" class="eg-control" value="rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq" placeholder="r..." spellcheck="false" autocomplete="off" />
+            </label>
+            <button type="button" class="eg-button" id="egRefreshBtn">Refresh</button>
+            <div class="eg-status-inline">View: <strong>24h · Live bounded SVG</strong></div>
+            <div class="eg-status-inline">Status: <strong id="egStatusText">Waiting for issuer data</strong></div>
+            <div class="eg-status-inline">Updated: <strong id="egUpdatedText">—</strong></div>
+          </div>
+          <div class="eg-presets" id="egPresets" aria-label="Issuer presets"></div>
+          <p class="flow-note flow-note--quiet">View is fixed to a 24h bounded SVG for stable release rendering.</p>
+          <p class="flow-note flow-note--quiet">State guide: stale/partial keeps last readable snapshot, empty means no trustline visibility, and invalid/no_issuer/error means risk status is unknown until input/data recovers.</p>
+        </section>
+
+        <section class="card eg-help-card">
+          <details class="eg-methods" open>
+            <summary><strong>How this works (methods)</strong></summary>
+            <ul class="eg-list eg-list--tight">
+              <li><strong>Exposure in this app:</strong> concentration weight from absolute trustline balances in live <code>account_lines</code> data.</li>
+              <li><strong>Bounded graph includes:</strong> issuer + top counterparties by exposure (fixed max for fast, stable rendering). It <strong>excludes</strong> long-tail counterparties from node display.</li>
+              <li><strong>Overall Low / Medium / High / Unknown:</strong> derived from concentration score + observed issuer controls, then reduced when evidence is unknown; returns Unknown when issuer is invalid or one dimension fails.</li>
+              <li><strong>Observed / Not observed / Unknown:</strong> derived from current account flag evidence. Unknown means the app could not verify that control from current data.</li>
+            </ul>
+          </details>
+        </section>
+
+        <section class="card eg-signal-card" id="egSignalCard"></section>
+
+        <section class="eg-metrics-grid" id="egMetricsGrid"></section>
+
+        <section class="card eg-overall-card" id="egOverallSummary"></section>
+
+        <section class="card eg-tabs-card">
+          <div class="eg-tabs" role="tablist" aria-label="Exposure Graph views">
+            <button id="egTabExposure" class="eg-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="egPanelExposure" data-eg-tab-target="egPanelExposure">Exposure</button>
+            <button id="egTabRisk" class="eg-tab" type="button" role="tab" aria-selected="false" aria-controls="egPanelRisk" data-eg-tab-target="egPanelRisk">Risk</button>
+          </div>
+          <p class="eg-tab-copy">Exposure shows concentration structure. Risk shows issuer-control evidence from account flags.</p>
+        </section>
+
+        <section id="egPanelExposure" class="eg-tab-panel is-active" role="tabpanel" aria-labelledby="egTabExposure">
+          <section class="eg-panel-grid">
+            <section class="card eg-mainviz-card">
+              <div class="eg-mainviz-head">
+                <h3 class="eg-section-title">Exposure network</h3>
+                <span class="eg-context-chip">issuer centered / live bounded svg</span>
+              </div>
+              <div id="egGraphMount" class="eg-svg-wrap"></div>
+              <div id="egLegendMount" class="eg-legend"></div>
+            </section>
+
+            <aside class="eg-side-stack">
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Selected entity</h3>
+                <div id="egEntityDetail"></div>
+              </section>
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Concentration list</h3>
+                <div id="egConcentrationList"></div>
+              </section>
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Watch / activity</h3>
+                <div id="egWatchList"></div>
+              </section>
+            </aside>
+          </section>
+        </section>
+
+        <section id="egPanelRisk" class="eg-tab-panel" role="tabpanel" aria-labelledby="egTabRisk" hidden>
+          <section class="eg-panel-grid eg-panel-grid--risk">
+            <section class="card eg-mainviz-card">
+              <div class="eg-mainviz-head">
+                <h3 class="eg-section-title">Issuer control radar</h3>
+                <span class="eg-context-chip">evidence-backed only</span>
+              </div>
+              <div id="egRadarMount" class="eg-svg-wrap"></div>
+            </section>
+
+            <aside class="eg-side-stack">
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Root cause summary</h3>
+                <div id="egRootCause"></div>
+              </section>
+              <section class="card eg-list-card">
+                <h3 class="eg-mini-title">Evidence list</h3>
+                <div id="egEvidence"></div>
+              </section>
+            </aside>
+          </section>
+        </section>
+
       </main>
+
       <div data-global-footer></div>
     </div>
-    <script src="/shared/ui-kit.js"></script>
+
     <script src="/shared/nav.js"></script>
-    <script>
-      window.XSICUiKit?.renderErrorState('[data-ui-mount="exposure-graph"]', {
-        title: 'Demo error state',
-        body: 'Graph module is not connected yet. This is a reusable error container.',
-        onRetry: () => window.XSICUiKit?.renderLoadingState('[data-ui-mount="exposure-graph"]', { label: 'Retrying…' }),
-      });
-    </script>
+    <script src="/apps/exposure-graph/exposure-graph.js?v=deadcontrols782aeea"></script>
   </body>
 </html>

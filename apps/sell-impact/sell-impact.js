@@ -1,0 +1,5545 @@
+
+  /* === XRPLMETA_SUGGEST_PATCH_20260204 ===
+   * Remote token suggestions via XRPL Meta /tokens
+   * Fills currency + issuer on select
+   * Keeps local presets as fallback
+   */
+  const XRPLMETA_BASE = "https://s1.xrplmeta.org";
+  const XRPLMETA_LIMIT = 30;
+  const XRPLMETA_TTL_MS = 5 * 60 * 1000;
+  const _xrplmetaCache = new Map(); // q -> { t, items }
+
+  function pick(obj, paths){
+    for(const path of paths){
+      let cur = obj;
+      let ok = true;
+      for(const k of path){
+        if(cur && typeof cur === "object" && k in cur){ cur = cur[k]; }
+        else { ok = false; break; }
+      }
+      if(ok && cur != null) return cur;
+    }
+    return null;
+  }
+
+  function normalizeTokenRow(row){
+    const currency = pick(row, [["currency"], ["token","currency"]]);
+    const issuer   = pick(row, [["issuer"], ["token","issuer"]]);
+    const name     = pick(row, [["name"], ["meta","name"], ["token","name"]]);
+    if(!currency || !issuer) return null;
+    const label = name ? `${name} (${currency})` : String(currency);
+    return { currency: String(currency), issuer: String(issuer), name: name ? String(name) : "", label };
+  }
+
+  async function xrplmetaSearchTokens(q){
+    const query = (q || "").trim();
+    if(query.length < 2) return [];
+    const key = query.toLowerCase();
+    const now = Date.now();
+    const hit = _xrplmetaCache.get(key);
+    if(hit && (now - hit.t) < XRPLMETA_TTL_MS) return hit.items;
+
+    const url = `${XRPLMETA_BASE}/tokens?name_like=${encodeURIComponent(query)}&limit=${XRPLMETA_LIMIT}&offset=0&sort_by=trustlines`;
+    let js;
+    try{
+      const res = await fetch(url, { mode: "cors" });
+      if(!res.ok) return [];
+      js = await res.json();
+    }catch(_e){
+      return [];
+    }
+    const arr = (js && js.tokens && Array.isArray(js.tokens)) ? js.tokens : [];
+    const items = [];
+    for(const row of arr){
+      const it = normalizeTokenRow(row);
+      if(it) items.push(it);
+    }
+    _xrplmetaCache.set(key, { t: now, items });
+    return items;
+  }
+
+  function attachRemoteSuggest(opts){
+    // opts: { inputEl, listEl, onPick(item) }
+    const { inputEl, listEl, onPick } = opts;
+    if(!inputEl || !listEl) return;
+
+    let timer = null;
+    let lastQ = "";
+    let active = [];
+
+    function clear(){
+      listEl.innerHTML = "";
+      active = [];
+      listEl.hidden = true;
+    }
+
+    function render(items){
+      listEl.innerHTML = "";
+      active = items.slice(0, XRPLMETA_LIMIT);
+      for(const it of active){
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "suggestions__item";
+        b.textContent = it.label;
+        b.addEventListener("click", () => {
+          clear();
+          onPick && onPick(it);
+        });
+        listEl.appendChild(b);
+      }
+      listEl.hidden = active.length === 0;
+    }
+
+    async function run(q){
+      const items = await xrplmetaSearchTokens(q);
+      // 入力が進んでるのに古い結果を出さない
+      if(inputEl.value.trim() !== q.trim()) return;
+      render(items);
+    }
+
+    inputEl.addEventListener("input", () => {
+      const q = inputEl.value.trim();
+      lastQ = q;
+      if(timer) clearTimeout(timer);
+      if(q.length < 2){ clear(); return; }
+      timer = setTimeout(() => run(q), 160);
+    });
+
+    // escape/blur
+    inputEl.addEventListener("keydown", (e) => {
+      if(e.key === "Escape") clear();
+    });
+    document.addEventListener("click", (e) => {
+      if(e.target === inputEl) return;
+      if(listEl.contains(e.target)) return;
+      clear();
+    });
+  }
+  /* === /XRPLMETA_SUGGEST_PATCH_20260204 === */
+
+import {
+  applyTranslations,
+  getTranslationOrFallback,
+  loadDictionary,
+  setActiveLang,
+  t,
+} from "/src/i18n/index.js";
+import { normalizeCurrencyInput } from "/shared/normalizeCurrency.js";
+import copyToClipboard from "/shared/copyToClipboard.js";
+
+
+const SELL_IMPACT_INIT_FLAG = '__xsicSellImpactInit';
+
+export function initSellImpact() {
+  if (typeof window !== 'undefined' && window[SELL_IMPACT_INIT_FLAG]) {
+    return false;
+  }
+  if (!document.querySelector('#currency-input')) {
+    return false;
+  }
+  if (typeof window !== 'undefined') {
+    window[SELL_IMPACT_INIT_FLAG] = true;
+  }
+
+  const BOOK_OFFERS_API = "/api/book-offers";
+  const AMM_INFO_API = "/api/amm-info";
+
+  const API_ERROR_CODES = new Set([
+    "missing_params",
+    "xrp_not_supported",
+    "issueMalformed",
+    "no_liquidity",
+    "upstream_fail",
+  ]);
+
+  const extractApiErrorCode = (error) => {
+    if (!error) {
+      return null;
+    }
+    if (typeof error === "string") {
+      return error;
+    }
+    if (typeof error === "object") {
+      if (typeof error.error === "string") {
+        return error.error;
+      }
+      if (typeof error.code === "string") {
+        return error.code;
+      }
+    }
+    return null;
+  };
+
+  const extractApiErrorMessage = (error) => {
+    if (!error || typeof error !== "object") {
+      return null;
+    }
+    if (typeof error.error_message === "string") {
+      return error.error_message;
+    }
+    if (typeof error.message === "string") {
+      return error.message;
+    }
+    return null;
+  };
+
+  const resolveUiErrorKey = (code) => {
+    if (API_ERROR_CODES.has(code)) {
+      return code;
+    }
+    if (code === "timeout") {
+      return "fetch_timeout";
+    }
+    if (code === "rpc_error") {
+      return "fetch_failed";
+    }
+    if (code === "connect_failed") {
+      return "network_unreachable";
+    }
+    return "default";
+  };
+
+  const buildErrorLines = ({ code, message }) => {
+    const uiKey = resolveUiErrorKey(code);
+    const title = getTranslationOrFallback(`errors.${uiKey}.title`, message || "Error");
+    const hintBase = getTranslationOrFallback(`errors.${uiKey}.hint`, "");
+    const hint =
+      message && hintBase && !hintBase.includes(message)
+        ? `${hintBase} (${message})`
+        : hintBase || message || "";
+    return { title, hint };
+  };
+
+  const showApiError = ({ code, message }) => {
+    const { title, hint } = buildErrorLines({ code, message });
+    showInputError(title, hint);
+  };
+
+  /** xrp_not_supported_ui */
+  function showInputError(title, hint = "") {
+    const message = hint ? `${title}\n${hint}` : title;
+
+    // Use the existing status line first (this app already has ".status")
+    const status = getStatusLine();
+    if (status) {
+      status.textContent = message;
+      status.hidden = false;
+      status.classList?.add?.("error");
+      return;
+    }
+
+    // Fallback: banners (some are hidden by default)
+    const banner =
+      document.querySelector("#i18n-error-banner") ||
+      document.querySelector(".error-banner") ||
+      null;
+
+    if (banner) {
+      banner.hidden = false;
+      banner.textContent = message;
+      banner.classList?.add?.("error");
+      return;
+    }
+
+    // Last resort
+    alert(message);
+  }
+
+
+  const ORDERBOOK_API_ENDPOINT = {
+    id: "orderbook-api",
+    url: BOOK_OFFERS_API,
+    labelKey: "endpoints.api.label",
+  };
+  const ORDERBOOK_API_RETRIES = 2;
+
+  const REQUEST_TIMEOUT_MS = 6000;
+  const DEFAULT_LIMIT = 50;
+  const FIAT_STORAGE_KEY = "fiat-currency";
+  const DEFAULT_FIAT = "USD";
+  const SHARE_URL_DEBOUNCE_MS = 200;
+  const MAX_AMOUNT = 1_000_000_000;
+  const LIMIT_MIN = 1;
+  const LIMIT_MAX = 200;
+  const THRESHOLD_VALUES = new Set([1, 2, 5, 10, 20]);
+  const DEFAULT_SLIPPAGE_PERCENT = 5;
+  const DEFAULT_THIN_CUTOFF_PERCENT = 20;
+  const FIAT_VALUES = new Set(["USD", "JPY"]);
+  const DEBUG_QUERY_PARAM = "debug";
+  const DEBUG_RESPONSE_LIMIT = 600;
+  const VENUE_CLOB = "CLOB";
+  const VENUE_AMM = "AMM";
+  const TOKEN_PRESETS_URL = "/data/token-presets.json"; // local presets for input suggestions
+  const scheduleRemoteUpdate = () => { /* disabled: offline-safe */ };
+  // NOTE: scheduleRemoteUpdate was referenced by older suggest code; keep no-op to avoid runtime crash.
+  const RECENT_TOKENS_STORAGE_KEY = "xsic_recent_tokens_v1";
+  const LEGACY_RECENT_TOKENS_STORAGE_KEY = "xsic.recentTokens.v1";
+  const MAX_RECENT_TOKENS = 10;
+  const QUICK_FILL_PRESET_LIMIT = 6;
+  const DEFAULT_TOKEN = {
+    currency: "ARMY",
+    issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
+  };
+  const EXAMPLE_CANDIDATES = [
+    DEFAULT_TOKEN,
+    {
+      currency: "USD",
+      issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
+    },
+    {
+      currency: "EUR",
+      issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
+    },
+    {
+      currency: "BTC",
+      issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
+    },
+  ];
+
+  const getStatusLine = () =>
+    document.querySelector('.status[data-i18n="status.waiting"]') ||
+    document.querySelector(".status");
+
+  const i18nErrorBanner = document.querySelector("#i18n-error-banner");
+
+  const showI18nError = () => {
+    if (!i18nErrorBanner) {
+      return;
+    }
+    const message = getTranslationOrFallback(
+      "errors.i18n_failed",
+      "Translations failed to load. Please refresh the page."
+    );
+    i18nErrorBanner.textContent = message;
+    i18nErrorBanner.hidden = false;
+  };
+
+  const initI18n = async () => {
+    setActiveLang("en");
+    try {
+      await loadDictionary("en");
+      applyTranslations();
+      renderQuickFillSuggestions();
+      if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+        console.info("i18n loaded", "en");
+      }
+    } catch (error) {
+      applyTranslations();
+      renderQuickFillSuggestions();
+      showI18nError();
+    }
+
+    updateImpactThresholdHelp(getImpactThresholdPct());
+    updateMaxSellLabel(getImpactThresholdPct());
+    updateLiquiditySplitLabel(getImpactThresholdPct());
+    setEstimateButtonBusy(Boolean(estimateButton?.disabled));
+    refreshStatusLine();
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+  // P0-2: collapse charts on mobile
+    try {
+      if (window.matchMedia && window.matchMedia("(max-width: 720px)").matches) {
+        document.querySelectorAll('details[data-mobile-details="1"]').forEach((d) => {
+          d.removeAttribute("open");
+        });
+      }
+    } catch (e) {}
+
+    void initI18n().finally(() => {
+      resetResults();
+    });
+  });
+
+  const statusEndpointLine = document.querySelector(".status-endpoint");
+  const errorBanner = document.querySelector(".error-banner");
+  const estimateButton = document.querySelector(".primary-button");
+  const tryExampleButton = document.querySelector("#try-example");
+  const resetButton = document.querySelector("#reset-inputs");
+  const currencyInput = document.querySelector("#currency-input");
+  const issuerInput = document.querySelector("#issuer-input");
+  const tokenSuggestionInput = currencyInput;
+  const tokenSuggestionList = document.querySelector("#token-suggestions");
+  const quickFillResultsList = document.querySelector("#quick-fill-results");
+  const HAS_QUICK_FILL = Boolean(quickFillResultsList);
+  const amountInput = document.querySelector("#sell-amount-input");
+  const limitInput = document.querySelector("#limit-input");
+  const fiatCurrencySelect = document.querySelector("#fiat-currency-select");
+  const impactThresholdSelect = document.querySelector("#impact-threshold-select");
+  const thinCutoffInput = document.querySelector("#thin-cutoff-input");
+  const limitNote = document.querySelector("#limit-note");
+  const copyLinkButton = document.querySelector("#copy-link");
+  const shareLoadNote = document.querySelector("#share-load-note");
+  const shareToast = document.querySelector("#share-toast");
+  const estimateProgress = document.querySelector("#estimate-progress");
+  const exampleStatus = document.querySelector("#example-status");
+  const fieldErrors = {
+    currency: document.querySelector('[data-error-for="currency"]'),
+    issuer: document.querySelector('[data-error-for="issuer"]'),
+    amount: document.querySelector('[data-error-for="amount"]'),
+    limit: document.querySelector('[data-error-for="limit"]'),
+  };
+  const resultSellability = document.querySelector('[data-result="sellability"]');
+  const resultFilledLine = document.querySelector('[data-result="filled-line"]');
+  const resultDataFetched = document.querySelector('[data-result="data-fetched"]');
+  const resultEndpoint = document.querySelector('[data-result="endpoint"]');
+  const resultEndpointDetails = Array.from(
+    document.querySelectorAll('[data-result="endpoint-details"]')
+  );
+  const resultOrderCount = document.querySelector('[data-result="order-count"]');
+  const resultBestPrice = document.querySelector('[data-result="best-price"]');
+  const resultWorstPrice = document.querySelector('[data-result="worst-price"]');
+  const resultLiquiditySplitLabel = document.querySelector(
+    '[data-result="liquidity-split-label"]'
+  );
+  const resultLiquiditySplit = document.querySelector('[data-result="liquidity-split"]');
+  const resultAmmReserves = document.querySelector('[data-result="amm-reserves"]');
+  const resultAmmFee = document.querySelector('[data-result="amm-fee"]');
+  const resultReceive = document.querySelector('[data-result="receive"]');
+  const resultFiatRate = document.querySelector('[data-result="fiat-rate"]');
+  const resultFiatWarning = document.querySelector('[data-result="fiat-warning"]');
+  const resultSlippage = document.querySelector('[data-result="slippage"]');
+  const resultSlippageHelp = document.querySelector('[data-result="slippage-help"]');
+  const resultWhyLine = document.querySelector('[data-result="why"]');
+  const resultWarning = document.querySelector('[data-result="warning"]');
+  const resultMaxSellLabel = document.querySelector('[data-result="max-sell-label"]');
+  const resultMaxSellValue = document.querySelector('[data-result="max-sell-value"]');
+  const resultMixSummary = document.querySelector('[data-result="mix-summary"]');
+  const resultMaxSellNote = document.querySelector('[data-result="max-sell-note"]');
+  const resultUsedVenueSummary = document.querySelector('[data-result="used-venue-summary"]');
+  const resultUsedVenueDetails = document.querySelector('[data-result="used-venue-details"]');
+  const resultUsedVenueNote = document.querySelector('[data-result="used-venue-note"]');
+  const resultPairLabel = document.querySelector('[data-result="pair-label"]');
+  const resultPairMeta = document.querySelector('[data-result="pair-meta"]');
+  const resultMixBook = document.querySelector('[data-result="mix-book"]');
+  const resultMixAmm = document.querySelector('[data-result="mix-amm"]');
+  const resultMixBridge = document.querySelector('[data-result="mix-bridge"]');
+  const resultMixBookSegment = document.querySelector('[data-result="mix-book-segment"]');
+  const resultMixAmmSegment = document.querySelector('[data-result="mix-amm-segment"]');
+  const resultMixBridgeSegment = document.querySelector('[data-result="mix-bridge-segment"]');
+  const resultDepthTouchBar = document.querySelector('[data-result="depth-touch-bar"]');
+  const resultDepthInnerBar = document.querySelector('[data-result="depth-inner-bar"]');
+  const resultDepthAmmBar = document.querySelector('[data-result="depth-amm-bar"]');
+  const resultDepthBridgeBar = document.querySelector('[data-result="depth-bridge-bar"]');
+  const resultDepthTouchLabel = document.querySelector('[data-result="depth-touch-label"]');
+  const resultDepthInnerLabel = document.querySelector('[data-result="depth-inner-label"]');
+  const resultDepthAmmLabel = document.querySelector('[data-result="depth-amm-label"]');
+  const resultDepthBridgeLabel = document.querySelector('[data-result="depth-bridge-label"]');
+  const resultDepthCaption = document.querySelector('[data-result="depth-caption"]');
+  const resultSnapshotHeadline = document.querySelector('[data-result="snapshot-headline"]');
+  const resultSnapshotBody = document.querySelector('[data-result="snapshot-body"]');
+  const resultSnapshotBullets = document.querySelector('[data-result="snapshot-bullets"]');
+  const resultRouteConfidenceCard = document.querySelector('[data-result="route-confidence-card"]');
+  const resultRouteConfidenceScore = document.querySelector('[data-result="route-confidence-score"]');
+  const resultRouteConfidenceBar = document.querySelector('[data-result="route-confidence-bar"]');
+  const resultRouteConfidenceSummary = document.querySelector('[data-result="route-confidence-summary"]');
+  const resultPathHeadline = document.querySelector('[data-result="path-headline"]');
+  const resultRiskBook = document.querySelector('[data-result="risk-book"]');
+  const resultRiskAmm = document.querySelector('[data-result="risk-amm"]');
+  const resultRiskBridge = document.querySelector('[data-result="risk-bridge"]');
+  const resultRiskDepth = document.querySelector('[data-result="risk-depth"]');
+  const resultRiskBookBar = document.querySelector('[data-result="risk-book-bar"]');
+  const resultRiskAmmBar = document.querySelector('[data-result="risk-amm-bar"]');
+  const resultRiskBridgeBar = document.querySelector('[data-result="risk-bridge-bar"]');
+  const resultRiskDepthBar = document.querySelector('[data-result="risk-depth-bar"]');
+  const resultPathBullets = document.querySelector('[data-result="path-bullets"]');
+  const routeCards = {
+    a: {
+      card: document.querySelector('[data-route-card="a"]'),
+      title: document.querySelector('[data-result="candidate-a-title"]'),
+      role: document.querySelector('[data-result="candidate-a-role"]'),
+      output: document.querySelector('[data-result="candidate-a-output"]'),
+      impact: document.querySelector('[data-result="candidate-a-impact"]'),
+      bottleneck: document.querySelector('[data-result="candidate-a-bottleneck"]'),
+      reason: document.querySelector('[data-result="candidate-a-reason"]'),
+      confidence: document.querySelector('[data-result="candidate-a-confidence"]'),
+      confidenceBar: document.querySelector('[data-result="candidate-a-confidence-bar"]'),
+    },
+    b: {
+      card: document.querySelector('[data-route-card="b"]'),
+      title: document.querySelector('[data-result="candidate-b-title"]'),
+      role: document.querySelector('[data-result="candidate-b-role"]'),
+      output: document.querySelector('[data-result="candidate-b-output"]'),
+      impact: document.querySelector('[data-result="candidate-b-impact"]'),
+      bottleneck: document.querySelector('[data-result="candidate-b-bottleneck"]'),
+      reason: document.querySelector('[data-result="candidate-b-reason"]'),
+      confidence: document.querySelector('[data-result="candidate-b-confidence"]'),
+      confidenceBar: document.querySelector('[data-result="candidate-b-confidence-bar"]'),
+    },
+    c: {
+      card: document.querySelector('[data-route-card="c"]'),
+      title: document.querySelector('[data-result="candidate-c-title"]'),
+      role: document.querySelector('[data-result="candidate-c-role"]'),
+      output: document.querySelector('[data-result="candidate-c-output"]'),
+      impact: document.querySelector('[data-result="candidate-c-impact"]'),
+      bottleneck: document.querySelector('[data-result="candidate-c-bottleneck"]'),
+      reason: document.querySelector('[data-result="candidate-c-reason"]'),
+      confidence: document.querySelector('[data-result="candidate-c-confidence"]'),
+      confidenceBar: document.querySelector('[data-result="candidate-c-confidence-bar"]'),
+    },
+  };
+  const routePathSegments = {
+    clob: Array.from(document.querySelectorAll('[data-route-segment="clob"]')),
+    amm: Array.from(document.querySelectorAll('[data-route-segment="amm"]')),
+    fallback: Array.from(document.querySelectorAll('[data-route-segment="fallback"]')),
+  };
+  const snapshotNoteCurrent = document.querySelector('[data-result="snapshot-note-current"]');
+  const snapshotNoteDelta = document.querySelector('[data-result="snapshot-note-delta"]');
+  const snapshotStripOutput = document.querySelector('[data-result="snapshot-strip-output"]');
+  const snapshotStripImpact = document.querySelector('[data-result="snapshot-strip-impact"]');
+  const snapshotStripContext = document.querySelector('[data-result="snapshot-strip-context"]');
+  const snapshotOutputNote = document.querySelector('[data-result="snapshot-output-note"]');
+  const snapshotImpactNote = document.querySelector('[data-result="snapshot-impact-note"]');
+  const snapshotContextNote = document.querySelector('[data-result="snapshot-context-note"]');
+  const routeTargetLabel = document.querySelector('[data-result="route-target-label"]');
+  const sideSelect = document.querySelector("#trade-side-select");
+  const modeButtons = Array.from(document.querySelectorAll(".mode-chip"));
+  const impactChart = document.querySelector("#impact-chart");
+  const depthChart = document.querySelector("#depth-chart");
+  const impactChartNote = document.querySelector('[data-result="impact-note"]');
+  const depthChartNote = document.querySelector('[data-result="depth-note"]');
+  const impactChartSummary = Array.from(
+    document.querySelectorAll('[data-result="impact-summary"]')
+  );
+  const depthChartSummary = Array.from(
+    document.querySelectorAll('[data-result="depth-summary"]')
+  );
+  const debugPanel = document.querySelector("#debug-panel");
+  const debugCopyButton = document.querySelector("#debug-copy");
+  const debugCopyStatus = document.querySelector('[data-debug="copy-status"]');
+  const debugLastRequest = document.querySelector('[data-debug="last-request"]');
+  const debugRequestPayload = document.querySelector('[data-debug="request-payload"]');
+  const debugEndpointUsed = document.querySelector('[data-debug="endpoint-used"]');
+  const debugUpstreamStatus = document.querySelector('[data-debug="upstream-status"]');
+  const debugStatus = document.querySelector('[data-debug="status"]');
+  const debugElapsed = document.querySelector('[data-debug="elapsed-ms"]');
+  const debugOffersCount = document.querySelector('[data-debug="offers-count"]');
+  const debugError = document.querySelector('[data-debug="error"]');
+  const debugRawResponse = document.querySelector('[data-debug="raw-response"]');
+  const debugResponseKeys = document.querySelector('[data-debug="response-keys"]');
+  const debugValidateTiming = document.querySelector('[data-debug="validate-ms"]');
+  const debugNetworkTiming = document.querySelector('[data-debug="network-ms"]');
+  const debugParseTiming = document.querySelector('[data-debug="parse-ms"]');
+  const debugClobMax = document.querySelector('[data-debug="clob-max"]');
+  const debugAmmMax = document.querySelector('[data-debug="amm-max"]');
+  const debugClobShare = document.querySelector('[data-debug="clob-share"]');
+  const debugVenue = document.querySelector('[data-debug="venue"]');
+  const debugVenueReason = document.querySelector('[data-debug="venue-reason"]');
+
+  let currentEndpointIndex = 0;
+  let lastReceiveXrp = 0;
+  let lastSortedOffers = null;
+  let lastBestPrice = 0;
+  let lastCurrency = "";
+  let lastFiatRate = null;
+  let lastSimulation = null;
+  let lastMaxSellResult = null;
+  let lastAmmReserves = null;
+  let lastAmmAvailable = false;
+  let lastAmmMaxSell = 0;
+  let lastShouldFetchAmm = false;
+  let lastOffersHash = "";
+  let lastFetchedAt = null;
+  let lastEndpointLabel = "";
+  let lastUsedVenue = VENUE_CLOB;
+  let lastDisplaySimulation = null;
+  let lastDisplayMaxSellResult = null;
+  let lastAmmMaxSellResult = null;
+  const SNAPSHOT_HISTORY_LIMIT = 10;
+  const snapshotHistory = [];
+  let chartUpdateTimer = null;
+  let pendingChartPayload = null;
+  let shareUrlTimer = null;
+  let shareToastTimer = null;
+  let isApplyingShareParams = false;
+  const isDebugEnabled = new URLSearchParams(window.location.search).get(DEBUG_QUERY_PARAM) === "1";
+  const debugState = {
+    lastRequestTime: null,
+    lastRequestUrl: BOOK_OFFERS_API,
+    requestPayload: null,
+    responseStatus: null,
+    endpointUsed: null,
+    upstreamStatus: null,
+    elapsedMs: null,
+    offersCount: null,
+    error: null,
+    rawResponse: null,
+    responseKeys: null,
+    timestamp: null,
+    clobMax: null,
+    ammMax: null,
+    clobSharePct: null,
+    venue: null,
+    venueReason: null,
+    timings: {
+      validateMs: null,
+      networkMs: null,
+      parseMs: null,
+    },
+  };
+
+  setActiveLang("en");
+
+  if (debugPanel) {
+    debugPanel.hidden = !isDebugEnabled;
+  }
+
+  let lastStatusKey = null;
+
+  const setStatus = (key, params) => {
+    const statusLine = getStatusLine();
+    if (!statusLine) {
+      return;
+    }
+    lastStatusKey = key;
+    statusLine.textContent = t(key, params);
+    statusLine.hidden = false;
+    statusLine.classList?.remove?.("error");
+  };
+
+  const setReadyStatus = () => {
+    setStatus("status.ready");
+  };
+
+  const refreshStatusLine = () => {
+    const statusLine = getStatusLine();
+    if (!statusLine || !lastStatusKey || statusLine.classList.contains("error")) {
+      return;
+    }
+    setStatus(lastStatusKey);
+  };
+
+  const setEstimateButtonBusy = (isBusy) => {
+    if (!estimateButton) {
+      return;
+    }
+    estimateButton.disabled = isBusy;
+    estimateButton.textContent = t(isBusy ? "actions.estimating" : "actions.estimate");
+    if (estimateProgress) {
+      estimateProgress.hidden = !isBusy;
+    }
+  };
+
+  const setError = (message) => {
+    if (!errorBanner) {
+      return;
+    }
+    errorBanner.textContent = message || "";
+    errorBanner.hidden = !message;
+  };
+
+  const setEndpointNotice = (message) => {
+    if (!statusEndpointLine) {
+      return;
+    }
+
+    statusEndpointLine.textContent = message || "";
+    statusEndpointLine.hidden = !message;
+  };
+
+  const resolveCacheStatus = (data) => {
+    if (data?.isStale) {
+      return "stale";
+    }
+    if (data?.cached) {
+      return "cached";
+    }
+    return "live";
+  };
+
+  const formatCacheStatusLabel = (cacheStatus) =>
+    getTranslationOrFallback(`status.cache_state.${cacheStatus}`, cacheStatus);
+
+  const buildEndpointNoticeMessage = ({ endpointLabel, cacheStatus }) => {
+    if (cacheStatus === "stale") {
+      return t("status.endpoint_stale", { endpointLabel });
+    }
+    return t("status.endpoint_in_use", {
+      endpointLabel,
+      cacheStatus: formatCacheStatusLabel(cacheStatus),
+    });
+  };
+
+  const formatIssuerShort = (issuer) => {
+    if (!issuer) {
+      return "";
+    }
+    if (issuer.length <= 10) {
+      return issuer;
+    }
+    return `${issuer.slice(0, 6)}…${issuer.slice(-4)}`;
+  };
+
+  const SUGGESTION_ALIAS_OVERRIDES = [
+    { currency: "XLM",  issuer: "rKiCet8SdvWxPXnAgYarFUXMh1zCPz432Y", name: "Ripple Fox",   label: "XLM" },
+    { currency: "CNY",  issuer: "rKiCet8SdvWxPXnAgYarFUXMh1zCPz432Y", name: "Ripple Fox",   label: "CNY" },
+    { currency: "XRG",  issuer: "rUo5UNKiRGhLq4LVgbCzvx53DH65cgk5Dp", name: "xGreen.Energy", label: "XRG" },
+
+    // ここからは現在の suggest probe で見えている候補に対する短縮issuerベースの補強
+    { currency: "EVR",  issuerShort: "ra9g3L…FtSe", name: "GateHub EVR",  label: "EVR" },
+    { currency: "FLR",  issuerShort: "rcxJwV…o1Eu", name: "GateHub FLR",  label: "FLR" },
+    { currency: "USDC", issuerShort: "rDsvn6…TJUf", name: "GateHub USDC", label: "USDC" },
+  ];
+
+  const getSuggestionAlias = ({ currency, issuer = "", issuerShort = "" }) => {
+    const cur = String(currency || "").trim().toUpperCase();
+    const full = String(issuer || "").trim();
+    const short = String(issuerShort || "").trim();
+
+    return (
+      SUGGESTION_ALIAS_OVERRIDES.find((item) => {
+        if (item.currency !== cur) {
+          return false;
+        }
+        if (item.issuer && item.issuer === full) {
+          return true;
+        }
+        if (item.issuerShort && item.issuerShort === short) {
+          return true;
+        }
+        return false;
+      }) || null
+    );
+  };
+
+  const normalizePresetTags = (tags) => {
+    if (!Array.isArray(tags)) {
+      return [];
+    }
+    return tags
+      .filter((tag) => typeof tag === "string")
+      .map((tag) => tag.trim().toLowerCase())
+      .filter(Boolean);
+  };
+
+  const normalizePresetToken = (item) => {
+    if (!item || typeof item !== "object") {
+      return null;
+    }
+    const issuer = typeof item.issuer === "string" ? item.issuer.trim() : "";
+    const rawCurrency =
+      typeof item.symbol === "string"
+        ? item.symbol.trim()
+        : typeof item.currency === "string"
+        ? item.currency.trim()
+        : "";
+    if (!issuer || !rawCurrency) {
+      return null;
+    }
+    const normalized = normalizeCurrencyInput(rawCurrency);
+    const currency = normalized.currencyNormalized || normalized.currencyInput?.trim() || "";
+    if (!currency || currency === "XRP") {
+      return null;
+    }
+    const name = typeof item.name === "string" ? item.name.trim() : "";
+    const label =
+      (typeof item.label === "string" && item.label.trim()) ||
+      (name
+        ? `${formatCurrencyForDisplay(currency)} — ${name}`
+        : formatCurrencyForDisplay(currency));
+    const group = typeof item.group === "string" ? item.group.trim() : "";
+    const tags = normalizePresetTags(item.tags);
+    return {
+      label,
+      currency,
+      issuer,
+      name,
+      tags,
+      group,
+    };
+  };
+
+  const normalizeRecentTokenRecord = (item) => {
+    if (!item || typeof item !== "object") {
+      return null;
+    }
+    const issuer = typeof item.issuer === "string" ? item.issuer.trim() : "";
+    const rawSymbol =
+      typeof item.symbol === "string"
+        ? item.symbol.trim()
+        : typeof item.currency === "string"
+        ? item.currency.trim()
+        : "";
+    if (!issuer || !rawSymbol) {
+      return null;
+    }
+    const normalized = normalizeCurrencyInput(rawSymbol);
+    const symbol = normalized.currencyNormalized || normalized.currencyInput?.trim() || "";
+    if (!symbol || symbol === "XRP") {
+      return null;
+    }
+    const ts = Number.isFinite(item.ts) ? item.ts : null;
+    return {
+      symbol,
+      issuer,
+      ts,
+    };
+  };
+
+  const getTokenKey = (token) =>
+    `${String(token.currency).toUpperCase()}|${String(token.issuer).toUpperCase()}`;
+  const getTokenLabel = (token) =>
+    token.label?.trim() || formatCurrencyForDisplay(token.currency);
+  let presetTokenSuggestions = [];
+  let recentTokenRecords = [];
+  let recentTokenSuggestions = [];
+  let tokenSuggestionPool = [];
+  let tokenSuggestionMatches = [];
+  let activeTokenSuggestionIndex = -1;
+  let tokenSuggestionDebounce = null;
+
+  const TOKEN_SUGGESTION_LIMIT = 8;
+  const TOKEN_SUGGESTION_DEBOUNCE_MS = 150;
+
+  const buildExampleLabel = (candidate) =>
+    `${candidate.currency} (issuer ${formatIssuerShort(candidate.issuer)})`;
+
+  const setExampleStatus = (message) => {
+    if (!exampleStatus) {
+      return;
+    }
+    exampleStatus.textContent = message || "";
+    exampleStatus.hidden = !message;
+  };
+
+  const parseRecentTokenRecords = (raw) => {
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map(normalizeRecentTokenRecord)
+      .filter((token) => token && token.symbol && token.issuer);
+  };
+
+  const buildRecentTokenSuggestions = (records) =>
+    records.map((record) => ({
+      currency: record.symbol,
+      issuer: record.issuer,
+      label:
+        findPresetLabel({ currency: record.symbol, issuer: record.issuer }) ||
+        formatCurrencyForDisplay(record.symbol),
+      ts: record.ts,
+    }));
+
+  const loadRecentTokenRecords = () => {
+    try {
+      const raw = localStorage.getItem(RECENT_TOKENS_STORAGE_KEY);
+      const parsed = parseRecentTokenRecords(raw);
+      if (parsed.length) {
+        return parsed;
+      }
+      const legacyRaw = localStorage.getItem(LEGACY_RECENT_TOKENS_STORAGE_KEY);
+      const legacyParsed = parseRecentTokenRecords(legacyRaw);
+      if (legacyParsed.length) {
+        localStorage.setItem(RECENT_TOKENS_STORAGE_KEY, JSON.stringify(legacyParsed));
+        localStorage.removeItem(LEGACY_RECENT_TOKENS_STORAGE_KEY);
+      }
+      return legacyParsed;
+    } catch (error) {
+      return [];
+    }
+  };
+
+  const findPresetLabel = ({ currency, issuer }) => {
+    const key = getTokenKey({ currency, issuer });
+    const match = presetTokenSuggestions.find((token) => getTokenKey(token) === key);
+    return match?.label || "";
+  };
+
+  const buildTokenSuggestionPool = () => {
+    const seen = new Set();
+    const pool = [];
+    const addToken = (token, meta) => {
+      const key = getTokenKey(token);
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      pool.push({
+        ...token,
+        ...meta,
+      });
+    };
+    recentTokenSuggestions.forEach((token) => addToken(token, { isRecent: true }));
+    presetTokenSuggestions.forEach((token) => addToken(token, { isPreset: true }));
+    return pool;
+  };
+
+  const refreshTokenSuggestionPool = () => {
+    tokenSuggestionPool = buildTokenSuggestionPool();
+  };
+
+  const getSuggestionBadges = (token) => {
+    const badges = [];
+    if (token.isRecent) {
+      badges.push(t("presets.badgeRecent"));
+    }
+    if (token.group) {
+      badges.push(token.group);
+    }
+    if (Array.isArray(token.tags)) {
+      if (token.tags.includes("popular")) {
+        badges.push(t("presets.badgePopular"));
+      }
+      if (token.tags.includes("verified")) {
+        badges.push(t("presets.badgeVerified"));
+      }
+    }
+    return badges;
+  };
+
+  const closeTokenSuggestions = () => {
+    if (!tokenSuggestionList || !tokenSuggestionInput) {
+      return;
+    }
+    tokenSuggestionList.hidden = true;
+    tokenSuggestionList.innerHTML = "";
+    tokenSuggestionMatches = [];
+    activeTokenSuggestionIndex = -1;
+    tokenSuggestionInput.setAttribute("aria-expanded", "false");
+    tokenSuggestionInput.removeAttribute("aria-activedescendant");
+  };
+
+  const openTokenSuggestions = () => {
+    if (!tokenSuggestionList || !tokenSuggestionInput) {
+      return;
+    }
+    tokenSuggestionList.hidden = false;
+    tokenSuggestionInput.setAttribute("aria-expanded", "true");
+  };
+
+  const renderTokenSuggestions = (matches) => {
+    if (!tokenSuggestionList || !tokenSuggestionInput) {
+      return;
+    }
+
+    const list = tokenSuggestionList;
+    const items = Array.isArray(matches) ? matches : [];
+
+    list.innerHTML = "";
+    tokenSuggestionMatches = items;
+
+    // アクティブインデックスを安全に矯正
+    if (typeof activeTokenSuggestionIndex !== "number") activeTokenSuggestionIndex = 0;
+    if (activeTokenSuggestionIndex < 0) activeTokenSuggestionIndex = 0;
+    if (activeTokenSuggestionIndex >= items.length) activeTokenSuggestionIndex = 0;
+
+    if (!items.length) {
+      closeTokenSuggestions();
+      return;
+    }
+
+    items.forEach((token, index) => {
+      const li = document.createElement("li");
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "suggestion-item";
+      button.id = `token-suggestion-${index}`;
+      button.setAttribute("role", "option");
+
+      const isActive = index === activeTokenSuggestionIndex;
+      if (isActive) {
+        button.classList.add("is-active");
+        button.setAttribute("aria-selected", "true");
+      } else {
+        button.setAttribute("aria-selected", "false");
+      }
+
+      // 1行目：SYMBOL — Name / Label + issuer短縮
+      const row = document.createElement("div");
+      row.className = "suggestion-item__row";
+
+      const symbol = formatCurrencyForDisplay(token.currency);
+      const title = document.createElement("span");
+      const label = (token.name || token.label || "").trim();
+      title.textContent = label ? `${symbol} — ${label}` : symbol;
+
+      const issuer = document.createElement("span");
+      issuer.className = "suggestion-item__issuer";
+      const short =
+        (typeof formatIssuerShort === "function")
+          ? formatIssuerShort(token.issuer)
+          : (typeof shortenIssuerForDisplay === "function")
+            ? shortenIssuerForDisplay(token.issuer)
+            : (token.issuer || "");
+      issuer.textContent = short;
+
+      row.appendChild(title);
+      row.appendChild(issuer);
+      button.appendChild(row);
+
+      // 2行目：バッジ（Recent/Popular/Verified）
+      const badges = (typeof getSuggestionBadges === "function") ? getSuggestionBadges(token) : [];
+      if (token && typeof token.trustlines === "number" && Number.isFinite(token.trustlines)) {
+        badges.push(`TL ${formatCompactNumber(token.trustlines)}`);
+      }
+      if (Array.isArray(badges) && badges.length) {
+        const meta = document.createElement("div");
+        meta.className = "suggestion-item__meta suggestion-item__badges";
+
+        badges.forEach((badgeLabel) => {
+          const badge = document.createElement("span");
+          // 既存CSSに寄せる（quick-fill はUI消したがバッジ見た目は流用）
+          badge.className = "quick-fill__badge";
+          badge.textContent = badgeLabel;
+          meta.appendChild(badge);
+        });
+
+        button.appendChild(meta);
+      }
+
+      button.addEventListener("click", () => {
+        applyTokenSuggestion(token);
+        closeTokenSuggestions();
+      });
+
+      li.appendChild(button);
+      list.appendChild(li);
+    });
+
+    list.hidden = false;
+    tokenSuggestionInput.setAttribute("aria-expanded", "true");
+  };
+
+  const getTokenSuggestionMatches = (query) => {
+    if (!query) {
+      return [];
+    }
+    const queryUpper = query.toUpperCase();
+    const queryLower = query.toLowerCase();
+    const matches = tokenSuggestionPool
+      .map((token, order) => {
+        const symbol = String(token.currency || "").toUpperCase();
+        if (!symbol) {
+          return null;
+        }
+        if (symbol.startsWith(queryUpper)) {
+          return { token, rank: 0, order };
+        }
+        if (symbol.includes(queryUpper)) {
+          return { token, rank: 1, order };
+        }
+        const name = token.name ? token.name.toLowerCase() : "";
+        if (name && name.includes(queryLower)) {
+          return { token, rank: 2, order };
+        }
+        return null;
+      })
+      .filter(Boolean);
+    matches.sort((a, b) => {
+      if (a.rank !== b.rank) {
+        return a.rank - b.rank;
+      }
+      return a.order - b.order;
+    });
+    return matches.slice(0, TOKEN_SUGGESTION_LIMIT).map((match) => match.token);
+  };
+
+
+  const buildPresetBadgeKeys = (token, fallbackKey) => {
+    if (fallbackKey) {
+      return [fallbackKey];
+    }
+    const tags = Array.isArray(token.tags) ? token.tags : [];
+    const badgeKeys = [];
+    if (tags.includes("popular")) {
+      badgeKeys.push("presets.badgePopular");
+    }
+    if (tags.includes("verified")) {
+      badgeKeys.push("presets.badgeVerified");
+    }
+    return badgeKeys;
+  };
+
+  const renderQuickFillTokens = (list, tokens, badgeKey, limit) => {
+    if (!list) {
+      return;
+    }
+    const section = list.closest(".quick-fill__section");
+    list.innerHTML = "";
+    const visibleTokens = tokens.slice(0, limit);
+    if (section) {
+      section.hidden = visibleTokens.length === 0;
+    }
+    visibleTokens.forEach((token) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "quick-fill__button";
+      const label = document.createElement("span");
+      label.className = "quick-fill__text";
+      label.textContent = getTokenLabel(token);
+      button.appendChild(label);
+      const badgeKeys = buildPresetBadgeKeys(token, badgeKey);
+      badgeKeys.forEach((key) => {
+        const badge = document.createElement("span");
+        badge.className = "quick-fill__badge quick-fill__badge--inline";
+        badge.textContent = t(key);
+        button.appendChild(badge);
+      });
+      button.addEventListener("click", () => applyTokenSuggestion(token));
+      list.appendChild(button);
+    });
+  };
+
+  const renderGroupedPresetTokens = (list, tokens, limit) => {
+    if (!list) {
+      return;
+    }
+    const section = list.closest(".quick-fill__section");
+    list.innerHTML = "";
+    const visibleTokens = tokens.slice(0, limit);
+    if (section) {
+      section.hidden = visibleTokens.length === 0;
+    }
+    const groups = [];
+    const groupIndex = new Map();
+    visibleTokens.forEach((token) => {
+      const groupLabel = typeof token.group === "string" ? token.group.trim() : "";
+      const key = groupLabel || "__ungrouped__";
+      if (!groupIndex.has(key)) {
+        const entry = { label: groupLabel, tokens: [] };
+        groupIndex.set(key, entry);
+        groups.push(entry);
+      }
+      groupIndex.get(key).tokens.push(token);
+    });
+    groups.forEach((group) => {
+      const groupWrapper = document.createElement("div");
+      groupWrapper.className = "quick-fill__group";
+      if (group.label) {
+        const groupLabel = document.createElement("p");
+        groupLabel.className = "quick-fill__group-label";
+        groupLabel.textContent = group.label;
+        groupWrapper.appendChild(groupLabel);
+      }
+      const items = document.createElement("div");
+      items.className = "quick-fill__items";
+      renderQuickFillTokens(items, group.tokens, null, group.tokens.length);
+      groupWrapper.appendChild(items);
+      list.appendChild(groupWrapper);
+    });
+  };
+
+  const renderQuickFillSuggestions = () => {
+    // quick-fill UI was removed from index.html.
+    // Keep recent chips, but skip quick-fill rendering when DOM is absent.
+    if (HAS_QUICK_FILL) {
+      renderQuickFillTokens(
+        recentTokenSuggestions,
+        "presets.badgeRecent",
+      );
+      renderGroupedPresetTokens(
+        quickFillResultsList,
+        presetTokenSuggestions,
+        QUICK_FILL_PRESET_LIMIT
+      );
+    }
+  };
+  const saveRecentTokenSuggestion = ({ currency, issuer, label }) => {
+    if (!currency || !issuer) {
+      return;
+    }
+    const normalizedCurrencyResult = normalizeCurrencyInput(currency);
+    const normalizedCurrency =
+      normalizedCurrencyResult.currencyNormalized ||
+      normalizedCurrencyResult.currencyInput?.trim() ||
+      "";
+    if (!normalizedCurrency || normalizedCurrency === "XRP") {
+      return;
+    }
+    const tokenRecord = {
+      symbol: normalizedCurrency,
+      issuer,
+      ts: Date.now(),
+    };
+    const key = getTokenKey({ currency: normalizedCurrency, issuer });
+    const deduped = recentTokenRecords.filter(
+      (item) => getTokenKey({ currency: item.symbol, issuer: item.issuer }) !== key
+    );
+    recentTokenRecords = [tokenRecord, ...deduped].slice(0, MAX_RECENT_TOKENS);
+    recentTokenSuggestions = buildRecentTokenSuggestions(recentTokenRecords).map(
+      (token) => ({
+        ...token,
+        label: label && getTokenKey(token) === key ? label : token.label,
+      })
+    );
+    try {
+      localStorage.setItem(RECENT_TOKENS_STORAGE_KEY, JSON.stringify(recentTokenRecords));
+    } catch (error) {
+      // Ignore storage failures.
+    }
+    refreshTokenSuggestionPool();
+    if (tokenSuggestionInput?.value?.trim()) {
+      const matches = getTokenSuggestionMatches(tokenSuggestionInput.value.trim());
+      activeTokenSuggestionIndex = matches.length ? 0 : -1;
+      renderTokenSuggestions(matches);
+      // Fetch remote suggestions after rendering local presets.
+      // NOTE: remote suggest disabled (was crashing: value/baseMatches undefined)
+      // scheduleRemoteUpdate(tokenSuggestionInput?.value, matches);
+
+    }
+    renderQuickFillSuggestions();
+  };
+
+  const applyTokenSuggestion = (token) => {
+    if (!currencyInput || !issuerInput) {
+      return;
+    }
+    // UI: keep human-friendly symbol, do NOT replace with hex/raw
+    const __raw = token.currency;
+    currencyInput.value = formatCurrencyForDisplay(__raw);
+    currencyInput.dataset.currencyRaw = __raw;
+    issuerInput.value = token.issuer;
+    setFieldError("currency", null);
+    setFieldError("issuer", null);
+    saveRecentTokenSuggestion(token);
+    handleShareInputChange();
+    currencyInput.focus();
+    closeTokenSuggestions();
+  };
+
+  const setFieldError = (key, message) => {
+    const element = fieldErrors[key];
+    if (!element) {
+      return;
+    }
+
+    element.textContent = message || "";
+    element.hidden = !message;
+  };
+
+  const setLimitNote = (message) => {
+    if (!limitNote) {
+      return;
+    }
+    limitNote.textContent = message || "";
+    limitNote.hidden = !message;
+  };
+
+  const truncateDebugText = (value, limit) => {
+    if (!value) {
+      return "—";
+    }
+    const text = String(value);
+    if (text.length <= limit) {
+      return text;
+    }
+    return `${text.slice(0, limit)}…`;
+  };
+
+  const formatDebugMs = (value) => {
+    if (!Number.isFinite(value)) {
+      return "—";
+    }
+    return `${Math.round(value)} ms`;
+  };
+
+  const formatDebugNumber = (value) => {
+    if (!Number.isFinite(value)) {
+      return "—";
+    }
+    return formatNumber(value, { maximumFractionDigits: 6 });
+  };
+
+  const formatDebugPercent = (value) => {
+    if (!Number.isFinite(value)) {
+      return "—";
+    }
+    return formatPercent(value, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  };
+
+  const setDebugValue = (element, value) => {
+    if (!element) {
+      return;
+    }
+    element.textContent = prettifyHexCurrencyInText(value ?? "—");
+  };
+
+  const formatDebugJson = (value) => {
+    if (value === null || value === undefined) {
+      return "—";
+    }
+    if (typeof value === "string") {
+      return value;
+    }
+    return JSON.stringify(value, null, 2);
+  };
+
+  const formatLastRequest = (url, time) => {
+    if (url && time) {
+      return `${url} @ ${time}`;
+    }
+    return url || time || "—";
+  };
+
+  const buildResponseKeysExcerpt = (rawResponse) => {
+    if (!rawResponse || typeof rawResponse !== "object") {
+      return "—";
+    }
+    const keys = Object.keys(rawResponse);
+    if (keys.length === 0) {
+      return "—";
+    }
+    const maxKeys = 8;
+    const truncatedKeys = keys.slice(0, maxKeys);
+    const formattedKeys = truncatedKeys.map((key) => {
+      if (key !== "offers") {
+        return key;
+      }
+      if (Array.isArray(rawResponse.offers)) {
+        return `offers(${rawResponse.offers.length})`;
+      }
+      return "offers";
+    });
+    const suffix = keys.length > maxKeys ? ` +${keys.length - maxKeys} more` : "";
+    return `${formattedKeys.join(", ")}${suffix}`;
+  };
+
+  const updateDebugPanel = (updates = {}) => {
+    if (!isDebugEnabled || !debugPanel) {
+      return;
+    }
+
+    if (debugPanel.hidden) {
+      debugPanel.hidden = false;
+    }
+
+    if (updates.timings) {
+      debugState.timings = {
+        ...debugState.timings,
+        ...updates.timings,
+      };
+    }
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (key === "timings") {
+        return;
+      }
+      if (value !== undefined) {
+        debugState[key] = value;
+      }
+    });
+
+    if (updates.rawResponse !== undefined && updates.responseKeys === undefined) {
+      debugState.responseKeys = buildResponseKeysExcerpt(debugState.rawResponse);
+    }
+
+    setDebugValue(
+      debugLastRequest,
+      formatLastRequest(debugState.lastRequestUrl, debugState.lastRequestTime)
+    );
+    setDebugValue(debugRequestPayload, formatDebugJson(debugState.requestPayload));
+    setDebugValue(debugEndpointUsed, debugState.endpointUsed);
+    setDebugValue(debugUpstreamStatus, debugState.upstreamStatus);
+    setDebugValue(debugStatus, debugState.responseStatus);
+    setDebugValue(debugElapsed, formatDebugMs(debugState.elapsedMs));
+    setDebugValue(debugOffersCount, debugState.offersCount ?? "—");
+    setDebugValue(debugError, debugState.error);
+    setDebugValue(debugRawResponse, formatDebugJson(debugState.rawResponse));
+    setDebugValue(debugResponseKeys, debugState.responseKeys);
+    setDebugValue(debugClobMax, formatDebugNumber(debugState.clobMax));
+    setDebugValue(debugAmmMax, formatDebugNumber(debugState.ammMax));
+    setDebugValue(debugClobShare, formatDebugPercent(debugState.clobSharePct));
+    setDebugValue(debugVenue, debugState.venue ?? "—");
+    setDebugValue(debugVenueReason, debugState.venueReason ?? "—");
+    setDebugValue(debugValidateTiming, formatDebugMs(debugState.timings.validateMs));
+    setDebugValue(debugNetworkTiming, formatDebugMs(debugState.timings.networkMs));
+    setDebugValue(debugParseTiming, formatDebugMs(debugState.timings.parseMs));
+  };
+
+  const buildDebugPayload = () => ({
+    input: debugState.requestPayload,
+    endpointUsed: debugState.endpointUsed,
+    elapsedMs: debugState.elapsedMs,
+    offersCount: debugState.offersCount,
+    clobMax: debugState.clobMax,
+    ammMax: debugState.ammMax,
+    clobSharePct: debugState.clobSharePct,
+    venue: debugState.venue,
+    venueReason: debugState.venueReason,
+    error: debugState.error,
+    timestamp: debugState.timestamp,
+  });
+
+  const buildDebugText = () => JSON.stringify(buildDebugPayload(), null, 2);
+
+  const buildExampleAttemptSummary = (attempts) => {
+    if (!Array.isArray(attempts) || attempts.length === 0) {
+      return "";
+    }
+    return attempts
+      .map((attempt) => {
+        const label = buildExampleLabel(attempt.candidate);
+        if (attempt.error) {
+          const code = attempt.error?.code || "error";
+          const message = attempt.error?.message || "Request failed";
+          return `${label} -> ${code}: ${message}`;
+        }
+        if (Number.isFinite(attempt.offersCount)) {
+          return `${label} -> offers=${attempt.offersCount}`;
+        }
+        return `${label} -> offers=unknown`;
+      })
+      .join("; ");
+  };
+
+  const clearFieldErrors = () => {
+    Object.keys(fieldErrors).forEach((key) => setFieldError(key, null));
+    setLimitNote(null);
+  };
+
+  const formatNumber = (value, options = {}) =>
+    new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: 6,
+      ...options,
+    }).format(value);
+
+  const formatCompactNumber = (value, options = {}) =>
+    new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 2,
+      ...options,
+    }).format(value);
+
+
+
+  function decodeCurrencyHexToAscii(hex) {
+    if (typeof hex !== "string") return "";
+    const v = hex.trim();
+    if (!/^[0-9A-Fa-f]{40}$/.test(v)) return v;
+    const bytes = v.match(/.{2}/g).map((b) => parseInt(b, 16));
+    let out = "";
+    for (const b of bytes) {
+      if (b === 0x00) continue;
+      if (b >= 0x20 && b <= 0x7e) out += String.fromCharCode(b);
+    }
+    return out.trim();
+  }
+
+  function formatCurrencyForDisplay(code) {
+    if (code == null) return "";
+    const raw = String(code).trim();
+    if (!raw) return "";
+    if (/^[0-9A-Fa-f]{40}$/.test(raw)) {
+      const decoded = decodeCurrencyHexToAscii(raw);
+      return decoded ? decoded.toUpperCase() : raw.toUpperCase();
+    }
+    return raw.toUpperCase();
+  }
+
+  function prettifyHexCurrencyInText(text) {
+    if (text == null) return text;
+    return String(text).replace(/\b([0-9A-Fa-f]{40})\b/g, (m) => {
+      const decoded = decodeCurrencyHexToAscii(m);
+      return decoded ? decoded.toUpperCase() : m.toUpperCase();
+    });
+  }
+
+  const formatPercent = (
+    value,
+    { minimumFractionDigits = 1, maximumFractionDigits = 2 } = {}
+  ) =>
+    `${new Intl.NumberFormat("en-US", {
+      minimumFractionDigits,
+      maximumFractionDigits,
+    }).format(value)}%`;
+
+  let requestIdCounter = 0;
+  const nextRequestId = () => {
+    requestIdCounter += 1;
+    return requestIdCounter;
+  };
+
+  const CHART_DIMENSIONS = {
+    width: 320,
+    height: 200,
+    padding: { top: 16, right: 16, bottom: 28, left: 40 },
+  };
+
+  const createSvgElement = (tag, attributes = {}) => {
+    const element = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.entries(attributes).forEach(([key, value]) => {
+      element.setAttribute(key, value);
+    });
+    return element;
+  };
+
+  const clearSvg = (svg) => {
+    if (!svg) {
+      return;
+    }
+    while (svg.firstChild) {
+      svg.removeChild(svg.firstChild);
+    }
+  };
+
+  const scaleValue = (value, domainMin, domainMax, rangeMin, rangeMax) => {
+    if (!Number.isFinite(value)) {
+      return rangeMin;
+    }
+    if (domainMax === domainMin) {
+      return (rangeMin + rangeMax) / 2;
+    }
+    const ratio = (value - domainMin) / (domainMax - domainMin);
+    return rangeMin + ratio * (rangeMax - rangeMin);
+  };
+
+  const FIAT_CACHE_TTL_MS = 120000;
+  const FIAT_RATE_SOURCE = "coingecko";
+  const fiatCache = new Map();
+
+  const formatFiatAmount = (value, fiat) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: fiat,
+      maximumFractionDigits: fiat === "JPY" ? 0 : 2,
+    }).format(value);
+
+  const formatFiatRate = (value, fiat) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: fiat,
+      maximumFractionDigits: fiat === "JPY" ? 2 : 4,
+    }).format(value);
+
+  const formatTime = (timestamp) =>
+    new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(new Date(timestamp));
+
+  const clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
+
+  const sanitizeCurrency = (value) => {
+    const result = normalizeCurrencyInput(value);
+    if (result.error) {
+      return null;
+    }
+    return result.currencyNormalized || null;
+  };
+
+  const sanitizeIssuer = (value) => {
+    if (!value) {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const issuerLooksValid = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(trimmed);
+    return issuerLooksValid ? trimmed : null;
+  };
+
+  const sanitizeAmount = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+    const clamped = clampNumber(parsed, 0, MAX_AMOUNT);
+    if (clamped <= 0) {
+      return null;
+    }
+    return clamped;
+  };
+
+  const sanitizeLimit = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+    const clamped = clampNumber(Math.round(parsed), LIMIT_MIN, LIMIT_MAX);
+    return clamped;
+  };
+
+  const sanitizeThreshold = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || !THRESHOLD_VALUES.has(parsed)) {
+      return null;
+    }
+    return parsed;
+  };
+
+  const sanitizeThinCutoff = (value) => {
+    if (value === "" || value === null || value === undefined) {
+      return null;
+    }
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+    return clampNumber(parsed, 0, 100);
+  };
+
+  const sanitizeFiat = (value) => {
+    if (!value) {
+      return null;
+    }
+    const upper = value.trim().toUpperCase();
+    return FIAT_VALUES.has(upper) ? upper : null;
+  };
+
+  const getCurrencyErrorMessage = (currencyResult) => {
+    if (!currencyResult?.error) {
+      return null;
+    }
+    switch (currencyResult.error.code) {
+      case "empty":
+        return t("errors.currency_required");
+      case "non_ascii":
+        return t("errors.currency_non_ascii");
+      case "hex_invalid":
+        return t("errors.currency_hex_invalid");
+      case "invalid_length":
+      default:
+        return t("errors.currency_invalid_length");
+    }
+  };
+
+  const setResultText = (element, text) => {
+    if (element) {
+      element.textContent = prettifyHexCurrencyInText(text);
+    }
+  };
+
+  const setResultTextMany = (elements, text) => {
+    if (Array.isArray(elements)) {
+      elements.forEach((element) => setResultText(element, text));
+      return;
+    }
+    setResultText(elements, text);
+  };
+
+  const setMaxSellValueText = (text) => {
+    setResultText(resultMaxSellValue, text);
+    setResultText(resultMixSummary, text);
+  };
+
+  const getImpactThresholdPct = () => {
+    const raw = impactThresholdSelect?.value;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : DEFAULT_SLIPPAGE_PERCENT;
+  };
+
+  const getThinCutoffPct = () => {
+    const raw = thinCutoffInput?.value;
+    if (raw === "" || raw === null || raw === undefined) {
+      return DEFAULT_THIN_CUTOFF_PERCENT;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      return DEFAULT_THIN_CUTOFF_PERCENT;
+    }
+    return clampNumber(parsed, 0, 100);
+  };
+
+  const updateImpactThresholdHelp = (thresholdPct) => {
+    const helper = document.querySelector("#impact-threshold-help");
+    if (!helper) {
+      return;
+    }
+    helper.textContent = t("fields.impact_threshold.helper_dynamic", {
+      threshold: formatPercent(thresholdPct, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }),
+    });
+  };
+
+  const updateMaxSellLabel = (thresholdPct) => {
+    setResultText(
+      resultMaxSellLabel,
+      t("results.max_sell.label", {
+        threshold: formatPercent(thresholdPct, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        }),
+      })
+    );
+  };
+
+  const updateLiquiditySplitLabel = (thresholdPct) => {
+    setResultText(
+      resultLiquiditySplitLabel,
+      t("details.liquidity_split", {
+        threshold: formatPercent(thresholdPct, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        }),
+      })
+    );
+  };
+
+  const setShareLoadNote = (visible) => {
+    if (!shareLoadNote) {
+      return;
+    }
+    shareLoadNote.hidden = !visible;
+  };
+
+  const clearShareParams = () => {
+    const url = new URL(window.location.href);
+    url.search = "";
+    history.replaceState(null, "", url.toString());
+  };
+
+  const showShareToast = (message) => {
+    if (!shareToast) {
+      return;
+    }
+    if (shareToastTimer) {
+      clearTimeout(shareToastTimer);
+    }
+    shareToast.textContent = message || "";
+    shareToast.hidden = !message;
+    if (message) {
+      shareToastTimer = setTimeout(() => {
+        shareToast.hidden = true;
+        shareToast.textContent = "";
+      }, 2000);
+    }
+  };
+
+  const getShareInputState = () => {
+    const currency = sanitizeCurrency(currencyInput?.value || "");
+    const amount = sanitizeAmount(amountInput?.value);
+    const threshold = sanitizeThreshold(impactThresholdSelect?.value);
+    const thinCutoff = sanitizeThinCutoff(thinCutoffInput?.value);
+    const fiat = sanitizeFiat(fiatCurrencySelect?.value);
+    const limitRaw = limitInput?.value;
+    const limit =
+      limitRaw === "" || limitRaw === null || limitRaw === undefined
+        ? null
+        : sanitizeLimit(limitRaw);
+    const issuer = sanitizeIssuer(issuerInput?.value || "");
+    return {
+      currency,
+      issuer,
+      amount,
+      limit,
+      threshold,
+      thinCutoff,
+      fiat,
+    };
+  };
+
+  const buildShareParams = () => {
+    const params = new URLSearchParams();
+    const { currency, issuer, amount, limit, threshold, thinCutoff, fiat } =
+      getShareInputState();
+    const hasPrimary = Boolean(currency || amount);
+    if (!hasPrimary) {
+      return params;
+    }
+    if (currency) {
+      params.set("currency", currency);
+    }
+    if (currency && currency !== "XRP" && issuer) {
+      params.set("issuer", issuer);
+    }
+    if (amount) {
+      params.set("amount", String(amount));
+    }
+    const resolvedLimit = limit ?? DEFAULT_LIMIT;
+    params.set("limit", String(resolvedLimit));
+    const resolvedThreshold = threshold ?? getImpactThresholdPct();
+    if (resolvedThreshold) {
+      params.set("threshold", String(resolvedThreshold));
+      params.set("slippage", String(resolvedThreshold));
+      params.set("slippagePercent", String(resolvedThreshold));
+    }
+    const resolvedThinCutoff = thinCutoff ?? getThinCutoffPct();
+    if (resolvedThinCutoff !== null && resolvedThinCutoff !== undefined) {
+      params.set("thin", String(resolvedThinCutoff));
+      params.set("thinCutoffPercent", String(resolvedThinCutoff));
+    }
+    const resolvedFiat = fiat ?? DEFAULT_FIAT;
+    if (resolvedFiat) {
+      params.set("fiat", resolvedFiat);
+    }
+    return params;
+  };
+
+  const updateShareUrl = () => {
+    const params = buildShareParams();
+    const url = new URL(window.location.href);
+    const search = params.toString();
+    url.search = search ? `?${search}` : "";
+    history.replaceState(null, "", url);
+  };
+
+  const scheduleShareUrlUpdate = ({ immediate = false } = {}) => {
+    if (isApplyingShareParams) {
+      return;
+    }
+    if (shareUrlTimer) {
+      clearTimeout(shareUrlTimer);
+      shareUrlTimer = null;
+    }
+    if (immediate) {
+      updateShareUrl();
+      return;
+    }
+    shareUrlTimer = setTimeout(() => {
+      shareUrlTimer = null;
+      updateShareUrl();
+    }, SHARE_URL_DEBOUNCE_MS);
+  };
+
+  const applyShareParamsFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.size === 0) {
+      return;
+    }
+
+    let hadInvalidParam = false;
+    const currencyParam = params.get("currency");
+    const issuerParam = params.get("issuer");
+    const amountParam = params.get("amount");
+    const limitParam = params.get("limit");
+    const slippageParam =
+      params.get("slippagePercent") ?? params.get("slippage") ?? params.get("threshold");
+    const thinCutoffParam = params.get("thinCutoffPercent") ?? params.get("thin");
+    const fiatParam = params.get("fiat");
+
+    const currencyResult = currencyParam ? normalizeCurrencyInput(currencyParam) : null;
+    const currency = currencyResult?.error ? null : currencyResult?.currencyNormalized ?? null;
+    if (currencyParam && !currency) {
+      hadInvalidParam = true;
+    }
+
+    const amount = amountParam ? sanitizeAmount(amountParam) : null;
+    if (amountParam && !amount) {
+      hadInvalidParam = true;
+    }
+
+    const limit = limitParam ? sanitizeLimit(limitParam) : null;
+    if (limitParam && !limit) {
+      hadInvalidParam = true;
+    }
+
+    const threshold = slippageParam ? sanitizeThreshold(slippageParam) : null;
+    if (slippageParam && !threshold) {
+      hadInvalidParam = true;
+    }
+
+    const thinCutoff = thinCutoffParam ? sanitizeThinCutoff(thinCutoffParam) : null;
+    if (thinCutoffParam && thinCutoff === null) {
+      hadInvalidParam = true;
+    }
+
+    const fiat = fiatParam ? sanitizeFiat(fiatParam) : null;
+    if (fiatParam && !fiat) {
+      hadInvalidParam = true;
+    }
+
+    let issuer = issuerParam ? sanitizeIssuer(issuerParam) : null;
+    if (issuerParam && !issuer) {
+      hadInvalidParam = true;
+    }
+
+    if (currency === "XRP") {
+      issuer = null;
+    }
+
+    isApplyingShareParams = true;
+    if (currencyInput && currency) {
+      // UI: show decoded symbol if possible; keep raw in dataset for API/share
+      currencyInput.value = formatCurrencyForDisplay(currency);
+      currencyInput.dataset.currencyRaw = currency;
+    }
+    if (amountInput && amount) {
+      amountInput.value = String(amount);
+    }
+    if (limitInput && limit) {
+      limitInput.value = String(limit);
+    }
+    if (impactThresholdSelect && threshold) {
+      impactThresholdSelect.value = String(threshold);
+      updateMaxSellLabel(threshold);
+      updateImpactThresholdHelp(threshold);
+      updateLiquiditySplitLabel(threshold);
+    }
+    if (thinCutoffInput && thinCutoff !== null) {
+      thinCutoffInput.value = String(thinCutoff);
+    }
+    if (fiatCurrencySelect && fiat) {
+      fiatCurrencySelect.value = fiat;
+      try {
+        localStorage.setItem(FIAT_STORAGE_KEY, fiat);
+      } catch (error) {
+        // Ignore storage failures.
+      }
+    }
+    if (issuerInput) {
+      issuerInput.value = issuer || "";
+    }
+    isApplyingShareParams = false;
+
+    const isXrpOnly = currency === "XRP" && !issuer;
+    if (currencyParam && isXrpOnly) {
+      setShareLoadNote(false);
+      showApiError({ code: "xrp_not_supported" });
+    } else if (!hadInvalidParam) {
+      setShareLoadNote(false);
+      setReadyStatus();
+    }
+
+    scheduleShareUrlUpdate({ immediate: true });
+  };
+
+  const setFiatWarning = (message) => {
+    if (!resultFiatWarning) {
+      return;
+    }
+    resultFiatWarning.textContent = message || "";
+    resultFiatWarning.hidden = !message;
+  };
+
+  const resetResults = () => {
+    const placeholder = getTranslationOrFallback("common.placeholder", "…");
+    setResultText(resultSellability, placeholder);
+    setResultText(resultFilledLine, placeholder);
+    setResultText(resultDataFetched, placeholder);
+    setResultText(resultEndpoint, placeholder);
+    setResultTextMany(resultEndpointDetails, placeholder);
+    setResultText(resultOrderCount, placeholder);
+    setResultText(resultBestPrice, placeholder);
+    setResultText(resultWorstPrice, placeholder);
+    updateLiquiditySplitLabel(getImpactThresholdPct());
+    setResultText(resultLiquiditySplit, placeholder);
+    setResultText(resultAmmReserves, placeholder);
+    setResultText(resultAmmFee, placeholder);
+    setResultText(resultReceive, placeholder);
+    setResultText(resultSlippage, placeholder);
+    setResultText(resultSlippageHelp, getTranslationOrFallback("results.slippage.help"));
+    setResultText(resultWhyLine, "");
+    setResultText(resultUsedVenueSummary, placeholder);
+    setResultText(resultUsedVenueDetails, placeholder);
+    setResultText(resultUsedVenueNote, "");
+    setResultText(resultPairLabel, "XRP → …");
+    setResultText(resultPairMeta, "Issuer context updates from token input.");
+    setResultText(resultMixBook, "Book 0%");
+    setResultText(resultMixAmm, "AMM 0%");
+    setResultText(resultMixBridge, "Bridge 0%");
+    setBarPercent(resultMixBookSegment, 0);
+    setBarPercent(resultMixAmmSegment, 0);
+    setBarPercent(resultMixBridgeSegment, 0);
+    setResultText(resultDepthTouchLabel, "Unavailable");
+    setResultText(resultDepthInnerLabel, "Unavailable");
+    setResultText(resultDepthAmmLabel, "Unavailable");
+    setResultText(resultDepthBridgeLabel, "Unavailable");
+    setBarPercent(resultDepthTouchBar, 0);
+    setBarPercent(resultDepthInnerBar, 0);
+    setBarPercent(resultDepthAmmBar, 0);
+    setBarPercent(resultDepthBridgeBar, 0);
+    setResultText(resultDepthCaption, "Unavailable in this snapshot.");
+    setResultText(resultSnapshotHeadline, "Unavailable in this snapshot.");
+    setResultText(resultSnapshotBody, "Run estimate to generate route-specific rationale.");
+    setSnapshotListItems(resultSnapshotBullets, ["Unavailable in this snapshot."]);
+    if (resultRouteConfidenceCard) {
+      resultRouteConfidenceCard.hidden = true;
+    }
+    setResultText(resultRouteConfidenceScore, "0 / 100");
+    setBarPercent(resultRouteConfidenceBar, 0);
+    setResultText(resultRouteConfidenceSummary, "Unavailable in this snapshot.");
+    setResultText(resultPathHeadline, "Unavailable in this snapshot.");
+    setResultText(resultRiskBook, "Unavailable");
+    setResultText(resultRiskAmm, "Unavailable");
+    setResultText(resultRiskBridge, "Unavailable");
+    setResultText(resultRiskDepth, "Unavailable");
+    setBarPercent(resultRiskBookBar, 0);
+    setBarPercent(resultRiskAmmBar, 0);
+    setBarPercent(resultRiskBridgeBar, 0);
+    setBarPercent(resultRiskDepthBar, 0);
+    setSnapshotListItems(resultPathBullets, ["Unavailable in this snapshot."]);
+    [routeCards.a, routeCards.b, routeCards.c].forEach((slot) => {
+      setResultText(slot?.output, placeholder);
+      setResultText(slot?.impact, placeholder);
+      setResultText(slot?.bottleneck, placeholder);
+      setResultText(slot?.reason, placeholder);
+      setResultText(slot?.confidence, placeholder);
+      setBarPercent(slot?.confidenceBar, 0);
+    });
+    Object.values(routePathSegments).forEach((segments) => {
+      segments.forEach((segment) => {
+        segment.style.opacity = "1";
+      });
+    });
+    setResultText(resultFiatRate, t("results.receive.fiat_pending"));
+    setFiatWarning(null);
+    lastReceiveXrp = 0;
+    lastSortedOffers = null;
+    lastBestPrice = 0;
+    lastCurrency = "";
+    updateMaxSellLabel(getImpactThresholdPct());
+    updateImpactThresholdHelp(getImpactThresholdPct());
+    setMaxSellValueText( placeholder);
+    setResultText(resultMaxSellNote, "");
+    if (resultWarning) {
+      resultWarning.hidden = true;
+      resultWarning.textContent = "";
+    }
+    lastFiatRate = null;
+    lastSimulation = null;
+    lastMaxSellResult = null;
+    lastAmmReserves = null;
+    lastAmmAvailable = false;
+    lastAmmMaxSell = 0;
+    lastShouldFetchAmm = false;
+    lastOffersHash = "";
+    lastFetchedAt = null;
+    lastEndpointLabel = "";
+    lastUsedVenue = VENUE_CLOB;
+    lastDisplaySimulation = null;
+    lastDisplayMaxSellResult = null;
+    lastAmmMaxSellResult = null;
+    snapshotHistory.splice(0, snapshotHistory.length);
+    renderSnapshotSeries();
+    if (snapshotOutputNote) {
+      snapshotOutputNote.textContent = "Waiting for snapshot updates.";
+    }
+    if (snapshotImpactNote) {
+      snapshotImpactNote.textContent = "Waiting for slippage context.";
+    }
+    if (snapshotContextNote) {
+      snapshotContextNote.textContent = "Waiting for route selection context.";
+    }
+    setSnapshotListItems(snapshotNoteCurrent, ["Waiting for estimate."]);
+    setSnapshotListItems(snapshotNoteDelta, ["Run estimate to compare with previous snapshot."]);
+    scheduleChartsUpdate(
+      { offers: null, simulation: null, maxSellResult: null, currency: "" },
+      { immediate: true }
+    );
+  };
+
+  const getFiatCacheKey = (fiat) => `xrp-fiat-rate:${fiat}`;
+
+  const readFiatCache = (fiat) => {
+    if (fiatCache.has(fiat)) {
+      return fiatCache.get(fiat);
+    }
+
+    try {
+      const raw = localStorage.getItem(getFiatCacheKey(fiat));
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed.rate !== "number") {
+        return null;
+      }
+      fiatCache.set(fiat, parsed);
+      return parsed;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const writeFiatCache = (fiat, payload) => {
+    fiatCache.set(fiat, payload);
+    try {
+      localStorage.setItem(getFiatCacheKey(fiat), JSON.stringify(payload));
+    } catch (error) {
+      // Ignore storage failures.
+    }
+  };
+
+  const fetchXrpFiatRate = async (fiat) => {
+    const cached = readFiatCache(fiat);
+    const now = Date.now();
+
+    if (cached && now - cached.fetchedAt < FIAT_CACHE_TTL_MS) {
+      return { ...cached, isStale: false, status: "cached" };
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=${fiat.toLowerCase()}`
+      );
+      if (!response.ok) {
+        throw new Error(`Fiat HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      const rate = data?.ripple?.[fiat.toLowerCase()];
+      if (!Number.isFinite(rate)) {
+        throw new Error("Fiat rate missing");
+      }
+      const payload = {
+        rate,
+        fetchedAt: now,
+        source: FIAT_RATE_SOURCE,
+      };
+      writeFiatCache(fiat, payload);
+      return { ...payload, isStale: false, status: "live" };
+    } catch (error) {
+      if (cached) {
+        return { ...cached, isStale: true, status: "stale" };
+      }
+      return null;
+    }
+  };
+
+  const updateFiatDisplay = ({ receiveXrp, fiatRate }) => {
+    const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
+    lastReceiveXrp = receiveXrp;
+    lastFiatRate = fiatRate;
+    const formattedXrp = formatNumber(receiveXrp, { maximumFractionDigits: 6 });
+
+    if (fiatRate && Number.isFinite(fiatRate.rate)) {
+      const fiatAmount = formatFiatAmount(receiveXrp * fiatRate.rate, fiat);
+      setResultText(
+        resultReceive,
+        t("results.receive.with_fiat", {
+          amount: formattedXrp,
+          fiat: fiatAmount,
+        })
+      );
+      const statusLabel = t(`results.receive.rate_status.${fiatRate.status ?? "live"}`);
+      setResultText(
+        resultFiatRate,
+        t("results.receive.rate_line", {
+          rate: formatFiatRate(fiatRate.rate, fiat),
+          time: formatTime(fiatRate.fetchedAt),
+          status: statusLabel,
+        })
+      );
+      setFiatWarning(null);
+      if (lastSortedOffers && lastDisplaySimulation) {
+        scheduleChartsUpdate({
+          offers: lastSortedOffers,
+          simulation: lastDisplaySimulation,
+          maxSellResult: lastDisplayMaxSellResult,
+          currency: lastCurrency,
+          venue: lastUsedVenue,
+          ammReserves: lastAmmReserves,
+        });
+      }
+      return;
+    }
+
+    setResultText(
+      resultReceive,
+      t("results.receive.with_fiat", {
+        amount: formattedXrp,
+        fiat: t("results.receive.fiat_unavailable"),
+      })
+    );
+    setResultText(resultFiatRate, t("results.receive.rate_unavailable"));
+    setFiatWarning(t("results.receive.fiat_warning"));
+    if (lastSortedOffers && lastDisplaySimulation) {
+      scheduleChartsUpdate({
+        offers: lastSortedOffers,
+        simulation: lastDisplaySimulation,
+        maxSellResult: lastDisplayMaxSellResult,
+        currency: lastCurrency,
+        venue: lastUsedVenue,
+        ammReserves: lastAmmReserves,
+      });
+    }
+  };
+
+  const refreshFiatEstimate = async (receiveXrp) => {
+    const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
+    const fiatRate = await fetchXrpFiatRate(fiat);
+    updateFiatDisplay({ receiveXrp, fiatRate });
+  };
+
+  const getOfferAmount = (offer, key) => {
+    const fundedKey = `${key}_funded`;
+    const fundedKeyCamel = `${key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())}Funded`;
+    if (Object.prototype.hasOwnProperty.call(offer, fundedKey)) {
+      return offer[fundedKey];
+    }
+    if (Object.prototype.hasOwnProperty.call(offer, fundedKeyCamel)) {
+      return offer[fundedKeyCamel];
+    }
+    return offer?.[key] ?? null;
+  };
+
+  const parseAmount = (amount) => {
+    if (amount === null || amount === undefined) {
+      return 0;
+    }
+
+    if (typeof amount === "string") {
+      const parsed = Number(amount);
+      return Number.isFinite(parsed) ? parsed / 1_000_000 : 0;
+    }
+
+    if (typeof amount === "number") {
+      return Number.isFinite(amount) ? amount : 0;
+    }
+
+    if (typeof amount === "object" && "value" in amount) {
+      const parsed = Number(amount.value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    return 0;
+  };
+
+  const normalizeOffers = (offers) => {
+    if (!Array.isArray(offers)) {
+      return [];
+    }
+
+    return offers.map((offer) => {
+      const takerGets = getOfferAmount(offer, "taker_gets");
+      const takerPays = getOfferAmount(offer, "taker_pays");
+      const availableTokenAmount = parseAmount(takerGets);
+      const availableXrpAmount = parseAmount(takerPays);
+      const price =
+        availableTokenAmount > 0 ? availableXrpAmount / availableTokenAmount : 0;
+
+      return {
+        account: offer?.Account ?? offer?.account ?? null,
+        price,
+        availableTokenAmount,
+        availableXrpAmount,
+      };
+    });
+  };
+
+  const buildBookOffersUrl = ({ currency, issuer, limit }) => {
+    const url = new URL(BOOK_OFFERS_API, window.location.origin);
+    url.searchParams.set("currency", currency);
+    url.searchParams.set("issuer", issuer ?? "");
+    if (limit !== null && limit !== undefined && limit !== "") {
+      url.searchParams.set("limit", String(limit));
+    }
+    return url.toString();
+  };
+
+  const requestBookOffers = async ({ payload }) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
+    const timings = {
+      networkMs: null,
+      parseMs: null,
+    };
+    let responseSnippet = null;
+    let statusCode = null;
+    let rawResponse = null;
+
+    try {
+      const requestUrl = buildBookOffersUrl(payload);
+      const networkStart = performance.now();
+      const response = await fetch(requestUrl, {
+        method: "GET",
+        signal: controller.signal,
+      });
+      timings.networkMs = performance.now() - networkStart;
+      statusCode = response.status;
+
+      let data;
+      const parseStart = performance.now();
+      try {
+        data = await response.json();
+      } catch (error) {
+        timings.parseMs = performance.now() - parseStart;
+        responseSnippet = "Failed to parse JSON response.";
+        const parseError = error instanceof Error ? error : new Error("Parse failed");
+        parseError.code = "rpc_error";
+        parseError.debugInfo = {
+          responseSnippet,
+          statusCode,
+          timings,
+        };
+        throw parseError;
+      }
+      timings.parseMs = performance.now() - parseStart;
+      rawResponse = data;
+      responseSnippet = truncateDebugText(JSON.stringify(data), DEBUG_RESPONSE_LIMIT);
+
+      if (!response.ok || !data?.ok) {
+        const apiErrorCode = extractApiErrorCode(data?.error) || "upstream_fail";
+        const apiMessage =
+          data?.message || extractApiErrorMessage(data?.error) || data?.error || null;
+        const rpcError = new Error(apiMessage || "Request failed");
+        rpcError.code = apiErrorCode;
+        rpcError.response = data;
+        rpcError.debugInfo = {
+          responseSnippet,
+          statusCode,
+          timings,
+          endpointUsed: data?.endpointUsed ?? null,
+          rawResponse,
+        };
+        throw rpcError;
+      }
+
+      return {
+        data,
+        cacheStatus: resolveCacheStatus(data),
+        debugInfo: {
+          responseSnippet,
+          statusCode,
+          timings,
+          endpointUsed: data?.endpointUsed ?? null,
+          rawResponse,
+        },
+      };
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        const timeoutError = new Error("Request timed out");
+        timeoutError.code = "timeout";
+        timeoutError.debugInfo = {
+          responseSnippet: "Request timed out.",
+          statusCode,
+          timings,
+          endpointUsed: null,
+          rawResponse,
+        };
+        throw timeoutError;
+      }
+      if (error?.code) {
+        throw error;
+      }
+      const networkError = error instanceof Error ? error : new Error("Network error");
+      networkError.code = "connect_failed";
+      networkError.debugInfo = {
+        responseSnippet: "Network connection failed.",
+        statusCode,
+        timings,
+        endpointUsed: null,
+        rawResponse,
+      };
+      throw networkError;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  const findExampleCandidate = async () => {
+    const attempts = [];
+    for (const candidate of EXAMPLE_CANDIDATES) {
+      const payload = {
+        currency: candidate.currency,
+        issuer: candidate.issuer,
+        limit: DEFAULT_LIMIT,
+      };
+      const requestTimestamp = Date.now();
+      const requestUrl = buildBookOffersUrl(payload);
+      var fetchStart = performance.now();
+
+      updateDebugPanel({
+        lastRequestTime: formatTime(requestTimestamp),
+        lastRequestUrl: requestUrl,
+        requestPayload: payload,
+        responseStatus: "pending",
+        endpointUsed: null,
+        upstreamStatus: null,
+        error: null,
+        rawResponse: null,
+        offersCount: null,
+        elapsedMs: null,
+      });
+
+      try {
+        const response = await requestBookOffers({ payload });
+        const offersCount = Array.isArray(response?.data?.offers)
+          ? response.data.offers.length
+          : 0;
+
+        updateDebugPanel({
+          responseStatus: "success",
+          endpointUsed: response.debugInfo?.endpointUsed ?? null,
+          upstreamStatus: response.debugInfo?.statusCode ?? null,
+          error: null,
+          rawResponse: response.debugInfo?.rawResponse ?? null,
+          offersCount,
+          elapsedMs: performance.now() - fetchStart,
+          timings: {
+            networkMs: response.debugInfo?.timings?.networkMs ?? null,
+            parseMs: response.debugInfo?.timings?.parseMs ?? null,
+          },
+        });
+
+        attempts.push({ candidate, offersCount });
+        if (offersCount > 0) {
+          return { candidate, attempts };
+        }
+      } catch (error) {
+        attempts.push({ candidate, error });
+        updateDebugPanel({
+          responseStatus: "fail",
+          endpointUsed: error?.debugInfo?.endpointUsed ?? null,
+          upstreamStatus: error?.debugInfo?.statusCode ?? null,
+          error: `${error?.code || "error"}: ${error?.message || "Request failed"}`,
+          rawResponse: error?.debugInfo?.rawResponse ?? null,
+          offersCount: null,
+          elapsedMs: performance.now() - fetchStart,
+          timings: {
+            networkMs: error?.debugInfo?.timings?.networkMs ?? null,
+            parseMs: error?.debugInfo?.timings?.parseMs ?? null,
+          },
+        });
+      }
+    }
+    return { candidate: DEFAULT_TOKEN, attempts };
+  };
+
+  const fetchBookOffers = async ({ currency, issuer, limit = DEFAULT_LIMIT }) => {
+    const payload = {
+      currency,
+      issuer,
+      limit,
+    };
+
+    const attemptedEndpoints = [];
+    const errors = [];
+    let lastDebugInfo = null;
+
+    for (let attempt = 0; attempt < ORDERBOOK_API_RETRIES; attempt += 1) {
+      attemptedEndpoints.push({
+        ...ORDERBOOK_API_ENDPOINT,
+        attempt: attempt + 1,
+      });
+      try {
+        const response = await requestBookOffers({
+          payload,
+        });
+        const offers = normalizeOffers(response?.data?.offers);
+        return {
+          offers,
+          cacheStatus: response?.cacheStatus ?? "live",
+          endpointIndex: 0,
+          attemptedEndpoints,
+          debugInfo: response?.debugInfo ?? null,
+        };
+      } catch (error) {
+        lastDebugInfo = error?.debugInfo ?? lastDebugInfo;
+        errors.push(error);
+      }
+    }
+
+    const errorCodes = errors.map((error) => error?.code).filter(Boolean);
+    const allRpc = errorCodes.length > 0 && errorCodes.every((code) => code === "rpc_error");
+    const anyTimeout = errorCodes.some((code) => code === "timeout");
+    const combinedError = new Error("All requests failed");
+    combinedError.code = allRpc ? "rpc_error" : anyTimeout ? "timeout" : "connect_failed";
+    combinedError.debugInfo = lastDebugInfo;
+    throw combinedError;
+  };
+
+  const sortOffersByPrice = (offers) =>
+    [...offers].sort((a, b) => b.price - a.price);
+
+  const filterValidOffers = (offers) =>
+    Array.isArray(offers)
+      ? offers.filter(
+          (offer) =>
+            Number.isFinite(offer.availableTokenAmount) &&
+            Number.isFinite(offer.availableXrpAmount) &&
+            offer.availableTokenAmount > 0 &&
+            offer.availableXrpAmount > 0 &&
+            offer.price > 0
+        )
+      : [];
+
+  const simulateSellIntoOrderbook = ({ sellAmount, offers }) => {
+    const requestedToken = sellAmount;
+    let filledToken = 0;
+    let receiveXrp = 0;
+    let topConsumedOffersCount = 0;
+
+    for (const offer of offers) {
+      if (filledToken >= requestedToken) {
+        break;
+      }
+
+      if (
+        !Number.isFinite(offer.availableTokenAmount) ||
+        !Number.isFinite(offer.availableXrpAmount) ||
+        offer.availableTokenAmount <= 0 ||
+        offer.availableXrpAmount <= 0 ||
+        offer.price <= 0
+      ) {
+        continue;
+      }
+
+      const remaining = requestedToken - filledToken;
+      const tokenToSell = Math.min(remaining, offer.availableTokenAmount);
+      if (tokenToSell <= 0) {
+        continue;
+      }
+
+      const xrpFromOffer =
+        (tokenToSell / offer.availableTokenAmount) * offer.availableXrpAmount;
+
+      filledToken += tokenToSell;
+      receiveXrp += xrpFromOffer;
+      topConsumedOffersCount += 1;
+    }
+
+    const fillRate = requestedToken > 0 ? filledToken / requestedToken : 0;
+    const fillRatePct = fillRate * 100;
+    const effectivePrice = filledToken > 0 ? receiveXrp / filledToken : 0;
+
+    return {
+      filledToken,
+      requestedToken,
+      fillRate,
+      fillRatePct,
+      receiveXrp,
+      effectivePrice,
+      topConsumedOffersCount,
+    };
+  };
+
+  const computeMaxSellUnderThreshold = ({
+    offers,
+    thresholdPct,
+    referencePrice,
+    maxIterations = 24,
+  }) => {
+    if (!Array.isArray(offers) || offers.length === 0) {
+      return { status: "not_available" };
+    }
+
+    if (!Number.isFinite(referencePrice) || referencePrice <= 0) {
+      return { status: "not_available" };
+    }
+
+    const validOffers = filterValidOffers(offers);
+
+    const totalLiquidity = validOffers.reduce(
+      (sum, offer) => sum + offer.availableTokenAmount,
+      0
+    );
+
+    if (!Number.isFinite(totalLiquidity) || totalLiquidity <= 0) {
+      return { status: "not_available" };
+    }
+
+    const fullSimulation = simulateSellIntoOrderbook({
+      sellAmount: totalLiquidity,
+      offers: validOffers,
+    });
+    const canFullyFill =
+      fullSimulation.requestedToken > 0 &&
+      fullSimulation.filledToken >= fullSimulation.requestedToken;
+
+    if (!canFullyFill) {
+      return { status: "not_available" };
+    }
+
+    let low = 0;
+    let high = totalLiquidity;
+    let lastOkSimulation = simulateSellIntoOrderbook({ sellAmount: 0, offers: validOffers });
+    let lastOkAmount = 0;
+
+    for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+      const mid = (low + high) / 2;
+      if (mid <= 0) {
+        low = mid;
+        continue;
+      }
+
+      const simulation = simulateSellIntoOrderbook({
+        sellAmount: mid,
+        offers: validOffers,
+      });
+      const isFullFill =
+        simulation.requestedToken > 0 &&
+        simulation.filledToken >= simulation.requestedToken;
+
+      let isOk = false;
+      if (isFullFill && simulation.effectivePrice > 0) {
+        const rawSlippagePct =
+          ((referencePrice - simulation.effectivePrice) / referencePrice) * 100;
+        const slippagePct = Math.max(0, rawSlippagePct);
+        isOk = slippagePct <= thresholdPct;
+      }
+
+      if (isOk) {
+        low = mid;
+        lastOkSimulation = simulation;
+        lastOkAmount = mid;
+      } else {
+        high = mid;
+      }
+    }
+
+    return {
+      status: "available",
+      maxSellAmount: lastOkAmount,
+      simulation: lastOkSimulation,
+    };
+  };
+
+
+  const fetchAmmInfo = async ({ currency, issuer }) => {
+    const url = new URL(AMM_INFO_API, window.location.href);
+    url.searchParams.set("currency", String(currency || "").toUpperCase());
+    url.searchParams.set("issuer", String(issuer || ""));
+    const res = await fetch(url.toString(), { method: "GET" });
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { ok: false, error: "non_json_response", rawText: text?.slice?.(0, 600) };
+    }
+  };
+
+  const parseAmmReserves = ({ amm, currency, issuer }) => {
+    if (!amm) return null;
+
+    const a1 = amm.amount ?? amm.asset1 ?? null;
+    const a2 = amm.amount2 ?? amm.asset2 ?? null;
+
+    const parseXrp = (x) => {
+      if (typeof x === "string") {
+        const drops = Number(x);
+        if (!Number.isFinite(drops)) return null;
+        return drops / 1_000_000;
+      }
+      if (x && typeof x === "object" && String(x.currency || "").toUpperCase() === "XRP") {
+        const v = Number(x.value);
+        return Number.isFinite(v) ? v : null;
+      }
+      return null;
+    };
+
+    const parseIou = (x) => {
+      if (x && typeof x === "object") {
+        const v = Number(x.value);
+        return Number.isFinite(v) ? v : null;
+      }
+      return null;
+    };
+
+    // determine which side is XRP
+    const xrp1 = parseXrp(a1);
+    const xrp2 = parseXrp(a2);
+
+    let xrpReserve = null;
+    let tokenReserve = null;
+
+    if (xrp1 != null) {
+      xrpReserve = xrp1;
+      tokenReserve = parseIou(a2);
+    } else if (xrp2 != null) {
+      xrpReserve = xrp2;
+      tokenReserve = parseIou(a1);
+    }
+
+    if (!Number.isFinite(xrpReserve) || !Number.isFinite(tokenReserve) || xrpReserve <= 0 || tokenReserve <= 0) {
+      return null;
+    }
+
+    const tradingFee = Number(amm.trading_fee ?? amm.tradingFee ?? 0);
+    const feePct = Number.isFinite(tradingFee) ? tradingFee / 100000 : 0;
+
+    return { xrpReserve, tokenReserve, feePct };
+  };
+
+  const simulateSellIntoAmm = ({ sellAmount, reserves }) => {
+    const sell = Number(sellAmount);
+    if (!reserves || !Number.isFinite(sell) || sell <= 0) {
+      return { ok: false, receivedXrp: 0, avgPrice: 0, slippagePct: null, spotPrice: null };
+    }
+
+    const { xrpReserve: Y, tokenReserve: X, feePct } = reserves;
+    const spotPrice = Y / X; // XRP per token
+    const dxEff = sell * (1 - Math.max(0, Math.min(1, feePct)));
+    const k = X * Y;
+
+    const newX = X + dxEff;
+    const newY = k / newX;
+    const out = Math.max(0, Y - newY);
+
+    const avgPrice = out / sell;
+    const rawSlip = spotPrice > 0 ? ((spotPrice - avgPrice) / spotPrice) * 100 : null;
+    const slippagePct = rawSlip == null ? null : Math.max(0, rawSlip);
+
+    return { ok: true, receivedXrp: out, avgPrice, slippagePct, spotPrice };
+  };
+
+  const findMaxSellWithinThresholdAmm = ({ reserves, thresholdPct }) => {
+    if (!reserves) return { ok: false, maxSell: 0 };
+
+    const thr = Number(thresholdPct);
+    if (!Number.isFinite(thr) || thr <= 0) return { ok: false, maxSell: 0 };
+
+    let lo = 0;
+    let hi = reserves.tokenReserve * 0.99; // practical cap
+
+    for (let i = 0; i < 50; i++) {
+      const mid = (lo + hi) / 2;
+      const sim = simulateSellIntoAmm({ sellAmount: mid, reserves });
+      if (!sim.ok || sim.slippagePct == null) {
+        hi = mid;
+        continue;
+      }
+      if (sim.slippagePct <= thr) lo = mid;
+      else hi = mid;
+    }
+    return { ok: true, maxSell: lo };
+  };
+
+  const buildAmmMaxSellResult = ({ reserves, thresholdPct }) => {
+    const result = findMaxSellWithinThresholdAmm({ reserves, thresholdPct });
+    if (!result.ok || !Number.isFinite(result.maxSell) || result.maxSell <= 0) {
+      return { status: "not_available" };
+    }
+    const simulation = simulateSellIntoAmm({ sellAmount: result.maxSell, reserves });
+    if (!simulation.ok) {
+      return { status: "not_available" };
+    }
+    return {
+      status: "available",
+      maxSellAmount: result.maxSell,
+      simulation: {
+        receiveXrp: simulation.receivedXrp,
+      },
+    };
+  };
+
+  const computeClobSlippagePct = ({ simulation, bestPrice }) => {
+    if (
+      !simulation ||
+      !Number.isFinite(bestPrice) ||
+      bestPrice <= 0 ||
+      simulation.filledToken < simulation.requestedToken ||
+      simulation.effectivePrice <= 0
+    ) {
+      return null;
+    }
+    return Math.max(0, ((bestPrice - simulation.effectivePrice) / bestPrice) * 100);
+  };
+
+  const canClobFillWithinSlippage = ({
+    simulation,
+    bestPrice,
+    thresholdPct,
+  }) => {
+    const slippagePct = computeClobSlippagePct({ simulation, bestPrice });
+    return slippagePct !== null && slippagePct <= thresholdPct;
+  };
+
+  const decideVenue = ({ clobMax, ammMax, hasAmm, thinCutoffPct, clobCanFill }) => {
+    if (!hasAmm) {
+      return {
+        venue: VENUE_CLOB,
+        reason: "AMM missing.",
+        clobSharePct: 100,
+      };
+    }
+
+    const total = clobMax + ammMax;
+    const clobSharePct = total > 0 ? (clobMax / total) * 100 : 0;
+
+    if (clobSharePct < thinCutoffPct) {
+      return {
+        venue: VENUE_AMM,
+        reason: "CLOB share below thin cutoff.",
+        clobSharePct,
+      };
+    }
+
+    if (clobCanFill) {
+      return {
+        venue: VENUE_CLOB,
+        reason: "CLOB fills within slippage threshold.",
+        clobSharePct,
+      };
+    }
+
+    return {
+      venue: VENUE_AMM,
+      reason: "CLOB exceeds slippage threshold.",
+      clobSharePct,
+    };
+  };
+
+  const buildImpactSamples = ({ offers, sellAmount, sampleCount = 20 }) => {
+    const validOffers = filterValidOffers(offers);
+    const totalLiquidity = validOffers.reduce(
+      (sum, offer) => sum + offer.availableTokenAmount,
+      0
+    );
+
+    if (!Number.isFinite(totalLiquidity) || totalLiquidity <= 0) {
+      return { samples: [], totalLiquidity };
+    }
+
+    const cap = Math.min(Math.max(sellAmount * 2, sellAmount), totalLiquidity);
+    const points = [];
+    const totalPoints = Math.max(2, Math.min(sampleCount, 30));
+
+    for (let index = 0; index < totalPoints; index += 1) {
+      const ratio = totalPoints === 1 ? 0 : index / (totalPoints - 1);
+      const amount = cap * ratio;
+      const simulation = simulateSellIntoOrderbook({
+        sellAmount: amount,
+        offers: validOffers,
+      });
+      points.push({
+        sellAmount: amount,
+        receiveXrp: simulation.receiveXrp,
+        filledToken: simulation.filledToken,
+        isPartial: simulation.filledToken < simulation.requestedToken,
+      });
+    }
+
+    return { samples: points, totalLiquidity };
+  };
+
+  const buildAmmImpactSamples = ({ reserves, sellAmount, sampleCount = 20 }) => {
+    const total = Number(sellAmount);
+    if (!reserves || !Number.isFinite(total) || total <= 0) {
+      return { samples: [], totalLiquidity: 0 };
+    }
+    const totalPoints = Math.max(2, Math.min(sampleCount, 30));
+    const points = [];
+
+    for (let index = 1; index <= totalPoints; index += 1) {
+      const amount = (total * index) / totalPoints;
+      const simulation = simulateSellIntoAmm({ sellAmount: amount, reserves });
+      if (!simulation.ok) {
+        continue;
+      }
+      points.push({
+        sellAmount: amount,
+        receiveXrp: simulation.receivedXrp,
+        filledToken: amount,
+        isPartial: false,
+      });
+    }
+
+    return { samples: points, totalLiquidity: total };
+  };
+
+  const getOffersHash = (offers) => {
+    if (!Array.isArray(offers) || offers.length === 0) {
+      return "empty";
+    }
+    const rounded = (value) =>
+      Number.isFinite(value) ? Math.round(value * 1e6) : 0;
+    let hash = 7;
+    for (const offer of offers) {
+      hash = (hash * 31 + rounded(offer.availableTokenAmount)) % 1_000_000_007;
+      hash = (hash * 31 + rounded(offer.availableXrpAmount)) % 1_000_000_007;
+      hash = (hash * 31 + rounded(offer.price)) % 1_000_000_007;
+    }
+    return String(hash);
+  };
+
+  const getAmmCacheKey = ({ reserves, sellAmount, sampleCount }) => {
+    if (!reserves) {
+      return "empty";
+    }
+    const rounded = (value) =>
+      Number.isFinite(value) ? Math.round(value * 1e6) : 0;
+    return [
+      rounded(reserves.tokenReserve),
+      rounded(reserves.xrpReserve),
+      rounded(reserves.feePct),
+      rounded(sellAmount),
+      sampleCount,
+    ].join(":");
+  };
+
+  const impactSampleCache = new Map();
+  const ammSampleCache = new Map();
+
+  const buildDepthSeries = ({ offers }) => {
+    const validOffers = filterValidOffers(offers);
+    const points = [{ token: 0, xrp: 0 }];
+    let totalToken = 0;
+    let totalXrp = 0;
+
+    validOffers.forEach((offer) => {
+      totalToken += offer.availableTokenAmount;
+      totalXrp += offer.availableXrpAmount;
+      points.push({ token: totalToken, xrp: totalXrp });
+    });
+
+    return { points, totalToken, totalXrp, hasLiquidity: totalToken > 0 };
+  };
+
+  const buildAmmDepthSeries = ({ reserves, sellAmount, sampleCount = 20 }) => {
+    const { samples, totalLiquidity } = buildAmmImpactSamples({
+      reserves,
+      sellAmount,
+      sampleCount,
+    });
+    if (!samples.length || totalLiquidity <= 0) {
+      return { points: [], totalToken: 0, totalXrp: 0, hasLiquidity: false };
+    }
+    const points = [{ token: 0, xrp: 0 }];
+    samples.forEach((sample) => {
+      points.push({ token: sample.sellAmount, xrp: sample.receiveXrp });
+    });
+    const lastPoint = points[points.length - 1];
+    return {
+      points,
+      totalToken: lastPoint.token,
+      totalXrp: lastPoint.xrp,
+      hasLiquidity: lastPoint.token > 0,
+    };
+  };
+
+  const buildConsumedDepth = ({ offers, sellAmount }) => {
+    const validOffers = filterValidOffers(offers);
+    const points = [{ token: 0, xrp: 0 }];
+    let remaining = sellAmount;
+    let cumulativeToken = 0;
+    let cumulativeXrp = 0;
+
+    for (const offer of validOffers) {
+      if (remaining <= 0) {
+        break;
+      }
+      const tokenToSell = Math.min(remaining, offer.availableTokenAmount);
+      if (tokenToSell <= 0) {
+        continue;
+      }
+      const xrpFromOffer =
+        (tokenToSell / offer.availableTokenAmount) * offer.availableXrpAmount;
+      cumulativeToken += tokenToSell;
+      cumulativeXrp += xrpFromOffer;
+      points.push({ token: cumulativeToken, xrp: cumulativeXrp });
+      remaining -= tokenToSell;
+    }
+
+    return { points, filledToken: cumulativeToken, receiveXrp: cumulativeXrp };
+  };
+
+  const renderChartFrame = ({ svg, xLabel, yLabel }) => {
+    const { width, height, padding } = CHART_DIMENSIONS;
+    const axisLeft = padding.left;
+    const axisRight = width - padding.right;
+    const axisTop = padding.top;
+    const axisBottom = height - padding.bottom;
+
+    svg.appendChild(
+      createSvgElement("line", {
+        x1: axisLeft,
+        y1: axisTop,
+        x2: axisLeft,
+        y2: axisBottom,
+        class: "chart__axis",
+      })
+    );
+    svg.appendChild(
+      createSvgElement("line", {
+        x1: axisLeft,
+        y1: axisBottom,
+        x2: axisRight,
+        y2: axisBottom,
+        class: "chart__axis",
+      })
+    );
+
+    [0.25, 0.5, 0.75].forEach((ratio) => {
+      const y = axisTop + (axisBottom - axisTop) * ratio;
+      svg.appendChild(
+        createSvgElement("line", {
+          x1: axisLeft,
+          y1: y,
+          x2: axisRight,
+          y2: y,
+          class: "chart__grid",
+        })
+      );
+    });
+
+    svg.appendChild(
+      createSvgElement("text", {
+        x: axisLeft,
+        y: axisTop - 4,
+        class: "chart__label",
+      })
+    ).textContent = yLabel;
+
+    svg.appendChild(
+      createSvgElement("text", {
+        x: axisRight,
+        y: height - 6,
+        class: "chart__label",
+        "text-anchor": "end",
+      })
+    ).textContent = xLabel;
+  };
+
+  const renderAxisTicks = ({ svg, maxX, maxY }) => {
+    const { width, height, padding } = CHART_DIMENSIONS;
+    const axisLeft = padding.left;
+    const axisRight = width - padding.right;
+    const axisTop = padding.top;
+    const axisBottom = height - padding.bottom;
+    const tickCount = 2;
+
+    for (let i = 0; i <= tickCount; i += 1) {
+      const value = (maxY / tickCount) * i;
+      const y = scaleValue(value, 0, maxY, axisBottom, axisTop);
+      svg.appendChild(
+        createSvgElement("text", {
+          x: axisLeft - 6,
+          y,
+          class: "chart__tick",
+          "text-anchor": "end",
+          "dominant-baseline": "middle",
+        })
+      ).textContent = formatCompactNumber(value, {
+        maximumFractionDigits: value < 1 ? 2 : 1,
+      });
+    }
+
+    for (let i = 0; i <= tickCount; i += 1) {
+      const value = (maxX / tickCount) * i;
+      const x = scaleValue(value, 0, maxX, axisLeft, axisRight);
+      svg.appendChild(
+        createSvgElement("text", {
+          x,
+          y: axisBottom + 14,
+          class: "chart__tick",
+          "text-anchor": i === 0 ? "start" : i === tickCount ? "end" : "middle",
+        })
+      ).textContent = formatCompactNumber(value, {
+        maximumFractionDigits: value < 1 ? 2 : 1,
+      });
+    }
+  };
+
+  const renderChartLegend = ({ svg, labels }) => {
+    if (!labels || labels.length === 0) {
+      return;
+    }
+    const { width, padding } = CHART_DIMENSIONS;
+    const startX = width - padding.right - 4;
+    const startY = padding.top + 6;
+    const lineHeight = 14;
+
+    labels.forEach((label, index) => {
+      const y = startY + index * lineHeight;
+      svg.appendChild(
+        createSvgElement("circle", {
+          cx: startX - 52,
+          cy: y - 4,
+          r: 3.5,
+          class: label.className,
+        })
+      );
+      svg.appendChild(
+        createSvgElement("text", {
+          x: startX,
+          y,
+          class: "chart__legend",
+          "text-anchor": "end",
+        })
+      ).textContent = label.text;
+    });
+  };
+
+  const renderEmptyState = ({ svg, message }) => {
+    if (!svg) {
+      return;
+    }
+    const { width, height } = CHART_DIMENSIONS;
+    svg.appendChild(
+      createSvgElement("text", {
+        x: width / 2,
+        y: height / 2,
+        class: "chart__empty",
+        "text-anchor": "middle",
+        "dominant-baseline": "middle",
+      })
+    ).textContent = message;
+  };
+
+  const renderImpactChart = ({
+    svg,
+    samples,
+    currentPoint,
+    maxPoint,
+    isPartial,
+    fiatRate,
+    fiat,
+    thresholdPct,
+  }) => {
+    if (!svg) {
+      return;
+    }
+    clearSvg(svg);
+
+    const { width, height, padding } = CHART_DIMENSIONS;
+    const axisLeft = padding.left;
+    const axisRight = width - padding.right;
+    const axisTop = padding.top;
+    const axisBottom = height - padding.bottom;
+
+    if (!samples || samples.length === 0) {
+      renderChartFrame({
+        svg,
+        xLabel: t("graphs.impact.axis_sell"),
+        yLabel: t("graphs.impact.axis_receive"),
+      });
+      renderEmptyState({ svg, message: t("graphs.empty.no_liquidity") });
+      return;
+    }
+
+    const maxX = Math.max(
+      ...samples.map((point) => point.sellAmount),
+      currentPoint?.sellAmount ?? 0,
+      maxPoint?.sellAmount ?? 0
+    );
+    const rate = fiatRate?.rate ?? null;
+    const hasFiat = Number.isFinite(rate);
+    const values = samples.map((point) => point.receiveXrp * (hasFiat ? rate : 1));
+    const maxY = Math.max(...values, currentPoint?.receiveValue ?? 0, 1);
+
+    renderChartFrame({
+      svg,
+      xLabel: t("graphs.impact.axis_sell"),
+      yLabel: hasFiat
+        ? t("graphs.impact.axis_receive_fiat", { fiat })
+        : t("graphs.impact.axis_receive_xrp"),
+    });
+    renderAxisTicks({ svg, maxX, maxY });
+
+    const path = samples
+      .map((point, index) => {
+        const x = scaleValue(point.sellAmount, 0, maxX, axisLeft, axisRight);
+        const y = scaleValue(
+          point.receiveXrp * (hasFiat ? rate : 1),
+          0,
+          maxY,
+          axisBottom,
+          axisTop
+        );
+        return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+      })
+      .join(" ");
+
+    const fillPath = `${path} L ${scaleValue(
+      samples[samples.length - 1].sellAmount,
+      0,
+      maxX,
+      axisLeft,
+      axisRight
+    )} ${axisBottom} L ${axisLeft} ${axisBottom} Z`;
+
+    svg.appendChild(createSvgElement("path", { d: fillPath, class: "chart__fill" }));
+    svg.appendChild(createSvgElement("path", { d: path, class: "chart__line" }));
+
+    const legendItems = [
+      {
+        text: t("graphs.legend.your_amount"),
+        className: "chart__legend-marker chart__marker",
+      },
+    ];
+
+    if (maxPoint && Number.isFinite(maxPoint.sellAmount)) {
+      const x = scaleValue(maxPoint.sellAmount, 0, maxX, axisLeft, axisRight);
+      svg.appendChild(
+        createSvgElement("line", {
+          x1: x,
+          y1: axisTop,
+          x2: x,
+          y2: axisBottom,
+          class: "chart__line--accent",
+        })
+      );
+      svg.appendChild(
+        createSvgElement("circle", {
+          cx: x,
+          cy: scaleValue(maxPoint.receiveValue, 0, maxY, axisBottom, axisTop),
+          r: 4.5,
+          class: "chart__marker chart__marker--secondary",
+        })
+      );
+      legendItems.push({
+        text: t("graphs.legend.max_under", {
+          threshold: formatPercent(thresholdPct, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+          }),
+        }),
+        className: "chart__legend-marker chart__marker chart__marker--secondary",
+      });
+    }
+
+    if (currentPoint && Number.isFinite(currentPoint.sellAmount)) {
+      const x = scaleValue(currentPoint.sellAmount, 0, maxX, axisLeft, axisRight);
+      const y = scaleValue(currentPoint.receiveValue, 0, maxY, axisBottom, axisTop);
+      svg.appendChild(
+        createSvgElement("circle", {
+          cx: x,
+          cy: y,
+          r: 5,
+          class: `chart__marker${isPartial ? " chart__marker--alert" : ""}`,
+        })
+      );
+      if (isPartial) {
+        svg.appendChild(
+          createSvgElement("line", {
+            x1: x,
+            y1: axisTop,
+            x2: x,
+            y2: axisBottom,
+            class: "chart__line--alert",
+          })
+        );
+        svg.appendChild(
+          createSvgElement("text", {
+            x: Math.min(x + 6, axisRight - 4),
+            y: axisTop + 12,
+            class: "chart__note-inline",
+            "text-anchor": x + 6 > axisRight - 4 ? "end" : "start",
+          })
+        ).textContent = t("graphs.liquidity_end");
+      }
+    }
+
+    renderChartLegend({ svg, labels: legendItems });
+  };
+
+  const renderDepthChart = ({ svg, depthSeries, consumedSeries, isPartial }) => {
+    if (!svg) {
+      return;
+    }
+    clearSvg(svg);
+
+    const { width, height, padding } = CHART_DIMENSIONS;
+    const axisLeft = padding.left;
+    const axisRight = width - padding.right;
+    const axisTop = padding.top;
+    const axisBottom = height - padding.bottom;
+
+    if (!depthSeries || depthSeries.points.length <= 1) {
+      renderChartFrame({
+        svg,
+        xLabel: t("graphs.depth.axis_sell"),
+        yLabel: t("graphs.depth.axis_receive"),
+      });
+      renderEmptyState({ svg, message: t("graphs.empty.no_liquidity") });
+      return;
+    }
+
+    const maxX = Math.max(depthSeries.totalToken, consumedSeries?.filledToken ?? 0, 1);
+    const maxY = Math.max(depthSeries.totalXrp, consumedSeries?.receiveXrp ?? 0, 1);
+
+    renderChartFrame({
+      svg,
+      xLabel: t("graphs.depth.axis_sell"),
+      yLabel: t("graphs.depth.axis_receive"),
+    });
+    renderAxisTicks({ svg, maxX, maxY });
+
+    const stepPath = depthSeries.points
+      .map((point, index) => {
+        const x = scaleValue(point.token, 0, maxX, axisLeft, axisRight);
+        const y = scaleValue(point.xrp, 0, maxY, axisBottom, axisTop);
+        if (index === 0) {
+          return `M ${x} ${y}`;
+        }
+        const prev = depthSeries.points[index - 1];
+        const prevX = scaleValue(prev.token, 0, maxX, axisLeft, axisRight);
+        const prevY = scaleValue(prev.xrp, 0, maxY, axisBottom, axisTop);
+        return `L ${prevX} ${y} L ${x} ${y}`;
+      })
+      .join(" ");
+
+    const fullAreaPath = `${stepPath} L ${axisRight} ${axisBottom} L ${axisLeft} ${axisBottom} Z`;
+    svg.appendChild(
+      createSvgElement("path", { d: fullAreaPath, class: "chart__area--remaining" })
+    );
+    svg.appendChild(createSvgElement("path", { d: stepPath, class: "chart__line" }));
+
+    if (consumedSeries && consumedSeries.points.length > 1) {
+      const consumedPath = consumedSeries.points
+        .map((point, index) => {
+          const x = scaleValue(point.token, 0, maxX, axisLeft, axisRight);
+          const y = scaleValue(point.xrp, 0, maxY, axisBottom, axisTop);
+          if (index === 0) {
+            return `M ${x} ${y}`;
+          }
+          const prev = consumedSeries.points[index - 1];
+          const prevX = scaleValue(prev.token, 0, maxX, axisLeft, axisRight);
+          return `L ${prevX} ${y} L ${x} ${y}`;
+        })
+        .join(" ");
+      const consumedArea = `${consumedPath} L ${scaleValue(
+        consumedSeries.points[consumedSeries.points.length - 1].token,
+        0,
+        maxX,
+        axisLeft,
+        axisRight
+      )} ${axisBottom} L ${axisLeft} ${axisBottom} Z`;
+      svg.appendChild(
+        createSvgElement("path", { d: consumedArea, class: "chart__area--consumed" })
+      );
+      svg.appendChild(createSvgElement("path", { d: consumedPath, class: "chart__line" }));
+
+      const lastPoint = consumedSeries.points[consumedSeries.points.length - 1];
+      const markerX = scaleValue(lastPoint.token, 0, maxX, axisLeft, axisRight);
+      const markerY = scaleValue(lastPoint.xrp, 0, maxY, axisBottom, axisTop);
+      svg.appendChild(
+        createSvgElement("circle", {
+          cx: markerX,
+          cy: markerY,
+          r: 5,
+          class: `chart__marker${isPartial ? " chart__marker--alert" : ""}`,
+        })
+      );
+      if (isPartial) {
+        svg.appendChild(
+          createSvgElement("line", {
+            x1: markerX,
+            y1: axisTop,
+            x2: markerX,
+            y2: axisBottom,
+            class: "chart__line--alert",
+          })
+        );
+        svg.appendChild(
+          createSvgElement("text", {
+            x: Math.min(markerX + 6, axisRight - 4),
+            y: axisTop + 12,
+            class: "chart__note-inline",
+            "text-anchor": markerX + 6 > axisRight - 4 ? "end" : "start",
+          })
+        ).textContent = t("graphs.liquidity_end");
+      }
+    }
+  };
+
+  const updateMaxSellResults = async ({
+    offers,
+    thresholdPct,
+    referencePrice,
+    currency,
+    result: precomputedResult,
+    venue = VENUE_CLOB,
+    ammReserves = null,
+  }) => {
+    updateMaxSellLabel(thresholdPct);
+
+    if (venue === VENUE_AMM) {
+      const result =
+        precomputedResult ?? buildAmmMaxSellResult({ reserves: ammReserves, thresholdPct });
+      if (result.status !== "available") {
+        setMaxSellValueText( t("results.max_sell.not_available"));
+        setResultText(resultMaxSellNote, "");
+        return;
+      }
+      const tokenAmount = formatNumber(result.maxSellAmount, {
+        maximumFractionDigits: 6,
+      });
+      const xrpAmount = formatNumber(result.simulation.receiveXrp, {
+        maximumFractionDigits: 6,
+      });
+      const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
+      const fiatRate = await fetchXrpFiatRate(fiat);
+
+      if (fiatRate && Number.isFinite(fiatRate.rate)) {
+        const fiatAmount = formatFiatAmount(
+          result.simulation.receiveXrp * fiatRate.rate,
+          fiat
+        );
+        setMaxSellValueText(
+          t("results.max_sell.value_with_fiat", {
+            amount: tokenAmount,
+            currency,
+            fiat: fiatAmount,
+          })
+        );
+        setResultText(
+          resultMaxSellNote,
+          t("results.max_sell.xrp_line", {
+            amount: xrpAmount,
+          })
+        );
+        return;
+      }
+
+      setMaxSellValueText(
+        t("results.max_sell.value_with_xrp", {
+          amount: tokenAmount,
+          currency,
+          xrp: xrpAmount,
+        })
+      );
+      setResultText(resultMaxSellNote, t("results.max_sell.fiat_unavailable"));
+      return;
+    }
+
+    if (!offers || offers.length === 0) {
+      setMaxSellValueText( t("results.max_sell.not_available"));
+      setResultText(resultMaxSellNote, "");
+      return;
+    }
+
+    const result =
+      precomputedResult ??
+      computeMaxSellUnderThreshold({
+        offers,
+        thresholdPct,
+        referencePrice,
+      });
+
+    if (result.status !== "available") {
+      setMaxSellValueText( t("results.max_sell.not_available"));
+      setResultText(resultMaxSellNote, "");
+      return;
+    }
+
+    const tokenAmount = formatNumber(result.maxSellAmount, { maximumFractionDigits: 6 });
+    const xrpAmount = formatNumber(result.simulation.receiveXrp, {
+      maximumFractionDigits: 6,
+    });
+    const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
+    const fiatRate = await fetchXrpFiatRate(fiat);
+
+    if (fiatRate && Number.isFinite(fiatRate.rate)) {
+      const fiatAmount = formatFiatAmount(result.simulation.receiveXrp * fiatRate.rate, fiat);
+      setMaxSellValueText(
+        t("results.max_sell.value_with_fiat", {
+          amount: tokenAmount,
+          currency,
+          fiat: fiatAmount,
+        })
+      );
+      setResultText(
+        resultMaxSellNote,
+        t("results.max_sell.xrp_line", {
+          amount: xrpAmount,
+        })
+      );
+      return;
+    }
+
+    setMaxSellValueText(
+      t("results.max_sell.value_with_xrp", {
+        amount: tokenAmount,
+        currency,
+        xrp: xrpAmount,
+      })
+    );
+    setResultText(resultMaxSellNote, t("results.max_sell.fiat_unavailable"));
+  };
+
+  const formatCandidateOutput = ({ simulation, venue }) => {
+    if (!simulation || !Number.isFinite(simulation.receiveXrp)) {
+      return t("common.not_available");
+    }
+    return `${formatNumber(simulation.receiveXrp, { maximumFractionDigits: 6 })} XRP (${venue})`;
+  };
+
+  const describeBottleneck = ({ simulation, offersCount, venue, thresholdPct, maxSellResult, hasAmm }) => {
+    if (!simulation || simulation.filledToken <= 0) {
+      return "No executable liquidity.";
+    }
+    if (simulation.filledToken < simulation.requestedToken) {
+      return `Fill limited at ${formatPercent(simulation.fillRatePct)} by depth.`;
+    }
+    if (venue === VENUE_AMM) {
+      if (!hasAmm) {
+        return "AMM path unavailable; synthetic fallback only.";
+      }
+      return `AMM slippage budget capped at ${formatPercent(thresholdPct)}.`;
+    }
+    if (!offersCount) {
+      return "Orderbook empty for current side.";
+    }
+    if (maxSellResult?.status === "available") {
+      const cap = formatNumber(maxSellResult.maxSellAmount, { maximumFractionDigits: 4 });
+      return `Book depth cap around ${cap} ${lastCurrency || "token"}.`;
+    }
+    return "Book refill risk dominates tail slices.";
+  };
+
+  const buildRouteCandidates = ({
+    clobSimulation,
+    ammSimulation,
+    chosenVenue,
+    clobSlippagePct,
+    ammSlippagePct,
+    clobCanFill,
+    hasAmm,
+    thresholdPct,
+    offersCount,
+    maxSellResult,
+  }) => {
+    const clobOutput = Number.isFinite(clobSimulation?.receiveXrp) ? clobSimulation.receiveXrp : 0;
+    const ammOutput = ammSimulation?.ok && Number.isFinite(ammSimulation?.receivedXrp) ? ammSimulation.receivedXrp : 0;
+    const selectedRoute = chosenVenue === VENUE_AMM ? "AMM assisted" : "Orderbook primary";
+    const altRoute = chosenVenue === VENUE_AMM ? "Orderbook primary" : "AMM assisted";
+    const selectedSimulation = chosenVenue === VENUE_AMM && ammSimulation?.ok
+      ? {
+          filledToken: clobSimulation.requestedToken,
+          requestedToken: clobSimulation.requestedToken,
+          fillRatePct: 100,
+          receiveXrp: ammOutput,
+        }
+      : clobSimulation;
+
+    const selected = {
+      title: `Route A · ${selectedRoute}`,
+      role: "Selected",
+      output: formatCandidateOutput({ simulation: selectedSimulation, venue: chosenVenue }),
+      impact: chosenVenue === VENUE_AMM
+        ? (Number.isFinite(ammSlippagePct) ? formatPercent(ammSlippagePct) : t("common.not_available"))
+        : (Number.isFinite(clobSlippagePct) ? formatPercent(clobSlippagePct) : t("common.not_available")),
+      bottleneck: describeBottleneck({
+        simulation: selectedSimulation,
+        offersCount,
+        venue: chosenVenue,
+        thresholdPct,
+        maxSellResult,
+        hasAmm,
+      }),
+      reason: chosenVenue === VENUE_AMM
+        ? `Chosen because book share dropped below thin cutoff (${formatPercent(getThinCutoffPct())}).`
+        : `Chosen because direct book route remains fill-safe at ${formatPercent(thresholdPct)} slippage guard.`,
+      confidencePct: chosenVenue === VENUE_AMM ? 78 : (clobCanFill ? 86 : 72),
+    };
+
+    const alternativeVenue = chosenVenue === VENUE_AMM ? VENUE_CLOB : VENUE_AMM;
+    const alternativeSimulation = alternativeVenue === VENUE_CLOB
+      ? clobSimulation
+      : (ammSimulation?.ok
+        ? {
+            filledToken: clobSimulation.requestedToken,
+            requestedToken: clobSimulation.requestedToken,
+            fillRatePct: 100,
+            receiveXrp: ammOutput,
+          }
+        : null);
+
+    const alternative = {
+      title: `Route B · ${altRoute}`,
+      role: "Alternative",
+      output: formatCandidateOutput({ simulation: alternativeSimulation, venue: alternativeVenue }),
+      impact: alternativeVenue === VENUE_AMM
+        ? (Number.isFinite(ammSlippagePct) ? formatPercent(ammSlippagePct) : t("common.not_available"))
+        : (Number.isFinite(clobSlippagePct) ? formatPercent(clobSlippagePct) : t("common.not_available")),
+      bottleneck: describeBottleneck({
+        simulation: alternativeSimulation,
+        offersCount,
+        venue: alternativeVenue,
+        thresholdPct,
+        maxSellResult,
+        hasAmm,
+      }),
+      reason: alternativeVenue === VENUE_AMM
+        ? (hasAmm ? "Not selected: AMM route improves depth but adds bridge dependence." : "Not selected: AMM liquidity unavailable.")
+        : "Not selected: book route loses on current thinness decision.",
+      confidencePct: alternativeVenue === VENUE_AMM ? (hasAmm ? 62 : 28) : 67,
+    };
+
+    const fallbackOutput = Math.max(0, Math.min(clobOutput, ammOutput || clobOutput) * 0.82);
+    const fallback = {
+      title: "Route C · Bounded fallback",
+      role: "Fallback",
+      output: `${formatNumber(fallbackOutput, { maximumFractionDigits: 6 })} XRP (bounded)` ,
+      impact: Number.isFinite(clobSlippagePct)
+        ? formatPercent(Math.min(99, clobSlippagePct + 2.5))
+        : t("common.not_available"),
+      bottleneck: "Tail depth exhaustion and confidence floor.",
+      reason: "Kept for degraded execution context only; not preferred while selected route is healthy.",
+      confidencePct: 39,
+    };
+
+    return [selected, alternative, fallback];
+  };
+
+  const updateRoutePathVisual = ({ chosenVenue, hasAmm, fallbackConfidence = 39 }) => {
+    const setPathState = (nodes, active, width) => {
+      nodes.forEach((node) => {
+        node.style.opacity = active ? "1" : "0.2";
+        node.style.strokeWidth = String(width);
+      });
+    };
+    const clobActive = chosenVenue === VENUE_CLOB || !hasAmm;
+    const ammActive = chosenVenue === VENUE_AMM && hasAmm;
+    setPathState(routePathSegments.clob, clobActive, clobActive ? 10 : 5);
+    setPathState(routePathSegments.amm, ammActive, ammActive ? 9 : 4);
+    setPathState(routePathSegments.fallback, fallbackConfidence >= 30, 6);
+  };
+
+  const updateRouteCandidates = ({ candidates, chosenVenue }) => {
+    const slots = [routeCards.a, routeCards.b, routeCards.c];
+    slots.forEach((slot, index) => {
+      const data = candidates[index];
+      if (!slot || !data) {
+        return;
+      }
+      slot.card?.classList.toggle("is-selected", index === 0);
+      setResultText(slot.title, data.title);
+      setResultText(slot.role, data.role);
+      setResultText(slot.output, data.output);
+      setResultText(slot.impact, data.impact);
+      setResultText(slot.bottleneck, data.bottleneck);
+      setResultText(slot.reason, data.reason);
+      setResultText(slot.confidence, `confidence ${formatPercent(data.confidencePct)}`);
+      setBarPercent(slot.confidenceBar, data.confidencePct);
+    });
+
+    const selected = candidates[0];
+    const selectedConfidence = Number.isFinite(selected?.confidencePct) ? selected.confidencePct : null;
+    const bookShare = chosenVenue === VENUE_AMM ? 54 : (lastAmmAvailable ? 68 : 88);
+    const ammShare = lastAmmAvailable ? (chosenVenue === VENUE_AMM ? 29 : 22) : 0;
+    const bridgeShare = Math.max(0, 100 - bookShare - ammShare);
+
+    setResultText(resultMixBook, `Book ${formatPercent(bookShare, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+    setResultText(resultMixAmm, `AMM ${formatPercent(ammShare, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+    setResultText(resultMixBridge, `Bridge ${formatPercent(bridgeShare, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+    setBarPercent(resultMixBookSegment, bookShare);
+    setBarPercent(resultMixAmmSegment, ammShare);
+    setBarPercent(resultMixBridgeSegment, bridgeShare);
+
+    const depthBands = [
+      { bar: resultDepthTouchBar, label: resultDepthTouchLabel, pct: Math.min(95, Math.max(45, bookShare + 20)), text: bookShare >= 65 ? "dense" : "steady" },
+      { bar: resultDepthInnerBar, label: resultDepthInnerLabel, pct: Math.min(90, Math.max(40, bookShare + 8)), text: bookShare >= 55 ? "healthy" : "watch" },
+      { bar: resultDepthAmmBar, label: resultDepthAmmLabel, pct: Math.min(86, Math.max(8, ammShare * 2.2)), text: ammShare >= 20 ? "assistive" : "limited" },
+      { bar: resultDepthBridgeBar, label: resultDepthBridgeLabel, pct: Math.min(82, Math.max(6, bridgeShare * 2.1)), text: bridgeShare >= 18 ? "thin" : "contained" },
+    ];
+    depthBands.forEach((band) => {
+      setBarPercent(band.bar, band.pct);
+      setResultText(band.label, band.text);
+    });
+    setResultText(resultDepthCaption, `selected size: ${amountInput?.value || "n/a"} XRP / outer bands thin faster than top touch`);
+    setResultText(
+      depthChartSummary,
+      chosenVenue === VENUE_AMM
+        ? "AMM support helps, but the book still anchors the route at this size."
+        : "The selected size reaches thin outer bands while top-touch book depth still leads."
+    );
+
+    const bookRisk = Math.min(100, Math.max(20, 55 + (100 - bookShare) * 0.3));
+    const ammRisk = Math.min(100, Math.max(12, 35 + (ammShare < 15 ? 18 : 0)));
+    const bridgeRisk = Math.min(100, Math.max(15, bridgeShare * 2.4));
+    const depthRisk = simulationHasPartialFill(lastDisplaySimulation) ? 62 : 32;
+    const riskLabel = (value) => value >= 75 ? "high" : value >= 55 ? "watch" : value >= 40 ? "medium" : "low";
+    setResultText(resultRiskBook, riskLabel(bookRisk));
+    setResultText(resultRiskAmm, riskLabel(ammRisk));
+    setResultText(resultRiskBridge, riskLabel(bridgeRisk));
+    setResultText(resultRiskDepth, depthRisk >= 55 ? "contained" : "low");
+    setBarPercent(resultRiskBookBar, bookRisk);
+    setBarPercent(resultRiskAmmBar, ammRisk);
+    setBarPercent(resultRiskBridgeBar, bridgeRisk);
+    setBarPercent(resultRiskDepthBar, depthRisk);
+
+    setResultText(resultSnapshotHeadline, chosenVenue === VENUE_AMM
+      ? "AMM support helps, but the book still anchors the route"
+      : "Book depth is still winning, but not by enough to ignore the tail");
+    setResultText(resultSnapshotBody, selected
+      ? `Selected ${selected.title} wins by balancing output, impact, and fallback safety in this snapshot.`
+      : "Unavailable in this snapshot.");
+    setSnapshotListItems(resultSnapshotBullets, [
+      `Selected route: ${selected?.title || "Unavailable in this snapshot."}`,
+      `Bottleneck focus: ${selected?.bottleneck || "Unavailable in this snapshot."}`,
+      bridgeShare > 15 ? "Bridge tail remains bounded but should stay secondary." : "Bridge tail stays bounded and non-dominant.",
+    ]);
+
+    setResultText(resultPathHeadline, "The selected route wins on balanced execution, not on a single best leg");
+    setResultText(
+      resultWhyLine,
+      selected
+        ? `${selected.reason} It remains robust against thin-tail fallback pressure.`
+        : "Unavailable in this snapshot."
+    );
+    setSnapshotListItems(resultPathBullets, [
+      "Book-led front leg keeps early impact steps tighter.",
+      lastAmmAvailable ? "AMM support reduces over-reliance on one orderbook pocket." : "AMM assist is currently unavailable, so book resilience dominates.",
+      bridgeShare > 15 ? "Bridge is kept as fallback tail, not primary dependency." : "Bridge participation remains bounded as a tail option.",
+    ]);
+
+    if (resultRouteConfidenceCard) {
+      resultRouteConfidenceCard.hidden = !Number.isFinite(selectedConfidence);
+    }
+    if (Number.isFinite(selectedConfidence)) {
+      setResultText(resultRouteConfidenceScore, `${Math.round(selectedConfidence)} / 100`);
+      setBarPercent(resultRouteConfidenceBar, selectedConfidence);
+      setResultText(
+        resultRouteConfidenceSummary,
+        `fallback: ${bridgeShare > 22 ? "usable" : "stable"} · tail risk: ${bridgeShare > 20 ? "moderate" : "contained"} · failure mode: bridge dominance if top book disappears`
+      );
+    }
+
+    setResultText(resultUsedVenueSummary, selected?.reason || t("common.not_available"));
+    updateRoutePathVisual({
+      chosenVenue,
+      hasAmm: lastAmmAvailable,
+      fallbackConfidence: candidates[2]?.confidencePct ?? 39,
+    });
+  };
+
+  const buildSnapshotPath = (values) => {
+    if (!Array.isArray(values) || values.length === 0) {
+      return "M8 56 L296 56";
+    }
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min;
+    const startX = 8;
+    const endX = 296;
+    const yTop = 16;
+    const yBottom = 66;
+    const step = values.length > 1 ? (endX - startX) / (values.length - 1) : 0;
+    return values
+      .map((value, index) => {
+        const ratio = span > 0 ? (value - min) / span : 0.5;
+        const x = startX + (step * index);
+        const y = yBottom - ((yBottom - yTop) * ratio);
+        return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+      })
+      .join(" ");
+  };
+
+  const setSnapshotListItems = (target, items) => {
+    if (!target) {
+      return;
+    }
+    const safeItems = Array.isArray(items) && items.length ? items : ["Waiting for estimate."];
+    while (target.firstChild) {
+      target.removeChild(target.firstChild);
+    }
+    safeItems.forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      target.appendChild(li);
+    });
+  };
+
+  const renderSnapshotSeries = () => {
+    const outputValues = snapshotHistory.map((item) => item.outputXrp);
+    const impactValues = snapshotHistory.map((item) => item.impactScore);
+    const contextValues = snapshotHistory.map((item) => item.contextScore);
+    if (snapshotStripOutput) {
+      snapshotStripOutput.setAttribute("d", buildSnapshotPath(outputValues));
+    }
+    if (snapshotStripImpact) {
+      snapshotStripImpact.setAttribute("d", buildSnapshotPath(impactValues));
+    }
+    if (snapshotStripContext) {
+      snapshotStripContext.setAttribute("d", buildSnapshotPath(contextValues));
+    }
+  };
+
+  const updateSnapshotPanel = ({ simulation, chosenVenue, slippagePct, routeCandidates, cacheStatus }) => {
+    const selected = routeCandidates?.[0] || null;
+    const previous = snapshotHistory.length > 0 ? snapshotHistory[snapshotHistory.length - 1] : null;
+    const outputXrp = Number.isFinite(simulation?.receiveXrp) ? simulation.receiveXrp : 0;
+    const fillRatePct = Number.isFinite(simulation?.fillRatePct) ? simulation.fillRatePct : 0;
+    const impactScore = Number.isFinite(slippagePct) ? slippagePct : Math.max(0, 100 - fillRatePct);
+    const contextScore = Number.isFinite(selected?.confidencePct)
+      ? selected.confidencePct
+      : (chosenVenue === VENUE_AMM ? 52 : 64);
+    const outputDeltaPct = previous && previous.outputXrp > 0
+      ? ((outputXrp - previous.outputXrp) / previous.outputXrp) * 100
+      : null;
+
+    snapshotHistory.push({
+      outputXrp,
+      impactScore,
+      contextScore,
+      outputDeltaPct,
+      venue: chosenVenue,
+      cacheStatus: cacheStatus || "live",
+      isPartial: fillRatePct > 0 && fillRatePct < 100,
+      timestamp: Date.now(),
+    });
+    if (snapshotHistory.length > SNAPSHOT_HISTORY_LIMIT) {
+      snapshotHistory.splice(0, snapshotHistory.length - SNAPSHOT_HISTORY_LIMIT);
+    }
+
+    renderSnapshotSeries();
+
+    if (snapshotOutputNote) {
+      snapshotOutputNote.textContent = outputDeltaPct === null
+        ? `First bounded point from ${chosenVenue}.`
+        : `Output ${outputDeltaPct >= 0 ? "up" : "down"} ${formatPercent(Math.abs(outputDeltaPct))} vs previous.`;
+    }
+    if (snapshotImpactNote) {
+      const impactText = Number.isFinite(slippagePct) ? formatPercent(slippagePct) : "n/a";
+      snapshotImpactNote.textContent = `Impact trend tracks slippage ${impactText}.`;
+    }
+    if (snapshotContextNote) {
+      snapshotContextNote.textContent = `Bridge share proxy ${selected ? formatPercent(Math.max(8, 100 - selected.confidencePct * 0.7)) : "n/a"} on ${chosenVenue}.`;
+    }
+
+    const latest = snapshotHistory[snapshotHistory.length - 1];
+    setSnapshotListItems(snapshotNoteCurrent, [
+      `Selected route: ${selected?.title || "unavailable"}.`,
+      `Fill ${formatPercent(fillRatePct)} / slippage ${Number.isFinite(slippagePct) ? formatPercent(slippagePct) : "n/a"}.`,
+      `Snapshot state ${latest.cacheStatus}${latest.isPartial ? " · partial" : ""}.`,
+    ]);
+
+    if (snapshotHistory.length < 2) {
+      setSnapshotListItems(snapshotNoteDelta, [
+        "Need one more estimate to show previous delta.",
+        "Snapshot remains bounded and decision-support only.",
+      ]);
+      return;
+    }
+
+    const prev = snapshotHistory[snapshotHistory.length - 2];
+    const confidenceDelta = latest.contextScore - prev.contextScore;
+    const impactDelta = latest.impactScore - prev.impactScore;
+    setSnapshotListItems(snapshotNoteDelta, [
+      `Output delta ${latest.outputDeltaPct === null ? "n/a" : `${latest.outputDeltaPct >= 0 ? "+" : ""}${formatPercent(latest.outputDeltaPct)}`}.`,
+      `Confidence ${confidenceDelta >= 0 ? "improved" : "softened"} by ${formatPercent(Math.abs(confidenceDelta))}.`,
+      `Impact score ${impactDelta >= 0 ? "widened" : "tightened"} by ${formatPercent(Math.abs(impactDelta))}.`,
+    ]);
+  };
+
+  const updateResultsSummary = ({
+    simulation,
+    bestPrice,
+    offersCount,
+    venue = VENUE_CLOB,
+    slippagePct = null,
+  }) => {
+    const isAmm = venue === VENUE_AMM;
+    const hasLiquidity = simulation.filledToken > 0;
+    const isFullFill = hasLiquidity && simulation.filledToken >= simulation.requestedToken;
+    const isPartialFill =
+      hasLiquidity && simulation.filledToken < simulation.requestedToken;
+    const filledLine = t("results.sellability.filled_line", {
+      filled: formatNumber(simulation.filledToken),
+      requested: formatNumber(simulation.requestedToken),
+      pct: formatPercent(simulation.fillRatePct),
+    });
+
+    if (isAmm) {
+      if (!hasLiquidity) {
+        setResultText(resultSellability, t("results.sellability.none"));
+      } else if (isPartialFill) {
+        setResultText(resultSellability, t("results.sellability.partial"));
+      } else {
+        setResultText(resultSellability, t("results.sellability.full"));
+      }
+    } else if (offersCount === 0) {
+      setResultText(resultSellability, t("results.sellability.empty"));
+    } else if (!hasLiquidity) {
+      setResultText(resultSellability, t("results.sellability.none"));
+    } else if (isPartialFill) {
+      setResultText(resultSellability, t("results.sellability.partial"));
+    } else {
+      setResultText(resultSellability, t("results.sellability.full"));
+    }
+
+    setResultText(resultFilledLine, filledLine);
+
+    if (resultWarning) {
+      if (isPartialFill) {
+        resultWarning.textContent = t("results.warnings.partial", {
+          pct: formatPercent(simulation.fillRatePct),
+        });
+        resultWarning.hidden = false;
+      } else if (!hasLiquidity || (!isAmm && offersCount === 0)) {
+        resultWarning.textContent = t("results.warnings.none");
+        resultWarning.hidden = false;
+      } else {
+        resultWarning.hidden = true;
+        resultWarning.textContent = "";
+      }
+    }
+
+    const formattedXrp = formatNumber(simulation.receiveXrp, {
+      maximumFractionDigits: 6,
+    });
+    setResultText(
+      resultReceive,
+      t("results.receive.with_fiat", {
+        amount: formattedXrp,
+        fiat: t("results.receive.fiat_loading"),
+      })
+    );
+    setResultText(resultFiatRate, t("results.receive.fiat_pending"));
+    setFiatWarning(null);
+
+    const resolvedSlippage =
+      slippagePct ??
+      (isFullFill && bestPrice > 0 && simulation.effectivePrice > 0
+        ? Math.max(0, ((bestPrice - simulation.effectivePrice) / bestPrice) * 100)
+        : null);
+    if (resolvedSlippage === null || resolvedSlippage === undefined) {
+      setResultText(resultSlippage, t("common.not_available"));
+    } else {
+      setResultText(resultSlippage, formatPercent(resolvedSlippage));
+      if (resultWarning && resolvedSlippage >= 10) {
+        resultWarning.textContent = t("results.warnings.high_slippage");
+        resultWarning.hidden = false;
+      }
+    }
+
+    setResultText(resultSlippageHelp, t("results.slippage.help"));
+    setResultText(
+      resultWhyLine,
+      isAmm
+        ? t("results.why_line_amm")
+        : t("results.why_line", { count: simulation.topConsumedOffersCount })
+    );
+  };
+
+  const updateExecutionDetails = ({
+    offers,
+    bestPrice,
+    worstPrice,
+    attemptedEndpoints,
+  }) => {
+    const orderCount = Array.isArray(offers) ? offers.length : null;
+    if (Number.isFinite(orderCount)) {
+      setResultText(resultOrderCount, formatNumber(orderCount));
+    } else {
+      setResultText(
+        resultOrderCount,
+        getTranslationOrFallback("common.placeholder", "…")
+      );
+    }
+
+    if (orderCount > 0 && Number.isFinite(bestPrice) && bestPrice > 0) {
+      setResultText(
+        resultBestPrice,
+        formatNumber(bestPrice, { maximumFractionDigits: 8 })
+      );
+    } else {
+      setResultText(resultBestPrice, t("common.not_available"));
+    }
+
+    if (orderCount > 0 && Number.isFinite(worstPrice) && worstPrice > 0) {
+      setResultText(
+        resultWorstPrice,
+        formatNumber(worstPrice, { maximumFractionDigits: 8 })
+      );
+    } else {
+      setResultText(resultWorstPrice, t("common.not_available"));
+    }
+
+    if (Array.isArray(attemptedEndpoints) && attemptedEndpoints.length > 0) {
+      const endpointTrail = attemptedEndpoints
+        .map((endpoint, index) => {
+          const attemptSuffix =
+            attemptedEndpoints.length > 1 ? ` #${index + 1}` : "";
+          return `${t(endpoint.labelKey)}${attemptSuffix} (${endpoint.url})`;
+        })
+        .join(" → ");
+      setResultTextMany(resultEndpointDetails, endpointTrail);
+    } else {
+      setResultText(
+        resultEndpointDetails,
+        getTranslationOrFallback("common.placeholder", "…")
+      );
+    }
+  };
+
+  const simulationHasPartialFill = (simulation) =>
+    Boolean(
+      simulation &&
+      Number.isFinite(simulation.filledToken) &&
+      Number.isFinite(simulation.requestedToken) &&
+      simulation.filledToken > 0 &&
+      simulation.filledToken < simulation.requestedToken
+    );
+
+  const setUsedVenue = (venue) => {
+    const placeholder = getTranslationOrFallback("common.placeholder", "…");
+    const value = venue || placeholder;
+    setResultText(resultUsedVenueSummary, value);
+    setResultText(resultUsedVenueDetails, value);
+    setResultText(resultUsedVenueNote, "");
+  };
+
+
+  const setBarPercent = (element, pct) => {
+    if (!element) return;
+    const clamped = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
+    element.style.setProperty("--w", `${clamped}%`);
+  };
+
+  const updatePairShell = () => {
+    const rawCurrency = currencyInput?.dataset?.currencyRaw || currencyInput?.value || ""; const normalizedCurrency = normalizeCurrencyInput(rawCurrency); const currency = formatCurrencyForDisplay(normalizedCurrency.currencyInput || rawCurrency) || "…";
+    const side = sideSelect?.value === "buy" ? "Buy" : "Sell";
+    setResultText(resultPairLabel, `XRP → ${currency}`);
+    const issuer = (issuerInput?.value || "").trim();
+    setResultText(resultPairMeta, issuer ? `${side} side · issuer ${issuer.slice(0, 8)}…` : `${side} side · issuer required for non-XRP`);
+    setResultText(routeTargetLabel, currency);
+  };
+
+  const updateExplainModeState = (mode = "explain") => {
+    modeButtons.forEach((button) => {
+      const active = button.dataset.mode === mode;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    document.body.classList.toggle("is-quick", mode === "quick");
+    document.body.classList.toggle("is-explain", mode !== "quick");
+  };
+
+  const updateLiquidityBreakdown = ({
+    thresholdPct = getImpactThresholdPct(),
+    currency = lastCurrency,
+  } = {}) => {
+    if (!resultLiquiditySplit || !resultAmmReserves || !resultAmmFee) {
+      return;
+    }
+
+    updateLiquiditySplitLabel(thresholdPct);
+
+    if (!lastShouldFetchAmm) {
+      setResultText(resultLiquiditySplit, t("details.liquidity_split_not_applicable"));
+      setResultText(resultAmmReserves, t("details.amm_not_applicable"));
+      setResultText(resultAmmFee, t("details.amm_not_applicable"));
+      setResultText(resultMixBook, "Book 0%");
+      setResultText(resultMixAmm, "AMM 0%");
+      setResultText(resultMixBridge, "Bridge 0%");
+      setResultText(resultRiskBook, t("common.not_available"));
+      setResultText(resultRiskBridge, t("common.not_available"));
+      setBarPercent(resultMixBookSegment, 0);
+      setBarPercent(resultMixAmmSegment, 0);
+      setBarPercent(resultMixBridgeSegment, 0);
+      setBarPercent(resultRiskBookBar, 0);
+      setBarPercent(resultRiskBridgeBar, 0);
+      return;
+    }
+
+    const clobMax =
+      lastMaxSellResult?.status === "available" ? lastMaxSellResult.maxSellAmount : 0;
+    const ammMax = Number.isFinite(lastAmmMaxSell) ? lastAmmMaxSell : 0;
+    const total = clobMax + ammMax;
+
+    if (!Number.isFinite(total) || total <= 0) {
+      setResultText(resultLiquiditySplit, t("common.not_available"));
+    } else {
+      const clobSharePct = (clobMax / total) * 100;
+      const ammSharePct = 100 - clobSharePct;
+      const splitKey = lastAmmAvailable
+        ? "details.liquidity_split_value"
+        : "details.liquidity_split_value_no_amm";
+      setResultText(
+        resultLiquiditySplit,
+        t(splitKey, {
+          clob: formatPercent(clobSharePct, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 1,
+          }),
+          amm: formatPercent(ammSharePct, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 1,
+          }),
+        })
+      );
+      setResultText(resultMixBook, `Book ${formatPercent(clobSharePct, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+      setResultText(resultMixAmm, `AMM ${formatPercent(ammSharePct, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+      setResultText(resultMixBridge, "Bridge 0%");
+      setBarPercent(resultMixBookSegment, clobSharePct);
+      setBarPercent(resultMixAmmSegment, ammSharePct);
+      setBarPercent(resultMixBridgeSegment, 0);
+      const bookRisk = Math.min(100, Math.max(0, 30 + (simulationHasPartialFill(lastDisplaySimulation) ? 25 : 0) + (100 - clobSharePct) * 0.25));
+      const bridgeRisk = Math.min(100, Math.max(0, ammSharePct * 0.9));
+      setResultText(resultRiskBook, bookRisk >= 70 ? "high" : bookRisk >= 45 ? "medium" : "low");
+      setResultText(resultRiskBridge, bridgeRisk >= 70 ? "high" : bridgeRisk >= 45 ? "watch" : "low");
+      setBarPercent(resultRiskBookBar, bookRisk);
+      setBarPercent(resultRiskBridgeBar, bridgeRisk);
+    }
+
+    if (!lastAmmAvailable || !lastAmmReserves) {
+      setResultText(resultAmmReserves, t("details.amm_not_found"));
+      setResultText(resultAmmFee, t("details.amm_not_found"));
+      return;
+    }
+
+    const tokenAmount = formatNumber(lastAmmReserves.tokenReserve, {
+      maximumFractionDigits: 6,
+    });
+    const xrpAmount = formatNumber(lastAmmReserves.xrpReserve, {
+      maximumFractionDigits: 6,
+    });
+    setResultText(
+      resultAmmReserves,
+      t("details.amm_reserves_value", {
+        token: tokenAmount,
+        currency,
+        xrp: xrpAmount,
+      })
+    );
+    const feePct = Number.isFinite(lastAmmReserves.feePct) ? lastAmmReserves.feePct : 0;
+    setResultText(
+      resultAmmFee,
+      formatPercent(feePct * 100, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+    );
+  };
+
+  function setChartNote(element, message) {
+    if (!element) {
+      return;
+    }
+    element.textContent = message || "";
+    element.hidden = !message;
+  }
+
+  function renderCharts({
+    offers,
+    simulation,
+    maxSellResult,
+    currency,
+    venue = VENUE_CLOB,
+    ammReserves = null,
+  }) {
+    if (!impactChart || !depthChart) {
+      return;
+    }
+
+    const isAmm = venue === VENUE_AMM;
+
+    if ((!simulation || (!isAmm && (!offers || offers.length === 0))) || (isAmm && !ammReserves)) {
+      renderImpactChart({ svg: impactChart, samples: [] });
+      renderDepthChart({ svg: depthChart, depthSeries: { points: [] } });
+      setChartNote(impactChartNote, null);
+      setChartNote(depthChartNote, null);
+      setResultTextMany(impactChartSummary, t("graphs.impact.summary_empty"));
+      setResultTextMany(depthChartSummary, t("graphs.depth.summary_empty"));
+      return;
+    }
+
+    const fiat = fiatCurrencySelect?.value || DEFAULT_FIAT;
+    const rate = lastFiatRate?.rate ?? null;
+    const hasFiat = Number.isFinite(rate);
+    const isPartial =
+      !isAmm && simulation.filledToken < simulation.requestedToken;
+    const receiveLabel = hasFiat
+      ? formatFiatAmount(simulation.receiveXrp * rate, fiat)
+      : t("graphs.impact.receive_xrp", {
+          amount: formatNumber(simulation.receiveXrp, { maximumFractionDigits: 6 }),
+        });
+
+    const thresholdPct = getImpactThresholdPct();
+    let samples = [];
+    let totalLiquidity = 0;
+    if (isAmm) {
+      const sampleCount = 24;
+      const chartSellAmount = Math.max(
+        simulation.requestedToken,
+        maxSellResult?.maxSellAmount ?? 0
+      );
+      const sampleCacheKey = getAmmCacheKey({
+        reserves: ammReserves,
+        sellAmount: chartSellAmount,
+        sampleCount,
+      });
+      let cachedSample = ammSampleCache.get(sampleCacheKey);
+      if (!cachedSample) {
+        cachedSample = buildAmmImpactSamples({
+          reserves: ammReserves,
+          sellAmount: chartSellAmount,
+          sampleCount,
+        });
+        ammSampleCache.set(sampleCacheKey, cachedSample);
+      }
+      ({ samples, totalLiquidity } = cachedSample);
+    } else {
+      const offersHash = lastOffersHash || getOffersHash(offers);
+      const sampleCacheKey = `${offersHash}:${fiat}:${thresholdPct}:${simulation.requestedToken}`;
+      let cachedSample = impactSampleCache.get(sampleCacheKey);
+      if (!cachedSample) {
+        cachedSample = buildImpactSamples({
+          offers,
+          sellAmount: simulation.requestedToken,
+          sampleCount: 24,
+        });
+        impactSampleCache.set(sampleCacheKey, cachedSample);
+      }
+      ({ samples, totalLiquidity } = cachedSample);
+    }
+    if (samples.length === 0 || totalLiquidity <= 0) {
+      renderImpactChart({ svg: impactChart, samples: [] });
+      setChartNote(impactChartNote, t("graphs.impact.note_no_liquidity"));
+      setResultTextMany(impactChartSummary, t("graphs.impact.summary_empty"));
+    }
+    const currentSellAmount = isPartial ? simulation.filledToken : simulation.requestedToken;
+    const currentReceiveValue = simulation.receiveXrp * (hasFiat ? rate : 1);
+    const maxPoint =
+      maxSellResult?.status === "available"
+        ? {
+            sellAmount: maxSellResult.maxSellAmount,
+            receiveValue: maxSellResult.simulation.receiveXrp * (hasFiat ? rate : 1),
+          }
+        : null;
+
+    if (samples.length > 0 && totalLiquidity > 0) {
+      renderImpactChart({
+        svg: impactChart,
+        samples,
+        currentPoint: {
+          sellAmount: currentSellAmount,
+          receiveValue: currentReceiveValue,
+        },
+        maxPoint,
+        isPartial,
+        fiatRate: lastFiatRate,
+        fiat,
+        thresholdPct,
+      });
+
+      if (simulation.filledToken <= 0 || isPartial) {
+        setChartNote(
+          impactChartNote,
+          !hasFiat
+            ? t("graphs.impact.note_insufficient_fiat_unavailable")
+            : t("graphs.impact.note_insufficient")
+        );
+      } else if (!hasFiat) {
+        setChartNote(impactChartNote, t("graphs.impact.note_fiat_unavailable"));
+      } else {
+        setChartNote(impactChartNote, null);
+      }
+
+      if (isPartial) {
+        setResultText(
+          impactChartSummary,
+          t("graphs.impact.summary_partial", {
+            filled: formatNumber(simulation.filledToken, { maximumFractionDigits: 6 }),
+            requested: formatNumber(simulation.requestedToken, {
+              maximumFractionDigits: 6,
+            }),
+            currency,
+            receive: receiveLabel,
+          })
+        );
+      } else {
+        setResultText(
+          impactChartSummary,
+          t("graphs.impact.summary", {
+            sell: formatNumber(simulation.requestedToken, { maximumFractionDigits: 6 }),
+            currency,
+            receive: receiveLabel,
+          })
+        );
+      }
+    }
+
+    const depthSeries = isAmm
+      ? buildAmmDepthSeries({
+          reserves: ammReserves,
+          sellAmount: Math.max(
+            simulation.requestedToken,
+            maxSellResult?.maxSellAmount ?? 0
+          ),
+          sampleCount: 24,
+        })
+      : buildDepthSeries({ offers });
+    const consumedSeries = isAmm
+      ? buildAmmDepthSeries({
+          reserves: ammReserves,
+          sellAmount: simulation.requestedToken,
+          sampleCount: 24,
+        })
+      : buildConsumedDepth({
+          offers,
+          sellAmount: simulation.requestedToken,
+        });
+
+    if (!depthSeries.hasLiquidity) {
+      renderDepthChart({ svg: depthChart, depthSeries: { points: [] } });
+      setChartNote(depthChartNote, t("graphs.depth.note_no_liquidity"));
+      setResultTextMany(depthChartSummary, t("graphs.depth.summary_empty"));
+      return;
+    }
+
+    renderDepthChart({
+      svg: depthChart,
+      depthSeries,
+      consumedSeries,
+      isPartial,
+    });
+
+    if (isPartial) {
+      setChartNote(
+        depthChartNote,
+        !hasFiat
+          ? t("graphs.depth.note_exhausted_fiat_unavailable")
+          : t("graphs.depth.note_exhausted")
+      );
+    } else if (!hasFiat) {
+      setChartNote(depthChartNote, t("graphs.depth.note_fiat_unavailable"));
+    } else {
+      setChartNote(depthChartNote, null);
+    }
+
+    const totalReceiveLabel = t("graphs.depth.receive_xrp", {
+      amount: formatNumber(depthSeries.totalXrp, { maximumFractionDigits: 6 }),
+    });
+    if (isPartial) {
+      setResultText(
+        depthChartSummary,
+        t("graphs.depth.summary_partial", {
+          filled: formatNumber(simulation.filledToken, { maximumFractionDigits: 6 }),
+          requested: formatNumber(simulation.requestedToken, { maximumFractionDigits: 6 }),
+          currency,
+          receive: receiveLabel,
+        })
+      );
+    } else {
+      setResultText(
+        depthChartSummary,
+        t("graphs.depth.summary", {
+          total: formatNumber(depthSeries.totalToken, { maximumFractionDigits: 6 }),
+          currency,
+          receive: totalReceiveLabel,
+          filled: formatNumber(simulation.filledToken, { maximumFractionDigits: 6 }),
+        })
+      );
+    }
+  }
+
+  const scheduleChartsUpdate = (payload, { immediate = false } = {}) => {
+    pendingChartPayload = payload;
+    if (immediate) {
+      if (chartUpdateTimer) {
+        clearTimeout(chartUpdateTimer);
+        chartUpdateTimer = null;
+      }
+      renderCharts(payload);
+      return;
+    }
+    if (chartUpdateTimer) {
+      return;
+    }
+    chartUpdateTimer = setTimeout(() => {
+      chartUpdateTimer = null;
+      renderCharts(pendingChartPayload);
+    }, 120);
+  };
+
+  const validateInputs = ({ currencyResult, issuer, amount, limit }) => {
+    const errors = {};
+
+    const currency = currencyResult?.currencyNormalized || "";
+    const currencyError = getCurrencyErrorMessage(currencyResult);
+    if (currencyError) {
+      errors.currency = currencyError;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      errors.amount = t("errors.amount_required");
+    }
+
+    if (!errors.currency && currency !== "XRP") {
+      if (!issuer) {
+        errors.issuer = t("errors.issuer_required");
+      } else {
+        const issuerLooksValid = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(issuer);
+        if (!issuerLooksValid) {
+          errors.issuer = t("errors.issuer_invalid");
+        }
+      }
+    }
+
+    let normalizedLimit = limit;
+    let limitWasAutofixed = false;
+
+    if (limit !== null && limit !== undefined && limit !== "") {
+      if (!Number.isFinite(limit) || limit <= 0) {
+        errors.limit = t("errors.limit_invalid");
+        normalizedLimit = DEFAULT_LIMIT;
+        limitWasAutofixed = true;
+      }
+    } else {
+      normalizedLimit = DEFAULT_LIMIT;
+    }
+
+    return {
+      errors,
+      normalizedLimit,
+      limitWasAutofixed,
+    };
+  };
+
+  const bindFieldClear = (input, key) => {
+    if (!input) {
+      return;
+    }
+    input.addEventListener("input", () => {
+      setFieldError(key, null);
+      if (key === "currency" && input.dataset) {
+        delete input.dataset.currencyRaw;
+      }
+      if (key === "limit") {
+        setLimitNote(null);
+      }
+    });
+  };
+
+  bindFieldClear(currencyInput, "currency");
+  bindFieldClear(issuerInput, "issuer");
+  bindFieldClear(amountInput, "amount");
+  bindFieldClear(limitInput, "limit");
+  currencyInput?.addEventListener("input", updatePairShell);
+  issuerInput?.addEventListener("input", updatePairShell);
+  sideSelect?.addEventListener("change", updatePairShell);
+  modeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      updateExplainModeState(button.dataset.mode || "explain");
+    });
+  });
+  updatePairShell();
+  updateExplainModeState("explain");
+  updateMaxSellLabel(getImpactThresholdPct());
+  updateImpactThresholdHelp(getImpactThresholdPct());
+  updateLiquiditySplitLabel(getImpactThresholdPct());
+
+  const initFiatSelection = () => {
+    if (!fiatCurrencySelect) {
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(FIAT_STORAGE_KEY);
+      const preferred = stored || DEFAULT_FIAT;
+      if (preferred) {
+        fiatCurrencySelect.value = preferred;
+      }
+    } catch (error) {
+      fiatCurrencySelect.value = DEFAULT_FIAT;
+    }
+  };
+
+  initFiatSelection();
+  applyShareParamsFromUrl();
+  if (currencyInput && !currencyInput.value) {
+    currencyInput.value = "";
+  }
+  if (issuerInput && !issuerInput.value) {
+    issuerInput.value = "";
+  }
+
+  const resetInputs = () => {
+    if (tokenSuggestionInput) {
+      tokenSuggestionInput.value = "";
+    }
+    if (currencyInput) {
+      currencyInput.value = "";
+      if (currencyInput.dataset) delete currencyInput.dataset.currencyRaw;
+    }
+    if (issuerInput) {
+      issuerInput.value = "";
+    }
+    if (amountInput) {
+      amountInput.value = "";
+    }
+    if (limitInput) {
+      limitInput.value = String(DEFAULT_LIMIT);
+    }
+    if (impactThresholdSelect) {
+      impactThresholdSelect.value = "5";
+    }
+    if (thinCutoffInput) {
+      thinCutoffInput.value = String(DEFAULT_THIN_CUTOFF_PERCENT);
+    }
+    if (fiatCurrencySelect) {
+      fiatCurrencySelect.value = DEFAULT_FIAT;
+      try {
+        localStorage.setItem(FIAT_STORAGE_KEY, DEFAULT_FIAT);
+      } catch (error) {
+        // Ignore storage failures.
+      }
+    }
+    clearFieldErrors();
+    setLimitNote(null);
+    setError(null);
+    setEndpointNotice(null);
+    setShareLoadNote(false);
+    showShareToast(null);
+    setExampleStatus("");
+    resetResults();
+    updatePairShell();
+    setStatus("status.waiting");
+    clearShareParams();
+  };
+
+  resetButton?.addEventListener("click", () => {
+    resetInputs();
+  });
+
+  const handleShareInputChange = () => {
+    setShareLoadNote(false);
+    scheduleShareUrlUpdate();
+  };
+
+  const initTokenSuggestions = async () => {
+    // --- Suggest dropdown CSS injection (no styles.css changes) ---
+    (function ensureSuggestStyle(){
+      if (document.getElementById("xsic-suggest-style")) return;
+      const st = document.createElement("style");
+      st.id = "xsic-suggest-style";
+      st.textContent = `
+        ul#token-suggestions.suggestions, ul#token-suggestion-list.suggestions {
+          position: fixed !important;
+          display: none;
+          max-height: 320px;
+          overflow: auto;
+          background: var(--panel, #fff);
+          border: 1px solid rgba(0,0,0,0.14);
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.14);
+          padding: 6px 0;
+          margin: 0;
+          list-style: none;
+        }
+
+        .token-suggestion-item { margin: 0; padding: 0; }
+
+        .token-suggestion-btn{
+          width: 100%;
+          text-align: left;
+          background: transparent;
+          border: 0;
+          padding: 10px 12px;
+          cursor: pointer;
+          display: block;
+        }
+        .token-suggestion-btn:hover{ background: rgba(0,0,0,0.04); }
+
+        .ts-row{
+          display:flex;
+          align-items:flex-start;
+          justify-content:space-between;
+          gap:12px;
+        }
+
+        .ts-main{ min-width: 0; }
+        .ts-cur{
+          font-weight: 700;
+          font-size: 13px;
+          line-height: 1.2;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+          max-width: 240px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .ts-name{
+          font-size: 12px;
+          opacity: .8;
+          max-width: 260px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          margin-top: 2px;
+        }
+
+        .ts-meta{
+          display:flex;
+          align-items:center;
+          gap:8px;
+          flex-shrink: 0;
+        }
+        .ts-issuer{
+          font-size: 12px;
+          opacity: .75;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+          max-width: 120px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .ts-badge{
+          font-size: 11px;
+          padding: 2px 6px;
+          border: 1px solid rgba(0,0,0,0.12);
+          border-radius: 999px;
+          opacity: .85;
+        }
+      `;
+      document.head.appendChild(st);
+    })();
+
+    const input = document.getElementById("currency-input");
+    const issuer = document.getElementById("issuer-input");
+    const list =
+      document.getElementById("token-suggestions") ||
+      document.getElementById("token-suggestion-list");
+
+    if (!input || !issuer || !list) return;
+
+    // ---------- helpers (no external deps) ----------
+    const esc = (x) =>
+      String(x ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const norm = (x) => String(x || "").trim();
+
+    const shorten = (addr) => {
+      const a = norm(addr);
+      if (!a) return "";
+      if (a.length <= 14) return a;
+      return a.slice(0, 6) + "…" + a.slice(-4);
+    };
+
+    const fmtCompact = (n) => {
+      try {
+        const x = Number(n);
+        if (!Number.isFinite(x)) return "";
+        // ざっくり compact
+        if (x >= 1e9) return (x / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+        if (x >= 1e6) return (x / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+        if (x >= 1e3) return (x / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+        return String(Math.round(x));
+      } catch (_e) {
+        return "";
+      }
+    };
+
+    const isIssuer = (x) => /^r[1-9A-HJ-NP-Za-km-z]{20,}$/.test(norm(x));
+
+    // 160-bit hex currency → ASCII (printable) 変換（表示用）
+    const hexToAscii = (hex40) => {
+      const h = String(hex40 || "");
+      if (!/^[A-Fa-f0-9]{40}$/.test(h)) return "";
+      try {
+        let out = "";
+        for (let i = 0; i < 40; i += 2) {
+          const b = parseInt(h.slice(i, i + 2), 16);
+          if (b === 0x00) continue; // padding
+          if (b < 0x20 || b > 0x7e) return ""; // non-printable
+          out += String.fromCharCode(b);
+        }
+        out = out.trim();
+        // それっぽい通貨コードだけ採用
+        if (!out) return "";
+        if (!/^[A-Za-z0-9._\-]{2,12}$/.test(out)) return "";
+        return out;
+      } catch (_e) {
+        return "";
+      }
+    };
+
+    // ---------- lifecycle ----------
+    const localCleanups = [];
+    let cleaned = false;
+    const runCleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      while (localCleanups.length) {
+        const dispose = localCleanups.pop();
+        try { dispose?.(); } catch (_e) {}
+      }
+    };
+    const addManagedListener = (target, eventName, handler, options) => {
+      if (!target) return;
+      target.addEventListener(eventName, handler, options);
+      localCleanups.push(() => target.removeEventListener(eventName, handler, options));
+    };
+
+    // ---------- dropdown placement ----------
+    try {
+      if (list.parentElement !== document.body) document.body.appendChild(list);
+    } catch (_e) {}
+
+    const place = () => {
+      if (list.getAttribute("data-open") !== "1") {
+        return;
+      }
+      const r = input.getBoundingClientRect();
+      list.style.position = "fixed";
+      list.style.left = Math.max(8, r.left) + "px";
+      list.style.top = (r.bottom + 6) + "px";
+      list.style.width = Math.max(240, r.width) + "px";
+      list.style.zIndex = "2147483647";
+    };
+
+    const createThrottle = (fn, waitMs) => {
+      let last = 0;
+      let timer = null;
+      const throttled = () => {
+        const now = Date.now();
+        const remain = waitMs - (now - last);
+        if (remain <= 0) {
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+          last = now;
+          fn();
+          return;
+        }
+        if (timer) {
+          return;
+        }
+        timer = setTimeout(() => {
+          timer = null;
+          last = Date.now();
+          fn();
+        }, remain);
+      };
+      throttled.cancel = () => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      };
+      return throttled;
+    };
+
+    const throttledPlace = createThrottle(place, 180);
+
+    const open = () => {
+      place();
+      list.style.display = "block";
+      list.setAttribute("data-open", "1");
+      input.setAttribute("aria-expanded", "true");
+    };
+
+    const close = () => {
+      list.style.display = "none";
+      list.removeAttribute("data-open");
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+    };
+
+    addManagedListener(window, "scroll", throttledPlace, true);
+    addManagedListener(window, "resize", throttledPlace, true);
+    localCleanups.push(() => throttledPlace.cancel?.());
+
+    // ---------- load presets ----------
+    let pool = [];
+    try {
+      const r = await fetch(TOKEN_PRESETS_URL, { cache: "no-store" });
+      if (!r.ok) throw new Error("preset fetch failed: " + r.status);
+      pool = await r.json();
+      if (!Array.isArray(pool)) throw new Error("preset json is not array");
+      console.log("[suggest] pool loaded", pool.length);
+    } catch (e) {
+      console.warn("[suggest] failed to load local presets:", e);
+      pool = [];
+    }
+
+    // ---------- match ----------
+    const buildMatches = (q) => {
+      const query = norm(q).toLowerCase();
+      if (query.length < 1) return [];
+
+      const out = [];
+      const seen = new Set();
+
+      for (const t of pool) {
+        if (!t) continue;
+
+        const curRaw = norm(t.currency);
+        const iss = norm(t.issuer);
+        if (!curRaw || !iss) continue;
+        if (curRaw === "???" || curRaw === "XRP") continue;
+        if (!isIssuer(iss)) continue;
+
+        const name = norm(t.name || t.label || "");
+        const curAscii = hexToAscii(curRaw);
+        const curDisp = curAscii || curRaw;
+
+        const hit =
+          curDisp.toLowerCase().startsWith(query) ||
+          (name && name.toLowerCase().includes(query));
+
+        if (!hit) continue;
+
+        const k = (curRaw + ":" + iss).toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+
+        out.push({
+          currency: formatCurrencyForDisplay(curRaw),
+          currencyRaw: curRaw, // keep raw internally; never show hex in UI
+          currencyDisp: curDisp, // 表示用
+          issuer: iss,
+          name,
+          trustlines:
+            typeof t.trustlines === "number" && Number.isFinite(t.trustlines)
+              ? t.trustlines
+              : null,
+        });
+
+        if (out.length >= 30) break;
+      }
+      return out;
+    };
+
+    // ---------- render (NO overflow garbage) ----------
+    const applyListStyle = () => {
+      list.style.maxHeight = "320px";
+      list.style.overflowY = "auto";
+      list.style.background = "var(--panel, #fff)";
+      list.style.border = "1px solid rgba(0,0,0,0.12)";
+      list.style.borderRadius = "10px";
+      list.style.boxShadow = "0 10px 30px rgba(0,0,0,0.12)";
+      list.style.padding = "6px 0";
+      list.style.margin = "0";
+    };
+
+    const render = (items) => {
+      list.innerHTML = "";
+      if (!items.length) {
+        close();
+        return;
+      }
+      applyListStyle();
+
+      items.forEach((t, idx) => {
+        const li = document.createElement("li");
+        li.style.listStyle = "none";
+        li.style.margin = "0";
+        li.style.padding = "0";
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = `token-suggestion-${idx}`;
+        btn.className = "token-suggestion-btn";
+
+        // ボタン自体を100%幅、overflowを完全に隠す
+        btn.style.display = "block";
+        btn.style.width = "100%";
+        btn.style.textAlign = "left";
+        btn.style.border = "0";
+        btn.style.background = "transparent";
+        btn.style.padding = "10px 12px";
+        btn.style.cursor = "pointer";
+
+        // 3カラム：currency / name / issuer(+TL)
+        const tl = t.trustlines ? fmtCompact(t.trustlines) : "";
+        const curRaw = norm(t.currency);
+        const iss = norm(t.issuer);
+        const issuerShort = shorten(iss);
+        const alias = getSuggestionAlias({
+          currency: norm(t.currencyDisp || t.currency || ""),
+          issuer: iss,
+          issuerShort,
+        });
+
+        const name = norm(alias?.name || t.name);
+        const curDisp = norm(alias?.label || t.currencyDisp || t.currency);
+
+        btn.innerHTML = `
+          <div style="display:flex; gap:10px; align-items:center; min-width:0;">
+            <div style="flex: 0 0 40%; min-width:0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color: rgba(0,0,0,0.80); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${esc(curDisp)}
+            </div>
+            <div style="flex: 1 1 auto; min-width:0; font-size:13px; color: rgba(0,0,0,0.90); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${esc(name || "")}
+            </div>
+            <div style="flex: 0 0 34%; min-width:0; display:flex; justify-content:flex-end; gap:8px; align-items:center;">
+              ${tl ? `<span style="font-size:11px; padding:2px 6px; border-radius:999px; background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.75); white-space:nowrap;">TL ${esc(tl)}</span>` : ""}
+              <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color: rgba(0,0,0,0.70); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px;">
+                ${esc(issuerShort)}
+              </span>
+            </div>
+          </div>
+        `;
+
+        btn.addEventListener("mousedown", (e) => e.preventDefault());
+        btn.addEventListener("mouseenter", () => {
+          // hover
+          btn.style.background = "rgba(0,0,0,0.04)";
+        });
+        btn.addEventListener("mouseleave", () => {
+          btn.style.background = "transparent";
+        });
+
+        btn.addEventListener("click", () => {
+          applyTokenSuggestion({
+            currency: curRaw,
+            issuer: iss,
+            label: (alias?.label || curDisp || curRaw),
+            name: (alias?.name || name || ""),
+            trustlines: t.trustlines ?? null,
+          });
+          close();
+          input.focus();
+        });
+
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+
+      open();
+    };
+
+    // keyboard navigation
+    let active = -1;
+
+    const updateActive = (next) => {
+      const items = Array.from(list.querySelectorAll(".token-suggestion-btn"));
+      if (!items.length) return;
+      active = Math.max(0, Math.min(next, items.length - 1));
+      const el = items[active];
+      input.setAttribute("aria-activedescendant", el.id);
+      items.forEach((x, i) => {
+        x.style.outline = i === active ? "2px solid rgba(99,102,241,0.45)" : "none";
+        x.style.outlineOffset = "-2px";
+      });
+      try { el.scrollIntoView({ block: "nearest" }); } catch (_e) {}
+    };
+
+    const run = () => {
+      const q = norm(input.value);
+      if (q.length < 1) { close(); return; }
+      const matches = buildMatches(q);
+      active = matches.length ? 0 : -1;
+      render(matches);
+      if (active >= 0) updateActive(active);
+    };
+
+    addManagedListener(input, "input", run);
+    addManagedListener(input, "focus", run);
+
+    const keydownHandler = (e) => {
+      const isOpen = list.getAttribute("data-open") === "1";
+      const items = list.querySelectorAll(".token-suggestion-btn");
+      if (!isOpen || !items.length) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        updateActive(active + 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        updateActive(active - 1);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const btn = list.querySelector(`#token-suggestion-${active}`);
+        if (btn) btn.click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+      }
+    };
+    addManagedListener(input, "keydown", keydownHandler);
+
+    // outside click closes
+    const outsideClickHandler = (e) => {
+      if (e.target === input) return;
+      if (list.contains(e.target)) return;
+      close();
+    };
+    addManagedListener(document, "mousedown", outsideClickHandler);
+    addManagedListener(window, "pagehide", runCleanup);
+    addManagedListener(window, "beforeunload", runCleanup);
+
+    close();
+  };
+
+  void initTokenSuggestions();
+
+  currencyInput?.addEventListener("input", handleShareInputChange);
+  issuerInput?.addEventListener("input", handleShareInputChange);
+  amountInput?.addEventListener("input", handleShareInputChange);
+  limitInput?.addEventListener("input", handleShareInputChange);
+  thinCutoffInput?.addEventListener("input", handleShareInputChange);
+
+  fiatCurrencySelect?.addEventListener("change", () => {
+    if (fiatCurrencySelect) {
+      try {
+        localStorage.setItem(FIAT_STORAGE_KEY, fiatCurrencySelect.value);
+      } catch (error) {
+        // Ignore storage failures.
+      }
+    }
+    if (!lastReceiveXrp) {
+      return;
+    }
+    setResultText(
+      resultReceive,
+      t("results.receive.with_fiat", {
+        amount: formatNumber(lastReceiveXrp, { maximumFractionDigits: 6 }),
+        fiat: t("results.receive.fiat_loading"),
+      })
+    );
+    setResultText(resultFiatRate, t("results.receive.fiat_pending"));
+    setFiatWarning(null);
+    void refreshFiatEstimate(lastReceiveXrp);
+    if (lastDisplaySimulation) {
+      void updateMaxSellResults({
+        offers: lastSortedOffers,
+        thresholdPct: getImpactThresholdPct(),
+        referencePrice: lastBestPrice,
+        currency: lastCurrency,
+        result: lastDisplayMaxSellResult,
+        venue: lastUsedVenue,
+        ammReserves: lastAmmReserves,
+      });
+    }
+    setShareLoadNote(false);
+    scheduleShareUrlUpdate();
+  });
+
+  impactThresholdSelect?.addEventListener("change", () => {
+    const thresholdPct = getImpactThresholdPct();
+    updateMaxSellLabel(thresholdPct);
+    updateImpactThresholdHelp(thresholdPct);
+    updateLiquiditySplitLabel(thresholdPct);
+    if (!lastSortedOffers || !lastDisplaySimulation) {
+      return;
+    }
+    const result = computeMaxSellUnderThreshold({
+      offers: lastSortedOffers,
+      thresholdPct,
+      referencePrice: lastBestPrice,
+    });
+    lastMaxSellResult = result;
+    let ammMaxSellResult = null;
+    if (lastAmmReserves) {
+      ammMaxSellResult = buildAmmMaxSellResult({
+        reserves: lastAmmReserves,
+        thresholdPct,
+      });
+      lastAmmMaxSellResult = ammMaxSellResult;
+      lastAmmMaxSell =
+        ammMaxSellResult?.status === "available" ? ammMaxSellResult.maxSellAmount : 0;
+    } else {
+      lastAmmMaxSellResult = null;
+      lastAmmMaxSell = 0;
+    }
+    lastDisplayMaxSellResult =
+      lastUsedVenue === VENUE_AMM ? ammMaxSellResult : result;
+    void updateMaxSellResults({
+      offers: lastSortedOffers,
+      thresholdPct,
+      referencePrice: lastBestPrice,
+      currency: lastCurrency,
+      result: lastDisplayMaxSellResult,
+      venue: lastUsedVenue,
+      ammReserves: lastAmmReserves,
+    });
+    scheduleChartsUpdate({
+      offers: lastSortedOffers,
+      simulation: lastDisplaySimulation,
+      maxSellResult: lastDisplayMaxSellResult,
+      currency: lastCurrency,
+      venue: lastUsedVenue,
+      ammReserves: lastAmmReserves,
+    });
+    updateLiquidityBreakdown({ thresholdPct });
+    setShareLoadNote(false);
+    scheduleShareUrlUpdate();
+  });
+
+  tryExampleButton?.addEventListener("click", () => {
+    const runExampleLookup = async () => {
+      if (!tryExampleButton) {
+        return;
+      }
+      tryExampleButton.disabled = true;
+      setError(null);
+      setExampleStatus(null);
+
+      const { candidate, attempts } = await findExampleCandidate();
+      if (!candidate) {
+        const summary = buildExampleAttemptSummary(attempts);
+        updateDebugPanel({
+          responseStatus: "fail",
+          requestPayload: attempts.map((attempt) => ({
+            currency: attempt.candidate.currency,
+            issuer: attempt.candidate.issuer,
+            offersCount: attempt.offersCount ?? null,
+            error: attempt.error ? attempt.error.message : null,
+          })),
+          error: summary || "examples_unavailable",
+          offersCount: null,
+        });
+        const unavailableMessage = t("status.examples_unavailable");
+        setExampleStatus(unavailableMessage);
+        setError(unavailableMessage);
+        return;
+      }
+
+      if (currencyInput) {
+        currencyInput.value = formatCurrencyForDisplay(candidate.currency);
+        currencyInput.dataset.currencyRaw = candidate.currency;
+      }
+      if (issuerInput) {
+        issuerInput.value = candidate.issuer;
+      }
+      if (amountInput) {
+        amountInput.value = "1000";
+      }
+      saveRecentTokenSuggestion({
+        currency: candidate.currency,
+        issuer: candidate.issuer,
+        label: findPresetLabel(candidate),
+      });
+      clearFieldErrors();
+      setError(null);
+      setExampleStatus(t("status.example_selected", { label: buildExampleLabel(candidate) }));
+      setShareLoadNote(false);
+      scheduleShareUrlUpdate({ immediate: true });
+      estimateButton?.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+
+    void runExampleLookup().finally(() => {
+      if (tryExampleButton) {
+        tryExampleButton.disabled = false;
+      }
+    });
+  });
+
+  copyLinkButton?.addEventListener("click", async () => {
+    scheduleShareUrlUpdate({ immediate: true });
+    const success = await copyToClipboard(window.location.href);
+    showShareToast(t(success ? "status.copy_success" : "status.copy_failed"));
+  });
+
+  debugCopyButton?.addEventListener("click", async () => {
+    if (!isDebugEnabled) {
+      return;
+    }
+    const success = await copyToClipboard(buildDebugText());
+    if (debugCopyStatus) {
+      debugCopyStatus.textContent = success ? "Debug copied." : "Failed to copy debug.";
+      debugCopyStatus.hidden = false;
+    }
+  });
+
+  estimateButton?.addEventListener("click", async () => {
+    if (estimateButton?.disabled) {
+      return;
+    }
+    setEstimateButtonBusy(true);
+    const estimateStart = performance.now();
+    const __currencySource = (currencyInput && currencyInput.dataset && currencyInput.dataset.currencyRaw)
+      ? currencyInput.dataset.currencyRaw
+      : (currencyInput?.value ?? "");
+    const currencyResult = normalizeCurrencyInput(__currencySource);
+    const currency = currencyResult.currencyNormalized || "";
+    const issuer = issuerInput?.value?.trim() || "";
+
+    // xrp_not_supported_ui: XRP alone is not a valid target in this tool
+    if (String(currency).trim().toUpperCase() === "XRP" && !String(issuer).trim()) {
+      showApiError({ code: "xrp_not_supported" });
+      setEstimateButtonBusy(false);
+      return;
+    }
+
+    const amountValue = amountInput?.value ? Number(amountInput.value) : 0;
+    const limitValue =
+      limitInput?.value === "" || limitInput?.value === undefined
+        ? ""
+        : Number(limitInput?.value);
+
+    try {
+      setStatus("status.validating");
+      setError(null);
+      setEndpointNotice(null);
+      clearFieldErrors();
+      resetResults();
+      if (debugCopyStatus) {
+        debugCopyStatus.hidden = true;
+      }
+      updateDebugPanel({
+        requestPayload: {
+          currencyInput: currencyResult.currencyInput ?? "",
+          currencyNormalized: currency,
+          currencyKind: currencyResult.kind ?? null,
+          issuer,
+          limit: limitValue,
+        },
+        responseStatus: "validating",
+        endpointUsed: null,
+        upstreamStatus: null,
+        offersCount: null,
+        clobMax: null,
+        ammMax: null,
+        clobSharePct: null,
+        venue: null,
+        venueReason: null,
+        error: null,
+        elapsedMs: null,
+        rawResponse: null,
+        timestamp: new Date().toISOString(),
+      });
+
+      const validateStart = performance.now();
+      const { errors, normalizedLimit, limitWasAutofixed } = validateInputs({
+        currencyResult,
+        issuer,
+        amount: amountValue,
+        limit: limitValue,
+      });
+      const validateMs = performance.now() - validateStart;
+      updateDebugPanel({
+        timings: {
+          validateMs,
+        },
+      });
+
+      Object.entries(errors).forEach(([key, message]) => {
+        if (message) {
+          setFieldError(key, message);
+        }
+      });
+
+      if (limitWasAutofixed) {
+        if (limitInput) {
+          limitInput.value = String(DEFAULT_LIMIT);
+        }
+        setLimitNote(t("notes.limit_autofix", { limit: DEFAULT_LIMIT }));
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setStatus("status.validation_failed");
+        updateDebugPanel({
+          responseStatus: "fail",
+          error: "validation_failed",
+          offersCount: null,
+          elapsedMs: performance.now() - estimateStart,
+        });
+        return;
+      }
+
+      setStatus("status.fetching_clob");
+      const requestTimestamp = Date.now();
+      const requestPayload = {
+        currency,
+        issuer,
+        limit: normalizedLimit,
+      };
+      const shouldFetchAmm = currency !== "XRP" && Boolean(issuer);
+      const clobPromise = fetchBookOffers({
+        currency,
+        issuer,
+        limit: normalizedLimit,
+      });
+      const requestUrl = buildBookOffersUrl(requestPayload);
+      var fetchStart = performance.now();
+      updateDebugPanel({
+        lastRequestTime: formatTime(requestTimestamp),
+        lastRequestUrl: requestUrl,
+        requestPayload: {
+          currencyInput: currencyResult.currencyInput ?? "",
+          currencyNormalized: currency,
+          currencyKind: currencyResult.kind ?? null,
+          issuer,
+          limit: normalizedLimit,
+        },
+        responseStatus: "pending",
+        endpointUsed: null,
+        upstreamStatus: null,
+        error: null,
+        rawResponse: null,
+        offersCount: null,
+      });
+
+      const { offers, endpointIndex, attemptedEndpoints, debugInfo, cacheStatus } =
+        await clobPromise;
+      let ammInfo = null;
+      if (shouldFetchAmm) {
+        setStatus("status.fetching_amm");
+        try {
+          ammInfo = await fetchAmmInfo({ currency, issuer });
+        } catch (error) {
+          ammInfo = { ok: false, error: "fetch_failed", fetchError: error };
+        }
+      }
+
+      currentEndpointIndex = endpointIndex;
+      const endpointLabel = t(ORDERBOOK_API_ENDPOINT.labelKey);
+      lastFetchedAt = Date.now();
+      lastEndpointLabel = endpointLabel;
+      setResultText(
+        resultDataFetched,
+        t("results.freshness.fetched_at", {
+          time: formatTime(lastFetchedAt),
+        })
+      );
+      setResultText(
+        resultEndpoint,
+        t("results.freshness.endpoint", {
+          endpointLabel,
+          cacheStatus: formatCacheStatusLabel(cacheStatus || "live"),
+        })
+      );
+
+      setEndpointNotice(
+        buildEndpointNoticeMessage({
+          endpointLabel,
+          cacheStatus: cacheStatus || "live",
+        })
+      );
+
+      setStatus("status.simulating");
+
+      const sortedOffers = sortOffersByPrice(offers);
+      const bestPrice = sortedOffers.find((offer) => offer.price > 0)?.price ?? 0;
+      const worstPrice =
+        sortedOffers.length > 0
+          ? sortedOffers[sortedOffers.length - 1]?.price ?? 0
+          : 0;
+      const clobSimulation = simulateSellIntoOrderbook({
+        sellAmount: amountValue,
+        offers: sortedOffers,
+      });
+      const thresholdPct = getImpactThresholdPct();
+      const maxSellResult = computeMaxSellUnderThreshold({
+        offers: sortedOffers,
+        thresholdPct,
+        referencePrice: bestPrice,
+      });
+      lastMaxSellResult = maxSellResult;
+      lastShouldFetchAmm = shouldFetchAmm;
+      const ammReserves =
+        shouldFetchAmm && ammInfo?.ok
+          ? parseAmmReserves({ amm: ammInfo?.amm, currency, issuer })
+          : null;
+      lastAmmReserves = ammReserves;
+      lastAmmAvailable = Boolean(ammReserves);
+      const clobMax =
+        maxSellResult?.status === "available" ? maxSellResult.maxSellAmount : 0;
+      const clobSlippagePct = computeClobSlippagePct({
+        simulation: clobSimulation,
+        bestPrice,
+      });
+      const clobCanFill = canClobFillWithinSlippage({
+        simulation: clobSimulation,
+        bestPrice,
+        thresholdPct,
+      });
+      let ammMax = 0;
+      let ammSimulation = null;
+      let ammMaxSellResult = null;
+      if (ammReserves) {
+        ammMaxSellResult = buildAmmMaxSellResult({
+          reserves: ammReserves,
+          thresholdPct,
+        });
+        lastAmmMaxSellResult = ammMaxSellResult;
+        ammMax =
+          ammMaxSellResult?.status === "available" ? ammMaxSellResult.maxSellAmount : 0;
+        lastAmmMaxSell = ammMax;
+        ammSimulation = simulateSellIntoAmm({
+          sellAmount: amountValue,
+          reserves: ammReserves,
+        });
+      } else {
+        lastAmmMaxSell = 0;
+        lastAmmMaxSellResult = null;
+      }
+      const thinCutoffPct = getThinCutoffPct();
+      const decision = decideVenue({
+        clobMax,
+        ammMax,
+        hasAmm: lastAmmAvailable,
+        thinCutoffPct,
+        clobCanFill,
+      });
+      let chosenVenue = decision.venue;
+      let venueReason = decision.reason;
+      let clobSharePct = decision.clobSharePct;
+      let displaySimulation = clobSimulation;
+      let displaySlippagePct = clobSlippagePct;
+      if (chosenVenue === VENUE_AMM) {
+        if (ammSimulation?.ok) {
+          displaySimulation = {
+            filledToken: amountValue,
+            requestedToken: amountValue,
+            fillRate: 1,
+            fillRatePct: 100,
+            receiveXrp: ammSimulation.receivedXrp,
+            effectivePrice: ammSimulation.avgPrice,
+            topConsumedOffersCount: 0,
+          };
+          displaySlippagePct = ammSimulation.slippagePct ?? null;
+        } else {
+          chosenVenue = VENUE_CLOB;
+          venueReason = "AMM calc failed; falling back to CLOB.";
+          displaySimulation = clobSimulation;
+          displaySlippagePct = clobSlippagePct;
+          clobSharePct = lastAmmAvailable ? clobSharePct : 100;
+        }
+      }
+
+      setUsedVenue(chosenVenue);
+      lastUsedVenue = chosenVenue;
+      lastDisplaySimulation = displaySimulation;
+      const displayMaxSellResult =
+        chosenVenue === VENUE_AMM ? ammMaxSellResult : maxSellResult;
+      lastDisplayMaxSellResult = displayMaxSellResult;
+      setStatus("status.rendering");
+      updateResultsSummary({
+        simulation: displaySimulation,
+        bestPrice,
+        offersCount: sortedOffers.length,
+        venue: chosenVenue,
+        slippagePct: displaySlippagePct,
+      });
+      updateExecutionDetails({
+        offers: sortedOffers,
+        bestPrice,
+        worstPrice,
+        attemptedEndpoints,
+      });
+      void refreshFiatEstimate(displaySimulation.receiveXrp);
+      lastSortedOffers = sortedOffers;
+      lastOffersHash = getOffersHash(sortedOffers);
+      lastBestPrice = bestPrice;
+      lastCurrency = currency;
+      lastSimulation = clobSimulation;
+      void updateMaxSellResults({
+        offers: sortedOffers,
+        thresholdPct,
+        referencePrice: bestPrice,
+        currency,
+        result: displayMaxSellResult,
+        venue: chosenVenue,
+        ammReserves: lastAmmReserves,
+      });
+      scheduleChartsUpdate(
+        {
+          offers: sortedOffers,
+          simulation: displaySimulation,
+          maxSellResult: displayMaxSellResult,
+          currency,
+          venue: chosenVenue,
+          ammReserves: lastAmmReserves,
+        },
+        { immediate: true }
+      );
+      updateLiquidityBreakdown({ thresholdPct, currency });
+
+      const routeCandidates = buildRouteCandidates({
+        clobSimulation,
+        ammSimulation,
+        chosenVenue,
+        clobSlippagePct,
+        ammSlippagePct: ammSimulation?.slippagePct ?? null,
+        clobCanFill,
+        hasAmm: lastAmmAvailable,
+        thresholdPct,
+        offersCount: sortedOffers.length,
+        maxSellResult,
+      });
+      updateRouteCandidates({ candidates: routeCandidates, chosenVenue });
+      updateSnapshotPanel({
+        simulation: displaySimulation,
+        chosenVenue,
+        slippagePct: displaySlippagePct,
+        routeCandidates,
+        cacheStatus,
+      });
+
+      updateDebugPanel({
+        responseStatus: "success",
+        endpointUsed: debugInfo?.endpointUsed ?? null,
+        upstreamStatus: debugInfo?.statusCode ?? null,
+        clobMax,
+        ammMax,
+        clobSharePct,
+        venue: chosenVenue,
+        venueReason,
+        error: null,
+        rawResponse: debugInfo?.rawResponse ?? null,
+        offersCount: sortedOffers.length,
+        elapsedMs: performance.now() - fetchStart,
+        timings: {
+          networkMs: debugInfo?.timings?.networkMs ?? null,
+          parseMs: debugInfo?.timings?.parseMs ?? null,
+        },
+      });
+      saveRecentTokenSuggestion({
+        currency,
+        issuer,
+        label: findPresetLabel({ currency, issuer }),
+      });
+      setStatus("status.done");
+    } catch (error) {
+      const errorCode = error?.code || "default";
+      showApiError({
+        code: errorCode,
+        message: error?.message || null,
+      });
+      setError(null);
+      updateDebugPanel({
+        responseStatus: "fail",
+        endpointUsed: error?.debugInfo?.endpointUsed ?? null,
+        upstreamStatus: error?.debugInfo?.statusCode ?? null,
+        clobMax: null,
+        ammMax: null,
+        clobSharePct: null,
+        venue: null,
+        venueReason: null,
+        error: `${errorCode}: ${error?.message || "Request failed"}`,
+        rawResponse: error?.debugInfo?.rawResponse ?? null,
+        offersCount: null,
+        elapsedMs: performance.now() - fetchStart,
+        timings: {
+          networkMs: error?.debugInfo?.timings?.networkMs ?? null,
+          parseMs: error?.debugInfo?.timings?.parseMs ?? null,
+        },
+      });
+      resetResults();
+      setResultText(
+        resultSellability,
+        t("results.sellability.error", { code: errorCode })
+      );
+    } finally {
+      setEstimateButtonBusy(false);
+    }
+  });
+
+    try{
+      const cur = document.getElementById("currency");
+      const iss = document.getElementById("issuer");
+      // suggestions list element: 既存の候補箱を優先。なければ作る
+      let box = document.querySelector(".suggestions");
+      if(!box && cur){
+        box = document.createElement("div");
+        box.className = "suggestions";
+        box.hidden = true;
+        cur.parentNode && cur.parentNode.appendChild(box);
+      }
+      if(cur && iss && box){
+        attachRemoteSuggest({
+          inputEl: cur,
+          listEl: box,
+          onPick: (it) => {
+            cur.value = formatCurrencyForDisplay(it.currency);
+            cur.dataset.currencyRaw = it.currency;
+            iss.value = it.issuer;
+            if (cur && cur.dataset && it.currencyRaw) cur.dataset.currencyRaw = it.currencyRaw;
+            // issuer 変更イベントが必要なら発火
+            try{ iss.dispatchEvent(new Event("input", { bubbles:true })); }catch(_e){}
+            try{ cur.dispatchEvent(new Event("input", { bubbles:true })); }catch(_e){}
+          }
+        });
+      }
+    }catch(_e){}
+
+  /* Keep debug discoverable without relying on legacy tabs. */
+  (function(){
+    function openDebugPane(){
+      var dbg = document.getElementById("debug-panel");
+      if (!dbg) return;
+      dbg.hidden = false;
+      dbg.setAttribute("open","open");
+      try { dbg.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch(_e) {}
+    }
+
+    document.addEventListener("DOMContentLoaded", function(){
+      var de = document.querySelector('[data-debug="error"]');
+      if (!de) return;
+      var obs = new MutationObserver(function(){
+        var txt = (de.textContent || "").trim();
+        if (txt) openDebugPane();
+      });
+      obs.observe(de, {subtree:true, characterData:true, childList:true});
+    });
+  })();
+
+  return true;
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    initSellImpact();
+  });
+} else {
+  initSellImpact();
+}
