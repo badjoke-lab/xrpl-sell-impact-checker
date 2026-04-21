@@ -1,5 +1,4 @@
 const RPC_ENDPOINTS = [
-  // Fallback priority order (first is preferred).
   "https://xrplcluster.com/",
   "https://s1.ripple.com:51234/",
   "https://s2.ripple.com:51234/",
@@ -7,7 +6,6 @@ const RPC_ENDPOINTS = [
 
 const CACHE_TTL_SECONDS = 30;
 
-// --- currency normalize: "SOLO" -> 40hex(ASCII + zero pad) ---
 function isHex40(v) {
   return typeof v === "string" && /^[0-9A-Fa-f]{40}$/.test(v.trim());
 }
@@ -15,7 +13,6 @@ function toHex40FromAscii(code) {
   const raw = String(code || "").trim();
   if (!raw) return "";
   if (isHex40(raw)) return raw.toUpperCase();
-  // XRPL: 3-char codes can stay as 3 chars. 4+ should be 160-bit hex.
   if (/^[A-Za-z0-9]{3}$/.test(raw)) return raw.toUpperCase();
   const bytes = Buffer.from(raw, "utf8");
   const out = Buffer.alloc(20);
@@ -28,21 +25,41 @@ function normalizeCurrencyInput(input) {
   const normalized = toHex40FromAscii(raw);
   return { currencyInput: raw.toUpperCase(), currencyNormalized: normalized };
 }
-
-// --- tiny helpers ---
+function normalizeIssuerInput(input) {
+  return String(input || "").trim();
+}
+function buildPairKey({ currencyNormalized, issuer }) {
+  const currency = String(currencyNormalized || "").trim().toUpperCase();
+  const normalizedIssuer = normalizeIssuerInput(issuer);
+  if (!currency || !normalizedIssuer) return "";
+  return `${currency}|${normalizedIssuer}`;
+}
+function nowIso() {
+  return new Date().toISOString();
+}
+function isoAgeMs(isoString) {
+  if (!isoString) return null;
+  const parsed = Date.parse(isoString);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Date.now() - parsed);
+}
+function buildFreshnessMeta({ observedAt, cacheTtlSeconds = CACHE_TTL_SECONDS, isStale = false, source = "runtime" } = {}) {
+  return {
+    observedAt: observedAt || null,
+    ageMs: isoAgeMs(observedAt),
+    cacheTtlSeconds,
+    source,
+    isStale: Boolean(isStale),
+  };
+}
 function jsonResponse(obj, { status = 200, cacheSeconds = 0 } = {}) {
   const headers = {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
   };
-  if (cacheSeconds > 0) {
-    headers["cache-control"] = `public, max-age=${cacheSeconds}`;
-  } else {
-    headers["cache-control"] = "no-store";
-  }
+  headers["cache-control"] = cacheSeconds > 0 ? `public, max-age=${cacheSeconds}` : "no-store";
   return new Response(JSON.stringify(obj), { status, headers });
 }
-
 async function fetchJsonWithTimeout(url, payload, timeoutMs) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(new Error("timeout")), timeoutMs);
@@ -61,71 +78,39 @@ async function fetchJsonWithTimeout(url, payload, timeoutMs) {
     } catch {
       json = { _invalid_json: true, _raw: text.slice(0, 200) };
     }
-    return {
-      ok: res.ok,
-      status: res.status,
-      elapsedMs: Math.round(performance.now() - start),
-      json,
-    };
+    return { ok: res.ok, status: res.status, elapsedMs: Math.round(performance.now() - start), json };
   } catch (e) {
-    return {
-      ok: false,
-      status: 0,
-      elapsedMs: Math.round(performance.now() - start),
-      error: e?.message || "fetch_failed",
-    };
+    return { ok: false, status: 0, elapsedMs: Math.round(performance.now() - start), error: e?.message || "fetch_failed" };
   } finally {
     clearTimeout(t);
   }
 }
-
-// stagger parallel (happy eyeballs)
 async function hedgedRpcCall(payload, { timeoutMs = 6000, staggerMs = 700 } = {}) {
   const attempts = [];
   let settled = false;
-
-  const controllers = [];
   const runners = RPC_ENDPOINTS.map((endpoint, idx) => {
     const delay = idx * staggerMs;
     return new Promise((resolve) => {
-      const timer = setTimeout(async () => {
+      setTimeout(async () => {
         if (settled) return resolve(null);
         const result = await fetchJsonWithTimeout(endpoint, payload, timeoutMs);
-        attempts.push({
-          endpoint,
-          ok: !!result.ok,
-          status: result.status,
-          elapsedMs: result.elapsedMs,
-          error: result.error || null,
-        });
-        // We accept first network success (HTTP ok) OR first JSON with result/error (even if HTTP 200 w/ rpc error)
+        attempts.push({ endpoint, ok: !!result.ok, status: result.status, elapsedMs: result.elapsedMs, error: result.error || null });
         const hasRpcShape = result?.json && (result.json.result || result.json.error);
         if (!settled && (result.ok || hasRpcShape)) {
           settled = true;
-          // nothing to abort here because each attempt has its own timeout; we just stop accepting later ones
           return resolve({ endpointUsed: endpoint, result });
         }
         return resolve(null);
       }, delay);
-      controllers.push({ timer });
     });
   });
-
   const winner = await Promise.race(runners);
-  if (winner && winner.result) {
-    return { endpointUsed: winner.endpointUsed, result: winner.result, attempts };
-  }
-
-  // If no winner in race (very rare), wait all and pick first ok
+  if (winner && winner.result) return { endpointUsed: winner.endpointUsed, result: winner.result, attempts };
   const all = (await Promise.all(runners)).filter(Boolean);
   const fallback = all.find((x) => x?.result?.ok) || all[0] || null;
-  if (fallback) {
-    return { endpointUsed: fallback.endpointUsed, result: fallback.result, attempts };
-  }
+  if (fallback) return { endpointUsed: fallback.endpointUsed, result: fallback.result, attempts };
   return { endpointUsed: "", result: { ok: false, status: 0, elapsedMs: 0, error: "all_failed", json: null }, attempts };
 }
-
-// Cache API helpers (GET only, keyed by full URL)
 function buildCacheKeyRequest(request) {
   const url = new URL(request.url);
   const sortedParams = [...url.searchParams.entries()].sort(([aKey, aValue], [bKey, bValue]) => {
@@ -136,19 +121,26 @@ function buildCacheKeyRequest(request) {
   url.search = new URLSearchParams(sortedParams).toString();
   return new Request(url.toString(), { method: request.method });
 }
-
 async function cacheGet(request, { markStale = false } = {}) {
   try {
     if (request.method !== "GET") return null;
-    const cache = caches.default;
-    const key = buildCacheKeyRequest(request);
-    const hit = await cache.match(key);
+    const hit = await caches.default.match(buildCacheKeyRequest(request));
     if (!hit) return null;
     if (!markStale) return hit;
     const payload = await hit.json().catch(() => null);
     if (!payload || typeof payload !== "object") return null;
-    const stalePayload = { ...payload, cached: true, isStale: true };
-    return jsonResponse(stalePayload, { status: 200, cacheSeconds: CACHE_TTL_SECONDS });
+    return jsonResponse({
+      ...payload,
+      cached: true,
+      isStale: true,
+      staleReason: payload.staleReason || "upstream_refresh_failed",
+      freshness: buildFreshnessMeta({
+        observedAt: payload.observedAt || payload.freshness?.observedAt || null,
+        cacheTtlSeconds: payload.freshness?.cacheTtlSeconds || CACHE_TTL_SECONDS,
+        isStale: true,
+        source: payload.freshness?.source || "cache-api",
+      }),
+    }, { status: 200, cacheSeconds: CACHE_TTL_SECONDS });
   } catch {
     return null;
   }
@@ -156,16 +148,26 @@ async function cacheGet(request, { markStale = false } = {}) {
 async function cachePut(request, body) {
   try {
     if (request.method !== "GET") return;
-    const cache = caches.default;
-    const key = buildCacheKeyRequest(request);
-    const cachedBody = { ...body, cached: true, isStale: false };
-    const response = jsonResponse(cachedBody, { status: 200, cacheSeconds: CACHE_TTL_SECONDS });
-    await cache.put(key, response);
+    const observedAt = body?.observedAt || nowIso();
+    const cachedBody = {
+      ...body,
+      observedAt,
+      cached: true,
+      isStale: false,
+      freshness: buildFreshnessMeta({ observedAt, cacheTtlSeconds: CACHE_TTL_SECONDS, isStale: false, source: "cache-api" }),
+    };
+    await caches.default.put(
+      buildCacheKeyRequest(request),
+      jsonResponse(cachedBody, { status: 200, cacheSeconds: CACHE_TTL_SECONDS })
+    );
   } catch {}
 }
-
 module.exports = {
   normalizeCurrencyInput,
+  normalizeIssuerInput,
+  buildPairKey,
+  buildFreshnessMeta,
+  nowIso,
   hedgedRpcCall,
   jsonResponse,
   cacheGet,

@@ -1,5 +1,9 @@
 const {
   normalizeCurrencyInput,
+  normalizeIssuerInput,
+  buildPairKey,
+  buildFreshnessMeta,
+  nowIso,
   hedgedRpcCall,
   jsonResponse,
   cacheGet,
@@ -10,7 +14,6 @@ const {
 function parseAmmReserves(amm) {
   if (!amm) return null;
 
-  // amm_info: amm has asset/asset2 and amount/amount2 (one is XRP drops, one is token object)
   const asset = amm.asset || null;
   const asset2 = amm.asset2 || null;
   const amount = amm.amount;
@@ -32,11 +35,8 @@ function parseAmmReserves(amm) {
 
   const xrpReserve = xrpDrops ? Number(xrpDrops) / 1_000_000 : null;
   const tokenReserve = tokenObj ? Number(tokenObj.value) : null;
-
-  // trading_fee exists on some responses (integer)
   const feeRaw = amm.trading_fee;
-  const feePct =
-    Number.isFinite(feeRaw) ? Number(feeRaw) / 100000 : null; // best-effort
+  const feePct = Number.isFinite(feeRaw) ? Number(feeRaw) / 100000 : null;
 
   if (!Number.isFinite(xrpReserve) || !Number.isFinite(tokenReserve)) {
     return null;
@@ -55,29 +55,32 @@ exports.onRequestGet = async (context) => {
   const url = new URL(request.url);
 
   const currency = url.searchParams.get("currency") || "";
-  const issuer = url.searchParams.get("issuer") || "";
+  const issuer = normalizeIssuerInput(url.searchParams.get("issuer") || "");
   const normalized = normalizeCurrencyInput(currency);
   const currencyNormalized = normalized.currencyNormalized;
+  const pairKey = buildPairKey({ currencyNormalized, issuer });
 
-
-  // Special-case: This endpoint expects an IOU (currency + issuer) paired with XRP.
-  // "currency=XRP" alone is not a valid query here.
   {
     const u = new URL(context.request.url);
     const cur = (u.searchParams.get("currency") || "").trim();
     const iss = (u.searchParams.get("issuer") || "").trim();
     if ((cur.toUpperCase() === "XRP") && !iss) {
+      const observedAt = nowIso();
       const body = {
         ok: false,
         endpointUsed: "",
         elapsedMs: 0,
         currencyInput: cur,
         currencyNormalized: "XRP",
+        issuer: "",
+        pairKey: "",
         amm: null,
         ammReserves: null,
         error: "xrp_not_supported",
         message: "XRP alone is not a valid AMM query for this tool. Provide an IOU token (currency + issuer).",
         attempts: [],
+        observedAt,
+        freshness: buildFreshnessMeta({ observedAt, source: "runtime", isStale: false }),
         cached: false,
         isStale: false
       };
@@ -93,6 +96,7 @@ exports.onRequestGet = async (context) => {
   }
 
   if (!currencyNormalized || !issuer) {
+    const observedAt = nowIso();
     return jsonResponse(
       {
         ok: false,
@@ -100,10 +104,14 @@ exports.onRequestGet = async (context) => {
         elapsedMs: 0,
         currencyInput: normalized.currencyInput,
         currencyNormalized,
+        issuer,
+        pairKey,
         amm: null,
         ammReserves: null,
         error: "missing_params",
         attempts: [],
+        observedAt,
+        freshness: buildFreshnessMeta({ observedAt, source: "runtime", isStale: false }),
         cached: false,
         isStale: false,
       },
@@ -134,7 +142,7 @@ exports.onRequestGet = async (context) => {
   });
 
   const elapsedMs = Math.round(performance.now() - start);
-
+  const observedAt = nowIso();
   const rpcResult = result?.json?.result;
   const rpcError = result?.json?.error || rpcResult?.error || null;
   const amm = rpcResult?.amm || null;
@@ -145,10 +153,14 @@ exports.onRequestGet = async (context) => {
     elapsedMs,
     currencyInput: normalized.currencyInput,
     currencyNormalized,
+    issuer,
+    pairKey,
     amm,
     ammReserves: parseAmmReserves(amm),
     error: rpcError || result?.error || null,
     attempts,
+    observedAt,
+    freshness: buildFreshnessMeta({ observedAt, cacheTtlSeconds: CACHE_TTL_SECONDS, source: endpointUsed || "runtime", isStale: false }),
     cached: false,
     isStale: false,
   };
