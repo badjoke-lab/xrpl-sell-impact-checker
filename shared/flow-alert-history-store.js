@@ -1,6 +1,6 @@
 const BASE_DIR = 'data/flow-history';
-// Canonical production history is committed JSON updated by GitHub Actions.
-// This store is a runtime fallback for local/dev and non-persisted environments.
+// Canonical production history can still come from committed JSON.
+// When XSIC_DB is bound, runtime history persistence prefers D1.
 const MAX_PER_KEY = 200;
 const memoryStore = globalThis.__xsicFlowAlertHistoryStore || new Map();
 globalThis.__xsicFlowAlertHistoryStore = memoryStore;
@@ -22,6 +22,10 @@ async function getFsApi() {
   return fsApiPromise;
 }
 
+function getBoundDb(env) {
+  return env?.XSIC_DB || env?.DB || null;
+}
+
 function normalizeWindow(rawWindow) {
   if (rawWindow === '5m' || rawWindow === '1h' || rawWindow === '24h' || rawWindow === '7d') return rawWindow;
   return '1h';
@@ -39,6 +43,15 @@ function keyFor(preset, window) {
   const p = normalizePreset(preset);
   const w = normalizeWindow(window);
   return { preset: p, window: w, key: `${sanitize(p)}__${sanitize(w)}`, fileName: `${sanitize(p)}-${sanitize(w)}.json` };
+}
+
+function parseSnapshotText(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 async function readFileList(filePath) {
@@ -77,7 +90,57 @@ function sortByTs(snapshots) {
   return [...snapshots].sort((a, b) => Number(a?.ts || 0) - Number(b?.ts || 0));
 }
 
-async function readSnapshots(resolved) {
+async function readSnapshotsFromD1(db, resolved, limit = MAX_PER_KEY) {
+  const stmt = db
+    .prepare(`SELECT snapshot_json
+      FROM flow_events
+      WHERE preset = ?1 AND window_key = ?2
+      ORDER BY ts DESC
+      LIMIT ?3`)
+    .bind(resolved.preset, resolved.window, Math.max(1, Math.min(MAX_PER_KEY, Number(limit) || MAX_PER_KEY)));
+  const { results } = await stmt.all();
+  return (results || [])
+    .map((row) => parseSnapshotText(row.snapshot_json))
+    .filter(Boolean)
+    .reverse();
+}
+
+async function readLatestFromD1(db, resolved, offset = 0) {
+  const row = await db
+    .prepare(`SELECT snapshot_json
+      FROM flow_events
+      WHERE preset = ?1 AND window_key = ?2
+      ORDER BY ts DESC
+      LIMIT 1 OFFSET ?3`)
+    .bind(resolved.preset, resolved.window, offset)
+    .first();
+  return parseSnapshotText(row?.snapshot_json || null);
+}
+
+async function readSummaryFromD1(db, resolved) {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS count, MIN(ts) AS oldestTs, MAX(ts) AS newestTs
+      FROM flow_events
+      WHERE preset = ?1 AND window_key = ?2`)
+    .bind(resolved.preset, resolved.window)
+    .first();
+
+  return {
+    count: Number(row?.count || 0),
+    oldestTs: row?.oldestTs ?? null,
+    newestTs: row?.newestTs ?? null,
+    storageMode: 'd1',
+  };
+}
+
+async function readSnapshots(resolved, env) {
+  const db = getBoundDb(env);
+  if (db) {
+    try {
+      return await readSnapshotsFromD1(db, resolved);
+    } catch {}
+  }
+
   const mem = memoryStore.get(resolved.key);
   if (Array.isArray(mem)) return sortByTs(mem);
 
@@ -92,15 +155,35 @@ async function readSnapshots(resolved) {
   return [];
 }
 
-export async function readHistory(preset, window) {
+export async function readHistory(preset, window, env) {
   const resolved = keyFor(preset, window);
-  const snapshots = await readSnapshots(resolved);
+  const snapshots = await readSnapshots(resolved, env);
   return { ...resolved, snapshots };
 }
 
-export async function appendSnapshot(snapshot) {
+export async function appendSnapshot(snapshot, env) {
   const resolved = keyFor(snapshot?.preset, snapshot?.window);
-  const prev = await readSnapshots(resolved);
+  const db = getBoundDb(env);
+
+  if (db) {
+    const snapshotJson = JSON.stringify({ ...snapshot, preset: resolved.preset, window: resolved.window });
+    try {
+      const latest = await readLatestFromD1(db, resolved, 0);
+      if (latest && (latest.ts === snapshot?.ts || JSON.stringify(latest) === snapshotJson)) {
+        return latest;
+      }
+      await db
+        .prepare(`INSERT INTO flow_events (preset, window_key, ts, pair_key, snapshot_json)
+          VALUES (?1, ?2, ?3, ?4, ?5)`)
+        .bind(resolved.preset, resolved.window, Number(snapshot?.ts || Date.now()), null, snapshotJson)
+        .run();
+      return parseSnapshotText(snapshotJson);
+    } catch {
+      // fall through to memory/fs fallback
+    }
+  }
+
+  const prev = await readSnapshots(resolved, env);
   const merged = sortByTs(prev.concat([{ ...snapshot, preset: resolved.preset, window: resolved.window }]));
   const trimmed = merged.slice(Math.max(0, merged.length - MAX_PER_KEY));
   memoryStore.set(resolved.key, trimmed);
@@ -113,28 +196,57 @@ export async function appendSnapshot(snapshot) {
   return trimmed[trimmed.length - 1] || null;
 }
 
-export async function getLatestSnapshot(preset, window) {
-  const { snapshots } = await readHistory(preset, window);
+export async function getLatestSnapshot(preset, window, env) {
+  const resolved = keyFor(preset, window);
+  const db = getBoundDb(env);
+  if (db) {
+    try {
+      return await readLatestFromD1(db, resolved, 0);
+    } catch {}
+  }
+  const { snapshots } = await readHistory(preset, window, env);
   return snapshots[snapshots.length - 1] || null;
 }
 
-export async function getPreviousSnapshot(preset, window) {
-  const { snapshots } = await readHistory(preset, window);
+export async function getPreviousSnapshot(preset, window, env) {
+  const resolved = keyFor(preset, window);
+  const db = getBoundDb(env);
+  if (db) {
+    try {
+      return await readLatestFromD1(db, resolved, 1);
+    } catch {}
+  }
+  const { snapshots } = await readHistory(preset, window, env);
   return snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
 }
 
-export async function getRecentSnapshots(preset, window, limit = 10) {
-  const { snapshots } = await readHistory(preset, window);
+export async function getRecentSnapshots(preset, window, limit = 10, env) {
+  const resolved = keyFor(preset, window);
   const safeLimit = Math.max(1, Math.min(500, Number(limit) || 10));
+  const db = getBoundDb(env);
+  if (db) {
+    try {
+      return await readSnapshotsFromD1(db, resolved, safeLimit);
+    } catch {}
+  }
+  const { snapshots } = await readHistory(preset, window, env);
   return snapshots.slice(Math.max(0, snapshots.length - safeLimit));
 }
 
-export async function getHistorySummary(preset, window) {
-  const { snapshots } = await readHistory(preset, window);
-  if (!snapshots.length) return { count: 0, oldestTs: null, newestTs: null };
+export async function getHistorySummary(preset, window, env) {
+  const resolved = keyFor(preset, window);
+  const db = getBoundDb(env);
+  if (db) {
+    try {
+      return await readSummaryFromD1(db, resolved);
+    } catch {}
+  }
+  const { snapshots } = await readHistory(preset, window, env);
+  if (!snapshots.length) return { count: 0, oldestTs: null, newestTs: null, storageMode: 'runtime-fallback' };
   return {
     count: snapshots.length,
     oldestTs: snapshots[0].ts,
     newestTs: snapshots[snapshots.length - 1].ts,
+    storageMode: 'runtime-fallback',
   };
 }
