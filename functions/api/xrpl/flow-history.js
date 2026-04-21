@@ -39,6 +39,7 @@ function normalizeStaticPayload(payload, preset, window, limit) {
     preset: payload?.historyMeta?.preset || preset,
     window: payload?.historyMeta?.window || window,
     updatedAt: payload?.historyMeta?.updatedAt || null,
+    storageMode: 'repo-json',
   };
 
   return {
@@ -88,7 +89,7 @@ function resolveLimit(rawLimit) {
   return Math.max(1, Math.min(500, Math.floor(parsed)));
 }
 
-export async function onRequestGet({ request }) {
+export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const preset = url.searchParams.get('preset') || 'exchanges';
   const window = normalizeWindow(url.searchParams.get('window'));
@@ -120,15 +121,16 @@ export async function onRequestGet({ request }) {
   }
 
   const [latest, previous, recent, historyMeta] = await Promise.all([
-    getLatestSnapshot(preset, window),
-    getPreviousSnapshot(preset, window),
-    getRecentSnapshots(preset, window, limit),
-    getHistorySummary(preset, window),
+    getLatestSnapshot(preset, window, env),
+    getPreviousSnapshot(preset, window, env),
+    getRecentSnapshots(preset, window, limit, env),
+    getHistorySummary(preset, window, env),
   ]);
 
   const deltaSummary = buildDeltaSummary(latest, previous);
   const recentNetSeries = recent.map((row) => ({ ts: row.ts, netXrp: row.summary?.netXrp ?? 0 }));
   const recentEventCountSeries = recent.map((row) => ({ ts: row.ts, matchedEvents: row.metrics?.matchedEvents ?? 0 }));
+  const storageMode = historyMeta?.storageMode || 'runtime-fallback';
 
   return json({
     ok: true,
@@ -141,7 +143,7 @@ export async function onRequestGet({ request }) {
     recentNetSeries,
     recentEventCountSeries,
     historyMeta,
-    source: 'runtime-fallback',
+    source: storageMode,
     historyMode: shouldUseRepoHistory ? 'primary' : 'supplemental-live',
   });
 }
