@@ -26,6 +26,12 @@ function setBar(target, pct) {
   target.style.setProperty('--w', `${clamped}%`);
 }
 
+function setWidth(target, pct) {
+  if (!target) return;
+  const clamped = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
+  target.style.width = `${clamped}%`;
+}
+
 function formatNumber(value, maximumFractionDigits = 2) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
@@ -102,6 +108,17 @@ function computeShare(summary) {
   };
 }
 
+function computeDepth(summary) {
+  const offersCount = Number(summary?.offersCount || 0);
+  const bookAvailable = Boolean(summary?.book?.available);
+  const ammAvailable = Boolean(summary?.amm?.available);
+  const touchPct = bookAvailable ? Math.min(92, 48 + offersCount * 3) : 0;
+  const innerPct = bookAvailable ? Math.min(86, 34 + offersCount * 2.4) : 0;
+  const ammPct = ammAvailable ? 58 : 8;
+  const bridgePct = summary?.bestRoute === 'none' ? 74 : 6;
+  return { touchPct, innerPct, ammPct, bridgePct };
+}
+
 function resolveCurrentPairLabel() {
   return String(byResult('pair-label')?.textContent || '').trim();
 }
@@ -147,13 +164,38 @@ function applyHeroCards(summary, routeLabel, checkedAt) {
   setText(byResult('filled-line'), `Seed row ${formatNumber(summary.sellAmount, 0)} / ${formatNumber(summary.sellAmount, 0)}`);
   setText(byResult('fiat-rate'), 'Precompute snapshot only · live fiat estimate pending.');
   setText(byResult('best-price'), summary.book?.bestPrice != null ? formatNumber(summary.book.bestPrice, 8) : '—');
-  setText(byResult('worst-price'), summary.bestRoute === 'none' ? '—' : 'Precompute does not hold full tail price.');
+  setText(byResult('worst-price'), summary.bestRoute === 'none' ? '—' : 'Tail worst price needs live depth.');
   setText(byResult('order-count'), formatNumber(summary.offersCount, 0));
   setText(byResult('data-fetched'), `precompute checked ${checkedAt}`);
-  setText(byResult('max-sell-value'), `seed ${formatNumber(summary.sellAmount, 0)}`);
+  setText(byResult('max-sell-value'), summary.bestRoute === 'none' ? 'No route' : `${routeLabel} seeded`);
   setText(byResult('mix-summary'), `seed ${formatNumber(summary.sellAmount, 0)}`);
-  setText(byResult('max-sell-note'), `Current D1 precompute row favors ${routeLabel}. Run Estimate for live max-sell bounds.`);
+  setText(byResult('max-sell-note'), `Seeded proxy only. Run Estimate for live max-sell bounds.`);
   setText(byResult('slippage-help'), `Seed-size ${routeLabel.toLowerCase()} impact from current precompute row.`);
+}
+
+function applyMixAndDepth(summary, shares, routeLabel) {
+  const depth = computeDepth(summary);
+  setText(byResult('mix-book'), `Book ${formatPercent(shares.bookPct, 0)}`);
+  setText(byResult('mix-amm'), `AMM ${formatPercent(shares.ammPct, 0)}`);
+  setText(byResult('mix-bridge'), `Bridge ${formatPercent(shares.bridgePct, 0)}`);
+  setWidth(byResult('mix-book-segment'), shares.bookPct);
+  setWidth(byResult('mix-amm-segment'), shares.ammPct);
+  setWidth(byResult('mix-bridge-segment'), shares.bridgePct);
+
+  setText(byResult('depth-summary'), summary.bestRoute === 'none'
+    ? 'Current precompute row does not show an executable XRP exit route.'
+    : `${routeLabel} leads in the current precompute row with visible seeded depth.`);
+  setText(byResult('depth-touch-label'), summary.book?.available ? 'Book-led' : 'Unavailable');
+  setText(byResult('depth-inner-label'), summary.offersCount > 0 ? `${formatNumber(summary.offersCount, 0)} offers` : 'Unavailable');
+  setText(byResult('depth-amm-label'), summary.amm?.available ? 'Available' : 'No path');
+  setText(byResult('depth-bridge-label'), shares.bridgePct > 0 ? formatPercent(shares.bridgePct, 0) : 'None');
+  setBar(byResult('depth-touch-bar'), depth.touchPct);
+  setBar(byResult('depth-inner-bar'), depth.innerPct);
+  setBar(byResult('depth-amm-bar'), depth.ammPct);
+  setBar(byResult('depth-bridge-bar'), depth.bridgePct);
+  setText(byResult('depth-caption'), summary.bestRoute === 'none'
+    ? 'Run Estimate to see whether live depth appears.'
+    : `Seeded snapshot only. Run Estimate for live depth curve and tail behavior.`);
 }
 
 function applySummary(summary) {
@@ -168,6 +210,7 @@ function applySummary(summary) {
   const shares = computeShare(summary);
 
   applyHeroCards(summary, routeLabel, checkedAt);
+  applyMixAndDepth(summary, shares, routeLabel);
   setText(byResult('used-venue-summary'), `Precomputed best route: ${routeLabel}`);
   setText(byResult('used-venue-details'), `Seed size ${formatNumber(summary.sellAmount, 0)} · offers ${formatNumber(summary.offersCount, 0)}`);
   setText(byResult('used-venue-note'), `Checked ${checkedAt}. Run Estimate to replace this with live route reasoning.`);
