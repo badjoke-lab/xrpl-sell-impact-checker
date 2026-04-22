@@ -1,0 +1,53 @@
+name: Refresh popular pair precompute rows
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Trigger precompute refresh
+        env:
+          XSIC_URL: https://xsic.badjoke-lab.com
+        run: |
+          set -euo pipefail
+          response="$(curl -fsSL "$XSIC_URL/api/precompute-popular-pairs?persist=1&amount=1000&limit=60")"
+          echo "$response"
+          RESPONSE_JSON="$response" python3 - <<'PY'
+import json, os, sys
+payload = json.loads(os.environ["RESPONSE_JSON"])
+if not payload.get("ok"):
+    print("precompute refresh failed: ok=false", file=sys.stderr)
+    sys.exit(1)
+count = int(payload.get("count") or 0)
+if count <= 0:
+    print("precompute refresh failed: count<=0", file=sys.stderr)
+    sys.exit(1)
+print(f"precompute refresh ok: {count} rows")
+PY
+
+      - name: Verify current rows
+        env:
+          XSIC_URL: https://xsic.badjoke-lab.com
+        run: |
+          set -euo pipefail
+          response="$(curl -fsSL "$XSIC_URL/api/precompute-current?limit=10")"
+          echo "$response"
+          RESPONSE_JSON="$response" python3 - <<'PY'
+import json, os, sys
+payload = json.loads(os.environ["RESPONSE_JSON"])
+if not payload.get("ok"):
+    print("precompute current check failed: ok=false", file=sys.stderr)
+    sys.exit(1)
+stats = payload.get("stats") or {}
+count = int(stats.get("count") or 0)
+if count <= 0:
+    print("precompute current check failed: stats.count<=0", file=sys.stderr)
+    sys.exit(1)
+print(f"precompute current rows ok: {count}")
+PY
