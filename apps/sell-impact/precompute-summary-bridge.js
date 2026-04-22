@@ -119,6 +119,31 @@ function computeDepth(summary) {
   return { touchPct, innerPct, ammPct, bridgePct };
 }
 
+function getRequestedAmount() {
+  const amountInput = document.getElementById('sell-amount-input');
+  const raw = String(amountInput?.value || '').trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function buildSeedState(summary) {
+  const seededAmount = Number(summary?.sellAmount || 0);
+  const requestedAmount = getRequestedAmount();
+  if (!Number.isFinite(seededAmount) || seededAmount <= 0) {
+    return { seededAmount: null, requestedAmount, matchesInput: true };
+  }
+  if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+    return { seededAmount, requestedAmount, matchesInput: true };
+  }
+  const relativeDiff = Math.abs(requestedAmount - seededAmount) / Math.max(requestedAmount, seededAmount);
+  return {
+    seededAmount,
+    requestedAmount,
+    matchesInput: relativeDiff <= 0.001,
+  };
+}
+
 function resolveCurrentPairLabel() {
   return String(byResult('pair-label')?.textContent || '').trim();
 }
@@ -152,29 +177,55 @@ function applyCandidate(prefix, config) {
   setBar(byResult(`${prefix}-confidence-bar`), config.confidence);
 }
 
-function applyHeroCards(summary, routeLabel, checkedAt) {
+function applyHeroCards(summary, routeLabel, checkedAt, seedState) {
   const selectedSlippage = summary.bestRoute === 'amm'
     ? summary.amm?.slippagePct ?? null
     : summary.book?.slippagePct ?? null;
   const bestReceive = summary.bestReceiveXrp;
-  const receiveText = bestReceive != null ? `${formatNumber(bestReceive, 6)} XRP` : 'Unavailable';
-  setText(byResult('receive'), receiveText);
-  setText(byResult('slippage'), selectedSlippage != null ? formatPercent(selectedSlippage) : '—');
-  setText(byResult('sellability'), summary.bestRoute === 'none' ? 'Unavailable' : 'Seeded');
-  setText(byResult('filled-line'), `Seed row ${formatNumber(summary.sellAmount, 0)} / ${formatNumber(summary.sellAmount, 0)}`);
-  setText(byResult('fiat-rate'), 'Precompute snapshot only · live fiat estimate pending.');
+  const seededAmountLabel = formatNumber(seedState.seededAmount || summary.sellAmount || 0, 0);
+  const requestedAmountLabel = Number.isFinite(seedState.requestedAmount)
+    ? formatNumber(seedState.requestedAmount, 0)
+    : null;
+
+  if (seedState.matchesInput) {
+    const receiveText = bestReceive != null ? `${formatNumber(bestReceive, 6)} XRP` : 'Unavailable';
+    setText(byResult('receive'), receiveText);
+    setText(byResult('slippage'), selectedSlippage != null ? formatPercent(selectedSlippage) : '—');
+    setText(byResult('sellability'), summary.bestRoute === 'none' ? 'Unavailable' : 'Seeded');
+    setText(byResult('filled-line'), `Seed row ${seededAmountLabel} / ${seededAmountLabel}`);
+    setText(byResult('fiat-rate'), 'Precompute snapshot only · live fiat estimate pending.');
+    setText(byResult('max-sell-value'), summary.bestRoute === 'none' ? 'No route' : `${routeLabel} seeded`);
+    setText(byResult('mix-summary'), `seed ${seededAmountLabel}`);
+    setText(byResult('max-sell-note'), 'Seeded proxy only. Run Estimate for live max-sell bounds.');
+    setText(byResult('slippage-help'), `Seed-size ${routeLabel.toLowerCase()} impact from current precompute row.`);
+  } else {
+    setText(byResult('receive'), `Seed preview ${bestReceive != null ? `${formatNumber(bestReceive, 6)} XRP` : 'Unavailable'}`);
+    setText(
+      byResult('slippage'),
+      selectedSlippage != null ? `Seed ${formatPercent(selectedSlippage)} @ ${seededAmountLabel}` : `Seed @ ${seededAmountLabel}`
+    );
+    setText(byResult('sellability'), 'Seed preview');
+    setText(byResult('filled-line'), `Input ${requestedAmountLabel} differs from seed ${seededAmountLabel}`);
+    setText(byResult('fiat-rate'), 'Run Estimate for live output at the current amount.');
+    setText(byResult('max-sell-value'), 'Run Estimate');
+    setText(byResult('mix-summary'), `seed ${seededAmountLabel}`);
+    setText(byResult('max-sell-note'), `Current input ${requestedAmountLabel} is outside the seeded preview size ${seededAmountLabel}.`);
+    setText(byResult('slippage-help'), `Precompute preview is only for seed size ${seededAmountLabel}.`);
+  }
+
   setText(byResult('best-price'), summary.book?.bestPrice != null ? formatNumber(summary.book.bestPrice, 8) : '—');
   setText(byResult('worst-price'), summary.bestRoute === 'none' ? '—' : 'Tail worst price needs live depth.');
   setText(byResult('order-count'), formatNumber(summary.offersCount, 0));
   setText(byResult('data-fetched'), `precompute checked ${checkedAt}`);
-  setText(byResult('max-sell-value'), summary.bestRoute === 'none' ? 'No route' : `${routeLabel} seeded`);
-  setText(byResult('mix-summary'), `seed ${formatNumber(summary.sellAmount, 0)}`);
-  setText(byResult('max-sell-note'), `Seeded proxy only. Run Estimate for live max-sell bounds.`);
-  setText(byResult('slippage-help'), `Seed-size ${routeLabel.toLowerCase()} impact from current precompute row.`);
 }
 
-function applyMixAndDepth(summary, shares, routeLabel) {
+function applyMixAndDepth(summary, shares, routeLabel, seedState) {
   const depth = computeDepth(summary);
+  const seededAmountLabel = formatNumber(seedState.seededAmount || summary.sellAmount || 0, 0);
+  const requestedAmountLabel = Number.isFinite(seedState.requestedAmount)
+    ? formatNumber(seedState.requestedAmount, 0)
+    : null;
+
   setText(byResult('mix-book'), `Book ${formatPercent(shares.bookPct, 0)}`);
   setText(byResult('mix-amm'), `AMM ${formatPercent(shares.ammPct, 0)}`);
   setText(byResult('mix-bridge'), `Bridge ${formatPercent(shares.bridgePct, 0)}`);
@@ -193,9 +244,12 @@ function applyMixAndDepth(summary, shares, routeLabel) {
   setBar(byResult('depth-inner-bar'), depth.innerPct);
   setBar(byResult('depth-amm-bar'), depth.ammPct);
   setBar(byResult('depth-bridge-bar'), depth.bridgePct);
-  setText(byResult('depth-caption'), summary.bestRoute === 'none'
-    ? 'Run Estimate to see whether live depth appears.'
-    : `Seeded snapshot only. Run Estimate for live depth curve and tail behavior.`);
+  setText(
+    byResult('depth-caption'),
+    seedState.matchesInput
+      ? 'Seeded snapshot only. Run Estimate for live depth curve and tail behavior.'
+      : `Showing seeded depth for ${seededAmountLabel}. Run Estimate for live depth at ${requestedAmountLabel}.`
+  );
 }
 
 function applySummary(summary) {
@@ -208,33 +262,53 @@ function applySummary(summary) {
   const confidence = computeConfidence(summary);
   const pairLabel = `${formatCurrencyDisplay(summary.currency)} / XRP`;
   const shares = computeShare(summary);
+  const seedState = buildSeedState(summary);
+  const seededAmountLabel = formatNumber(seedState.seededAmount || summary.sellAmount || 0, 0);
+  const requestedAmountLabel = Number.isFinite(seedState.requestedAmount)
+    ? formatNumber(seedState.requestedAmount, 0)
+    : null;
 
-  applyHeroCards(summary, routeLabel, checkedAt);
-  applyMixAndDepth(summary, shares, routeLabel);
+  applyHeroCards(summary, routeLabel, checkedAt, seedState);
+  applyMixAndDepth(summary, shares, routeLabel, seedState);
   setText(byResult('used-venue-summary'), `Precomputed best route: ${routeLabel}`);
-  setText(byResult('used-venue-details'), `Seed size ${formatNumber(summary.sellAmount, 0)} · offers ${formatNumber(summary.offersCount, 0)}`);
-  setText(byResult('used-venue-note'), `Checked ${checkedAt}. Run Estimate to replace this with live route reasoning.`);
+  setText(byResult('used-venue-details'), `Seed size ${seededAmountLabel} · offers ${formatNumber(summary.offersCount, 0)}`);
+  setText(
+    byResult('used-venue-note'),
+    seedState.matchesInput
+      ? `Checked ${checkedAt}. Run Estimate to replace this with live route reasoning.`
+      : `Checked ${checkedAt}. Seed row is ${seededAmountLabel}; run Estimate for live reasoning at ${requestedAmountLabel}.`
+  );
   setText(byResult('endpoint'), `precompute snapshot · ${checkedAt}`);
   setText(byResult('endpoint-details'), `precompute current row · ${pairLabel}`);
   setText(byResult('pair-label'), pairLabel);
-  setText(byResult('pair-meta'), `precompute seed ${formatNumber(summary.sellAmount, 0)} · route ${summary.bestRoute}`);
+  setText(byResult('pair-meta'), `precompute seed ${seededAmountLabel} · route ${summary.bestRoute}`);
   setText(byResult('liquidity-split'), `Book ${formatPercent(shares.bookPct, 0)} / AMM ${formatPercent(shares.ammPct, 0)}`);
   setText(byResult('amm-reserves'), summary.amm?.available ? 'Precomputed AMM path available.' : 'No AMM path in current precompute row.');
   setText(byResult('amm-fee'), summary.amm?.slippagePct != null ? `impact ${formatPercent(summary.amm.slippagePct)}` : '—');
 
   setText(byResult('snapshot-headline'), `${routeLabel} leads for ${pairLabel} at the seeded size.`);
-  setText(byResult('snapshot-body'), `This precompute row was built from ${formatNumber(summary.sellAmount, 0)} units and ${formatNumber(summary.offersCount, 0)} visible book levels. Live estimate can still differ.`);
+  setText(
+    byResult('snapshot-body'),
+    seedState.matchesInput
+      ? `This precompute row was built from ${seededAmountLabel} units and ${formatNumber(summary.offersCount, 0)} visible book levels. Live estimate can still differ.`
+      : `This precompute row was built from ${seededAmountLabel} units and ${formatNumber(summary.offersCount, 0)} visible book levels. Your current input is ${requestedAmountLabel}, so treat this as a seeded preview only.`
+  );
   setList(byResult('snapshot-bullets'), [
     `Best route: ${routeLabel}`,
     `Worst route: ${worstRouteLabel}`,
-    `Best receive: ${summary.bestReceiveXrp != null ? `${formatNumber(summary.bestReceiveXrp, 6)} XRP` : 'unavailable'}`,
+    `Best receive at seed ${seededAmountLabel}: ${summary.bestReceiveXrp != null ? `${formatNumber(summary.bestReceiveXrp, 6)} XRP` : 'unavailable'}`,
   ]);
 
   const confidenceCard = byResult('route-confidence-card');
   if (confidenceCard) confidenceCard.hidden = false;
   setText(byResult('route-confidence-score'), `${Math.round(confidence)} / 100`);
   setBar(byResult('route-confidence-bar'), confidence);
-  setText(byResult('route-confidence-summary'), `Precomputed from D1 current row · checked ${checkedAt} · rerun Estimate for live execution values.`);
+  setText(
+    byResult('route-confidence-summary'),
+    seedState.matchesInput
+      ? `Precomputed from D1 current row · checked ${checkedAt} · rerun Estimate for live execution values.`
+      : `Precomputed from D1 current row · seed ${seededAmountLabel} only · rerun Estimate for live execution at ${requestedAmountLabel}.`
+  );
 
   setText(byResult('path-headline'), `${routeLabel} is currently the strongest precomputed path.`);
   setText(byResult('why'), `Precompute favors ${routeLabel} because it currently offers the strongest bounded receive at the seed size. Live execution may shift with fresh depth.`);
@@ -249,7 +323,9 @@ function applySummary(summary) {
   setList(byResult('path-bullets'), [
     `Book route available: ${summary.book?.available ? 'yes' : 'no'}`,
     `AMM route available: ${summary.amm?.available ? 'yes' : 'no'}`,
-    'This is a stable precompute snapshot, not the final live estimate.',
+    seedState.matchesInput
+      ? 'This is a stable precompute snapshot, not the final live estimate.'
+      : `This is a stable precompute snapshot for ${seededAmountLabel}, not the final live estimate for ${requestedAmountLabel}.`,
   ]);
 
   applyCandidate('candidate-a', {
@@ -258,7 +334,9 @@ function applySummary(summary) {
     output: summary.bestReceiveXrp != null ? `${formatNumber(summary.bestReceiveXrp, 6)} XRP` : 'Unavailable',
     impact: summary.bestRoute === 'amm' ? formatPercent(summary.amm?.slippagePct) : formatPercent(summary.book?.slippagePct),
     bottleneck: summary.offersCount > 0 ? `Observed offers ${formatNumber(summary.offersCount, 0)}` : 'No visible executable depth.',
-    reason: `Current D1 precompute row selects ${routeLabel.toLowerCase()} at the seed size.`,
+    reason: seedState.matchesInput
+      ? `Current D1 precompute row selects ${routeLabel.toLowerCase()} at the seed size.`
+      : `Current D1 precompute row selects ${routeLabel.toLowerCase()} at the seed size ${seededAmountLabel}.`,
     confidence,
   });
 
@@ -274,7 +352,9 @@ function applySummary(summary) {
     output: alternativeOutput,
     impact: alternativeImpact,
     bottleneck: summary.bestRoute === 'book' ? 'AMM path not leading in current row.' : 'Orderbook path not leading in current row.',
-    reason: 'Shown from the current precompute row only.',
+    reason: seedState.matchesInput
+      ? 'Shown from the current precompute row only.'
+      : `Shown from the current precompute row only. Current input ${requestedAmountLabel} still needs live calculation.`,
     confidence: Math.max(24, confidence - 18),
   });
 
@@ -285,27 +365,40 @@ function applySummary(summary) {
     output: fallbackReceive != null ? `${formatNumber(fallbackReceive, 6)} XRP` : 'Unavailable',
     impact: summary.bestRoute === 'none' ? 'Unavailable' : 'higher than selected',
     bottleneck: 'Fallback shown for continuity only.',
-    reason: 'Precompute fallback is indicative only until live estimate runs.',
+    reason: seedState.matchesInput
+      ? 'Precompute fallback is indicative only until live estimate runs.'
+      : `Precompute fallback is indicative only until live estimate runs for ${requestedAmountLabel}.`,
     confidence: Math.max(12, confidence - 34),
   });
 
   setText(byResult('snapshot-output-note'), `Precompute checked ${checkedAt}.`);
-  setText(byResult('snapshot-impact-note'), `Seed-size impact ${summary.bestRoute === 'amm' ? formatPercent(summary.amm?.slippagePct) : formatPercent(summary.book?.slippagePct)}.`);
+  setText(
+    byResult('snapshot-impact-note'),
+    seedState.matchesInput
+      ? `Seed-size impact ${summary.bestRoute === 'amm' ? formatPercent(summary.amm?.slippagePct) : formatPercent(summary.book?.slippagePct)}.`
+      : `Seed-size impact ${summary.bestRoute === 'amm' ? formatPercent(summary.amm?.slippagePct) : formatPercent(summary.book?.slippagePct)} at ${seededAmountLabel}.`
+  );
   setText(byResult('snapshot-context-note'), `Book ${formatPercent(shares.bookPct, 0)} / AMM ${formatPercent(shares.ammPct, 0)}.`);
   setList(byResult('snapshot-note-current'), [
     `Precompute route: ${routeLabel}`,
     `Offers seen: ${formatNumber(summary.offersCount, 0)}`,
     `Checked at: ${checkedAt}`,
   ]);
-  setList(byResult('snapshot-note-delta'), [
-    'Live estimate has not run yet for this pair in the current view.',
-    'Use Estimate to refresh route quality with live orderbook and AMM reads.',
-  ]);
+  setList(byResult('snapshot-note-delta'), seedState.matchesInput
+    ? [
+        'Live estimate has not run yet for this pair in the current view.',
+        'Use Estimate to refresh route quality with live orderbook and AMM reads.',
+      ]
+    : [
+        `Current input ${requestedAmountLabel} differs from precompute seed ${seededAmountLabel}.`,
+        'Use Estimate to refresh route quality with live orderbook and AMM reads.',
+      ]);
 }
 
 function createHydrator() {
   const currencyInput = document.getElementById('currency-input');
   const issuerInput = document.getElementById('issuer-input');
+  const amountInput = document.getElementById('sell-amount-input');
   const estimateButton = document.querySelector('.primary-button');
   if (!currencyInput || !issuerInput || !estimateButton) return null;
 
@@ -346,7 +439,7 @@ function createHydrator() {
     }, DEBOUNCE_MS);
   }
 
-  return { schedule };
+  return { schedule, amountInput };
 }
 
 function mount() {
@@ -354,10 +447,13 @@ function mount() {
   if (!hydrator) return;
   const currencyInput = document.getElementById('currency-input');
   const issuerInput = document.getElementById('issuer-input');
+  const amountInput = hydrator.amountInput;
   currencyInput?.addEventListener('input', () => hydrator.schedule(false));
   issuerInput?.addEventListener('input', () => hydrator.schedule(false));
+  amountInput?.addEventListener('input', () => hydrator.schedule(false));
   currencyInput?.addEventListener('blur', () => hydrator.schedule(true));
   issuerInput?.addEventListener('blur', () => hydrator.schedule(true));
+  amountInput?.addEventListener('blur', () => hydrator.schedule(true));
   window.addEventListener('pageshow', () => hydrator.schedule(true));
   hydrator.schedule(true);
 }
