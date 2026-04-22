@@ -102,11 +102,26 @@ function computeShare(summary) {
   };
 }
 
-function shouldApplySummary() {
+function resolveCurrentPairLabel() {
+  return String(byResult('pair-label')?.textContent || '').trim();
+}
+
+function isPrecomputeOwnedView() {
+  const endpoint = String(byResult('endpoint')?.textContent || '').trim();
+  const venue = String(byResult('used-venue-summary')?.textContent || '').trim();
+  return /precompute/i.test(endpoint) || /Precomputed/i.test(venue);
+}
+
+function shouldApplySummary(summary) {
   const orderCount = byResult('order-count');
   const usedVenue = byResult('used-venue-summary');
   const snapshotHeadline = byResult('snapshot-headline');
-  return [orderCount, usedVenue, snapshotHeadline].some((el) => isPlaceholderText(el?.textContent));
+  const expectedPairLabel = `${formatCurrencyDisplay(summary?.currency)} / XRP`;
+  const currentPairLabel = resolveCurrentPairLabel();
+  if (currentPairLabel && expectedPairLabel && currentPairLabel !== expectedPairLabel) {
+    return true;
+  }
+  return isPrecomputeOwnedView() || [orderCount, usedVenue, snapshotHeadline].some((el) => isPlaceholderText(el?.textContent));
 }
 
 function applyCandidate(prefix, config) {
@@ -120,8 +135,29 @@ function applyCandidate(prefix, config) {
   setBar(byResult(`${prefix}-confidence-bar`), config.confidence);
 }
 
+function applyHeroCards(summary, routeLabel, checkedAt) {
+  const selectedSlippage = summary.bestRoute === 'amm'
+    ? summary.amm?.slippagePct ?? null
+    : summary.book?.slippagePct ?? null;
+  const bestReceive = summary.bestReceiveXrp;
+  const receiveText = bestReceive != null ? `${formatNumber(bestReceive, 6)} XRP` : 'Unavailable';
+  setText(byResult('receive'), receiveText);
+  setText(byResult('slippage'), selectedSlippage != null ? formatPercent(selectedSlippage) : '—');
+  setText(byResult('sellability'), summary.bestRoute === 'none' ? 'Unavailable' : 'Seeded');
+  setText(byResult('filled-line'), `Seed row ${formatNumber(summary.sellAmount, 0)} / ${formatNumber(summary.sellAmount, 0)}`);
+  setText(byResult('fiat-rate'), 'Precompute snapshot only · live fiat estimate pending.');
+  setText(byResult('best-price'), summary.book?.bestPrice != null ? formatNumber(summary.book.bestPrice, 8) : '—');
+  setText(byResult('worst-price'), summary.bestRoute === 'none' ? '—' : 'Precompute does not hold full tail price.');
+  setText(byResult('order-count'), formatNumber(summary.offersCount, 0));
+  setText(byResult('data-fetched'), `precompute checked ${checkedAt}`);
+  setText(byResult('max-sell-value'), `seed ${formatNumber(summary.sellAmount, 0)}`);
+  setText(byResult('mix-summary'), `seed ${formatNumber(summary.sellAmount, 0)}`);
+  setText(byResult('max-sell-note'), `Current D1 precompute row favors ${routeLabel}. Run Estimate for live max-sell bounds.`);
+  setText(byResult('slippage-help'), `Seed-size ${routeLabel.toLowerCase()} impact from current precompute row.`);
+}
+
 function applySummary(summary) {
-  if (!summary || !shouldApplySummary()) return;
+  if (!summary || !shouldApplySummary(summary)) return;
   const checkedAt = summary.checkedAt ? new Date(summary.checkedAt).toLocaleTimeString('en-US', {
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   }) : '—';
@@ -131,10 +167,12 @@ function applySummary(summary) {
   const pairLabel = `${formatCurrencyDisplay(summary.currency)} / XRP`;
   const shares = computeShare(summary);
 
+  applyHeroCards(summary, routeLabel, checkedAt);
   setText(byResult('used-venue-summary'), `Precomputed best route: ${routeLabel}`);
   setText(byResult('used-venue-details'), `Seed size ${formatNumber(summary.sellAmount, 0)} · offers ${formatNumber(summary.offersCount, 0)}`);
   setText(byResult('used-venue-note'), `Checked ${checkedAt}. Run Estimate to replace this with live route reasoning.`);
   setText(byResult('endpoint'), `precompute snapshot · ${checkedAt}`);
+  setText(byResult('endpoint-details'), `precompute current row · ${pairLabel}`);
   setText(byResult('pair-label'), pairLabel);
   setText(byResult('pair-meta'), `precompute seed ${formatNumber(summary.sellAmount, 0)} · route ${summary.bestRoute}`);
   setText(byResult('liquidity-split'), `Book ${formatPercent(shares.bookPct, 0)} / AMM ${formatPercent(shares.ammPct, 0)}`);
