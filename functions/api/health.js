@@ -27,6 +27,23 @@ function detectBindings(env) {
   };
 }
 
+function buildFoundation(bindings, popularPairs, precomputeStats) {
+  const freshness = precomputeStats?.freshness || null;
+  return {
+    bindings,
+    popular_pairs_count: popularPairs.length,
+    precompute_registry_ready: popularPairs.length > 0,
+    precompute_current_count: precomputeStats.count,
+    precompute_latest_success_at: precomputeStats.latestSuccessAt,
+    precompute_stale_count: precomputeStats.staleCount,
+    precompute_freshness: freshness?.state || 'missing',
+    precompute_age_ms: freshness?.ageMs ?? null,
+    precompute_warn_after_ms: freshness?.warnAfterMs ?? null,
+    precompute_stale_after_ms: freshness?.staleAfterMs ?? null,
+    quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
+  };
+}
+
 async function fetchRpcHealth(endpoint) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
@@ -89,6 +106,7 @@ export async function onRequestGet({ env }) {
   const bindings = detectBindings(env);
   const popularPairs = getPopularPairs();
   const precomputeStats = await getPairPrecomputeStats(env);
+  const foundation = buildFoundation(bindings, popularPairs, precomputeStats);
 
   try {
     let sawPartial = false;
@@ -120,17 +138,11 @@ export async function onRequestGet({ env }) {
             upstream_latency_ms: attempt.latencyMs,
             last_successful_quote_age_ms: null,
             cache_freshness: bindings.kv_bound ? 'kv-ready' : 'cache-api-only',
+            precompute_freshness: foundation.precompute_freshness,
+            precompute_age_ms: foundation.precompute_age_ms,
             degraded_mode: false,
           },
-          foundation: {
-            bindings,
-            popular_pairs_count: popularPairs.length,
-            precompute_registry_ready: popularPairs.length > 0,
-            precompute_current_count: precomputeStats.count,
-            precompute_latest_success_at: precomputeStats.latestSuccessAt,
-            precompute_stale_count: precomputeStats.staleCount,
-            quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
-          },
+          foundation,
         });
       }
 
@@ -151,17 +163,11 @@ export async function onRequestGet({ env }) {
         upstream_latency_ms: null,
         last_successful_quote_age_ms: null,
         cache_freshness: bindings.kv_bound ? 'kv-ready' : 'cache-api-only',
+        precompute_freshness: foundation.precompute_freshness,
+        precompute_age_ms: foundation.precompute_age_ms,
         degraded_mode: true,
       },
-      foundation: {
-        bindings,
-        popular_pairs_count: popularPairs.length,
-        precompute_registry_ready: popularPairs.length > 0,
-        precompute_current_count: precomputeStats.count,
-        precompute_latest_success_at: precomputeStats.latestSuccessAt,
-        precompute_stale_count: precomputeStats.staleCount,
-        quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
-      },
+      foundation,
     });
   } catch {
     return jsonResponse({
@@ -175,17 +181,11 @@ export async function onRequestGet({ env }) {
         upstream_latency_ms: null,
         last_successful_quote_age_ms: null,
         cache_freshness: bindings.kv_bound ? 'kv-ready' : 'cache-api-only',
+        precompute_freshness: foundation.precompute_freshness,
+        precompute_age_ms: foundation.precompute_age_ms,
         degraded_mode: true,
       },
-      foundation: {
-        bindings,
-        popular_pairs_count: popularPairs.length,
-        precompute_registry_ready: popularPairs.length > 0,
-        precompute_current_count: precomputeStats.count,
-        precompute_latest_success_at: precomputeStats.latestSuccessAt,
-        precompute_stale_count: precomputeStats.staleCount,
-        quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
-      },
+      foundation,
     });
   }
 }
