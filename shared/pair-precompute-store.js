@@ -1,3 +1,6 @@
+export const PRECOMPUTE_WARN_AFTER_MS = 90 * 60 * 1000;
+export const PRECOMPUTE_STALE_AFTER_MS = 150 * 60 * 1000;
+
 function getBoundDb(env) {
   return env?.XSIC_DB || env?.DB || null;
 }
@@ -9,6 +12,50 @@ function parseSummaryText(raw) {
   } catch {
     return null;
   }
+}
+
+function parseTimestampMs(value) {
+  if (!value) return null;
+  const ms = Date.parse(String(value));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+export function summarizePrecomputeFreshness(lastSuccessAt, now = Date.now()) {
+  const tsMs = parseTimestampMs(lastSuccessAt);
+  if (!tsMs) {
+    return {
+      state: 'missing',
+      ageMs: null,
+      warnAfterMs: PRECOMPUTE_WARN_AFTER_MS,
+      staleAfterMs: PRECOMPUTE_STALE_AFTER_MS,
+      isWarning: true,
+      isStale: true,
+    };
+  }
+
+  const ageMs = Math.max(0, Number(now) - tsMs);
+  const state = ageMs >= PRECOMPUTE_STALE_AFTER_MS
+    ? 'stale'
+    : ageMs >= PRECOMPUTE_WARN_AFTER_MS
+      ? 'aging'
+      : 'fresh';
+
+  return {
+    state,
+    ageMs,
+    warnAfterMs: PRECOMPUTE_WARN_AFTER_MS,
+    staleAfterMs: PRECOMPUTE_STALE_AFTER_MS,
+    isWarning: state !== 'fresh',
+    isStale: state === 'stale',
+  };
+}
+
+function withFreshness(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    freshness: summarizePrecomputeFreshness(row.lastSuccessAt || row.updatedAt || null),
+  };
 }
 
 export async function getPairPrecompute(pairKey, env) {
@@ -24,7 +71,7 @@ export async function getPairPrecompute(pairKey, env) {
     .first();
 
   if (!row) return null;
-  return {
+  return withFreshness({
     pairKey: row.pair_key,
     currency: row.currency,
     issuer: row.issuer,
@@ -36,7 +83,7 @@ export async function getPairPrecompute(pairKey, env) {
     stale: Boolean(row.stale),
     errorText: row.error_text,
     updatedAt: row.updated_at,
-  };
+  });
 }
 
 export async function listPairPrecomputes(env, limit = 20) {
@@ -53,7 +100,7 @@ export async function listPairPrecomputes(env, limit = 20) {
     .bind(safeLimit)
     .all();
 
-  return (results || []).map((row) => ({
+  return (results || []).map((row) => withFreshness({
     pairKey: row.pair_key,
     currency: row.currency,
     issuer: row.issuer,
@@ -119,7 +166,14 @@ export async function upsertPairPrecompute(row, env) {
 
 export async function getPairPrecomputeStats(env) {
   const db = getBoundDb(env);
-  if (!db) return { count: 0, latestSuccessAt: null, staleCount: 0 };
+  if (!db) {
+    return {
+      count: 0,
+      latestSuccessAt: null,
+      staleCount: 0,
+      freshness: summarizePrecomputeFreshness(null),
+    };
+  }
 
   const row = await db
     .prepare(`SELECT COUNT(*) AS count,
@@ -128,9 +182,11 @@ export async function getPairPrecomputeStats(env) {
       FROM pair_precompute_current`)
     .first();
 
+  const latestSuccessAt = row?.latestSuccessAt || null;
   return {
     count: Number(row?.count || 0),
-    latestSuccessAt: row?.latestSuccessAt || null,
+    latestSuccessAt,
     staleCount: Number(row?.staleCount || 0),
+    freshness: summarizePrecomputeFreshness(latestSuccessAt),
   };
 }
