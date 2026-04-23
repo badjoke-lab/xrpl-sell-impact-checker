@@ -1,5 +1,8 @@
 import { normalizeCurrencyInput } from '../../shared/normalizeCurrency.js';
-import { getPairPrecompute } from '../../shared/pair-precompute-store.js';
+import {
+  getPairPrecompute,
+  summarizePrecomputeFreshness,
+} from '../../shared/pair-precompute-store.js';
 
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -33,16 +36,25 @@ export async function onRequestGet({ request, env }) {
   const pairKey = pairKeyParam || buildPairKey(currency, issuer);
 
   if (!pairKey) {
-    return json({ ok: false, error: 'missing_params', pairKey: '', currency, issuer }, 400);
+    return json({
+      ok: false,
+      error: 'missing_params',
+      pairKey: '',
+      currency,
+      issuer,
+      freshness: summarizePrecomputeFreshness(null),
+    }, 400);
   }
 
   const row = await getPairPrecompute(pairKey, env);
+  const freshness = row?.freshness || summarizePrecomputeFreshness(null);
   return json({
     ok: true,
     pairKey,
     currency,
     issuer,
     found: Boolean(row),
+    freshness,
     row,
   });
 }
