@@ -20,15 +20,15 @@ function resolveLimit(rawLimit) {
   return Math.max(1, Math.min(1000, Math.floor(parsed)));
 }
 
-export async function onRequestGet({ request }) {
+export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const pool = url.searchParams.get('pool') || 'xrp-rlusd';
   const limit = resolveLimit(url.searchParams.get('limit'));
 
   const [latest, recent, historyMeta] = await Promise.all([
-    getLatestSnapshot(pool),
-    getRecentSnapshots(pool, limit),
-    getHistorySummary(pool),
+    getLatestSnapshot(pool, env),
+    getRecentSnapshots(pool, limit, env),
+    getHistorySummary(pool, env),
   ]);
 
   return json({
@@ -40,6 +40,6 @@ export async function onRequestGet({ request }) {
       ...historyMeta,
       pool,
     },
-    source: 'runtime-fallback',
+    source: historyMeta?.source || 'runtime-fallback',
   });
 }
