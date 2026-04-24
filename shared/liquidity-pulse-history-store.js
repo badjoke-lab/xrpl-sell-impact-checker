@@ -1,6 +1,8 @@
 const BASE_DIR = 'data/liquidity-pulse-history';
 const MAX_PER_KEY = 720;
 const D1_METRIC_PREFIX = 'liquidity-pulse';
+const LIQUIDITY_WARN_AFTER_MS = 20 * 60 * 1000;
+const LIQUIDITY_STALE_AFTER_MS = 45 * 60 * 1000;
 const memoryStore = globalThis.__xsicLiquidityPulseHistoryStore || new Map();
 globalThis.__xsicLiquidityPulseHistoryStore = memoryStore;
 
@@ -44,6 +46,41 @@ function keyFor(pool) {
 
 function metricKeyFor(resolved) {
   return `${D1_METRIC_PREFIX}:${resolved.key}`;
+}
+
+function parseTsMs(value) {
+  const parsed = Date.parse(value || '');
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function summarizeLiquidityFreshness(latestTs, now = Date.now()) {
+  const tsMs = parseTsMs(latestTs);
+  if (!tsMs) {
+    return {
+      state: 'missing',
+      ageMs: null,
+      warnAfterMs: LIQUIDITY_WARN_AFTER_MS,
+      staleAfterMs: LIQUIDITY_STALE_AFTER_MS,
+      isWarning: true,
+      isStale: true,
+    };
+  }
+
+  const ageMs = Math.max(0, Number(now) - tsMs);
+  const state = ageMs >= LIQUIDITY_STALE_AFTER_MS
+    ? 'stale'
+    : ageMs >= LIQUIDITY_WARN_AFTER_MS
+      ? 'aging'
+      : 'fresh';
+
+  return {
+    state,
+    ageMs,
+    warnAfterMs: LIQUIDITY_WARN_AFTER_MS,
+    staleAfterMs: LIQUIDITY_STALE_AFTER_MS,
+    isWarning: state !== 'fresh',
+    isStale: state === 'stale',
+  };
 }
 
 async function readFileList(filePath) {
@@ -104,6 +141,14 @@ function normalizeSnapshotForStore(snapshot, resolved) {
   };
 }
 
+function withFreshness(snapshot) {
+  if (!snapshot) return null;
+  return {
+    ...snapshot,
+    freshness: summarizeLiquidityFreshness(snapshot.ts),
+  };
+}
+
 function parseSnapshotJson(raw) {
   if (!raw) return null;
   try {
@@ -145,7 +190,7 @@ async function readD1Snapshots(resolved, env, limit = MAX_PER_KEY) {
     .map((row) => parseSnapshotJson(row.value_json))
     .filter(Boolean);
 
-  return sortByTs(rows);
+  return sortByTs(rows).map(withFreshness);
 }
 
 async function readSnapshots(resolved, env) {
@@ -153,7 +198,7 @@ async function readSnapshots(resolved, env) {
   if (Array.isArray(d1Rows)) return d1Rows;
 
   const mem = memoryStore.get(resolved.key);
-  if (Array.isArray(mem)) return sortByTs(mem);
+  if (Array.isArray(mem)) return sortByTs(mem).map(withFreshness);
 
   const filePath = await fileFor(resolved);
   if (filePath) {
@@ -161,7 +206,7 @@ async function readSnapshots(resolved, env) {
     if (Array.isArray(fileRows)) {
       const sorted = sortByTs(fileRows);
       memoryStore.set(resolved.key, sorted);
-      return sorted;
+      return sorted.map(withFreshness);
     }
   }
 
@@ -202,7 +247,7 @@ async function appendD1Snapshot(snapshot, resolved, env) {
     .bind(metricKey, MAX_PER_KEY)
     .run();
 
-  return incoming;
+  return withFreshness(incoming);
 }
 
 export async function readHistory(pool, env) {
@@ -233,7 +278,7 @@ export async function appendSnapshot(snapshot, env) {
     await writeFileList(filePath, { pool: resolved.pool, snapshots: trimmed });
   }
 
-  return trimmed[trimmed.length - 1] || null;
+  return withFreshness(trimmed[trimmed.length - 1] || null);
 }
 
 export async function getLatestSnapshot(pool, env) {
@@ -249,11 +294,11 @@ export async function getLatestSnapshot(pool, env) {
       .bind(metricKeyFor(resolved))
       .first();
     const parsed = parseSnapshotJson(row?.value_json);
-    if (parsed) return parsed;
+    if (parsed) return withFreshness(parsed);
   }
 
   const { snapshots } = await readHistory(pool, env);
-  return snapshots[snapshots.length - 1] || null;
+  return withFreshness(snapshots[snapshots.length - 1] || null);
 }
 
 export async function getRecentSnapshots(pool, limit = 60, env) {
@@ -263,7 +308,7 @@ export async function getRecentSnapshots(pool, limit = 60, env) {
 
   const { snapshots } = await readHistory(pool, env);
   const safeLimit = Math.max(1, Math.min(1000, Number(limit) || 60));
-  return snapshots.slice(Math.max(0, snapshots.length - safeLimit));
+  return snapshots.slice(Math.max(0, snapshots.length - safeLimit)).map(withFreshness);
 }
 
 export async function getHistorySummary(pool, env) {
@@ -279,20 +324,32 @@ export async function getHistorySummary(pool, env) {
       .bind(metricKeyFor(resolved))
       .first();
 
+    const newestTs = row?.newestTs || null;
     return {
       count: Number(row?.count || 0),
       oldestTs: row?.oldestTs || null,
-      newestTs: row?.newestTs || null,
+      newestTs,
       source: 'd1',
+      freshness: summarizeLiquidityFreshness(newestTs),
     };
   }
 
   const { snapshots } = await readHistory(pool, env);
-  if (!snapshots.length) return { count: 0, oldestTs: null, newestTs: null, source: 'runtime-fallback' };
+  if (!snapshots.length) {
+    return {
+      count: 0,
+      oldestTs: null,
+      newestTs: null,
+      source: 'runtime-fallback',
+      freshness: summarizeLiquidityFreshness(null),
+    };
+  }
+  const newestTs = snapshots[snapshots.length - 1].ts;
   return {
     count: snapshots.length,
     oldestTs: snapshots[0].ts,
-    newestTs: snapshots[snapshots.length - 1].ts,
+    newestTs,
     source: 'runtime-fallback',
+    freshness: summarizeLiquidityFreshness(newestTs),
   };
 }
