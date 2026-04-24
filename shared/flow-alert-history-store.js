@@ -2,6 +2,8 @@ const BASE_DIR = 'data/flow-history';
 // Canonical production history can still come from committed JSON.
 // When XSIC_DB is bound, runtime history persistence prefers D1.
 const MAX_PER_KEY = 200;
+const FLOW_WARN_AFTER_MS = 90 * 60 * 1000;
+const FLOW_STALE_AFTER_MS = 180 * 60 * 1000;
 const memoryStore = globalThis.__xsicFlowAlertHistoryStore || new Map();
 globalThis.__xsicFlowAlertHistoryStore = memoryStore;
 
@@ -54,6 +56,52 @@ function parseSnapshotText(raw) {
   }
 }
 
+function parseTsMs(value) {
+  if (value == null) return null;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function summarizeFlowFreshness(latestTs, now = Date.now()) {
+  const tsMs = parseTsMs(latestTs);
+  if (!tsMs) {
+    return {
+      state: 'missing',
+      ageMs: null,
+      warnAfterMs: FLOW_WARN_AFTER_MS,
+      staleAfterMs: FLOW_STALE_AFTER_MS,
+      isWarning: true,
+      isStale: true,
+    };
+  }
+
+  const ageMs = Math.max(0, Number(now) - tsMs);
+  const state = ageMs >= FLOW_STALE_AFTER_MS
+    ? 'stale'
+    : ageMs >= FLOW_WARN_AFTER_MS
+      ? 'aging'
+      : 'fresh';
+
+  return {
+    state,
+    ageMs,
+    warnAfterMs: FLOW_WARN_AFTER_MS,
+    staleAfterMs: FLOW_STALE_AFTER_MS,
+    isWarning: state !== 'fresh',
+    isStale: state === 'stale',
+  };
+}
+
+function withFreshness(snapshot) {
+  if (!snapshot) return null;
+  return {
+    ...snapshot,
+    freshness: summarizeFlowFreshness(snapshot.ts),
+  };
+}
+
 async function readFileList(filePath) {
   const api = await getFsApi();
   if (!api) return null;
@@ -102,7 +150,8 @@ async function readSnapshotsFromD1(db, resolved, limit = MAX_PER_KEY) {
   return (results || [])
     .map((row) => parseSnapshotText(row.snapshot_json))
     .filter(Boolean)
-    .reverse();
+    .reverse()
+    .map(withFreshness);
 }
 
 async function readLatestFromD1(db, resolved, offset = 0) {
@@ -114,7 +163,7 @@ async function readLatestFromD1(db, resolved, offset = 0) {
       LIMIT 1 OFFSET ?3`)
     .bind(resolved.preset, resolved.window, offset)
     .first();
-  return parseSnapshotText(row?.snapshot_json || null);
+  return withFreshness(parseSnapshotText(row?.snapshot_json || null));
 }
 
 async function readSummaryFromD1(db, resolved) {
@@ -125,11 +174,13 @@ async function readSummaryFromD1(db, resolved) {
     .bind(resolved.preset, resolved.window)
     .first();
 
+  const newestTs = row?.newestTs ?? null;
   return {
     count: Number(row?.count || 0),
     oldestTs: row?.oldestTs ?? null,
-    newestTs: row?.newestTs ?? null,
+    newestTs,
     storageMode: 'd1',
+    freshness: summarizeFlowFreshness(newestTs),
   };
 }
 
@@ -142,14 +193,14 @@ async function readSnapshots(resolved, env) {
   }
 
   const mem = memoryStore.get(resolved.key);
-  if (Array.isArray(mem)) return sortByTs(mem);
+  if (Array.isArray(mem)) return sortByTs(mem).map(withFreshness);
 
   const filePath = await fileFor(resolved);
   if (filePath) {
     const fileRows = await readFileList(filePath);
     if (Array.isArray(fileRows)) {
       memoryStore.set(resolved.key, sortByTs(fileRows));
-      return sortByTs(fileRows);
+      return sortByTs(fileRows).map(withFreshness);
     }
   }
   return [];
@@ -177,7 +228,7 @@ export async function appendSnapshot(snapshot, env) {
           VALUES (?1, ?2, ?3, ?4, ?5)`)
         .bind(resolved.preset, resolved.window, Number(snapshot?.ts || Date.now()), null, snapshotJson)
         .run();
-      return parseSnapshotText(snapshotJson);
+      return withFreshness(parseSnapshotText(snapshotJson));
     } catch {
       // fall through to memory/fs fallback
     }
@@ -193,7 +244,7 @@ export async function appendSnapshot(snapshot, env) {
     await writeFileList(filePath, { preset: resolved.preset, window: resolved.window, snapshots: trimmed });
   }
 
-  return trimmed[trimmed.length - 1] || null;
+  return withFreshness(trimmed[trimmed.length - 1] || null);
 }
 
 export async function getLatestSnapshot(preset, window, env) {
@@ -205,7 +256,7 @@ export async function getLatestSnapshot(preset, window, env) {
     } catch {}
   }
   const { snapshots } = await readHistory(preset, window, env);
-  return snapshots[snapshots.length - 1] || null;
+  return withFreshness(snapshots[snapshots.length - 1] || null);
 }
 
 export async function getPreviousSnapshot(preset, window, env) {
@@ -217,7 +268,7 @@ export async function getPreviousSnapshot(preset, window, env) {
     } catch {}
   }
   const { snapshots } = await readHistory(preset, window, env);
-  return snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
+  return snapshots.length >= 2 ? withFreshness(snapshots[snapshots.length - 2]) : null;
 }
 
 export async function getRecentSnapshots(preset, window, limit = 10, env) {
@@ -230,7 +281,7 @@ export async function getRecentSnapshots(preset, window, limit = 10, env) {
     } catch {}
   }
   const { snapshots } = await readHistory(preset, window, env);
-  return snapshots.slice(Math.max(0, snapshots.length - safeLimit));
+  return snapshots.slice(Math.max(0, snapshots.length - safeLimit)).map(withFreshness);
 }
 
 export async function getHistorySummary(preset, window, env) {
@@ -242,11 +293,21 @@ export async function getHistorySummary(preset, window, env) {
     } catch {}
   }
   const { snapshots } = await readHistory(preset, window, env);
-  if (!snapshots.length) return { count: 0, oldestTs: null, newestTs: null, storageMode: 'runtime-fallback' };
+  if (!snapshots.length) {
+    return {
+      count: 0,
+      oldestTs: null,
+      newestTs: null,
+      storageMode: 'runtime-fallback',
+      freshness: summarizeFlowFreshness(null),
+    };
+  }
+  const newestTs = snapshots[snapshots.length - 1].ts;
   return {
     count: snapshots.length,
     oldestTs: snapshots[0].ts,
-    newestTs: snapshots[snapshots.length - 1].ts,
+    newestTs,
     storageMode: 'runtime-fallback',
+    freshness: summarizeFlowFreshness(newestTs),
   };
 }
