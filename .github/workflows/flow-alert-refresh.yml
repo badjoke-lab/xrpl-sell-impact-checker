@@ -1,0 +1,46 @@
+name: Refresh Flow Alert snapshots
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Refresh exchanges 5m snapshot
+        env:
+          XSIC_URL: https://xsic.badjoke-lab.com
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=exchanges&window=5m&persist=1"
+
+      - name: Refresh exchanges 1h snapshot
+        env:
+          XSIC_URL: https://xsic.badjoke-lab.com
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=exchanges&window=1h&persist=1"
+
+      - name: Refresh whales 1h snapshot
+        env:
+          XSIC_URL: https://xsic.badjoke-lab.com
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=whales&window=1h&persist=1"
+
+      - name: Refresh ripple 24h snapshot
+        env:
+          XSIC_URL: https://xsic.badjoke-lab.com
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=ripple&window=24h&persist=1"
+
+      - name: Verify exchanges 5m history
+        env:
+          XSIC_URL: https://xsic.badjoke-lab.com
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/xrpl/flow-history?preset=exchanges&window=5m&limit=5"
