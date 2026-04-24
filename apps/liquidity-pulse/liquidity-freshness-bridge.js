@@ -1,5 +1,6 @@
 (() => {
   const HISTORY_API = '/api/xrpl/liquidity-history?pool=xrp-rlusd&limit=1';
+  const CURRENT_API = '/api/xrpl/liquidity-current?pool=xrp-rlusd';
   const REFRESH_MS = 60_000;
 
   function q(selector) {
@@ -8,6 +9,23 @@
 
   function setText(node, value) {
     if (node) node.textContent = value ?? '';
+  }
+
+  function isEmpty(node) {
+    const text = String(node?.textContent || '').trim();
+    return !text || text === '—' || /waiting|initialization|loading|placeholder/i.test(text);
+  }
+
+  function formatUsd(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    return `$${Math.round(n).toLocaleString()}`;
+  }
+
+  function formatPrice(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    return n.toFixed(6);
   }
 
   function formatAge(ageMs) {
@@ -40,6 +58,42 @@
       return `History source ${source || 'unknown'} · stale · ${age}. Treat trend bars as delayed context until refresh succeeds.`;
     }
     return `History source ${source || 'unknown'} · missing. Waiting for the first materialized Liquidity Pulse snapshot.`;
+  }
+
+  function applyCurrent(payload) {
+    const latest = payload?.latest;
+    if (!payload?.ok || !payload?.found || !latest) return;
+
+    const freshness = payload.freshness || latest.freshness || payload.historyMeta?.freshness || null;
+    const source = payload.source || payload.historyMeta?.source || 'runtime-fallback';
+    const freshnessState = stateLabel(freshness?.state);
+    const helper = `Current layer preload · ${source} · ${freshnessState} · ${formatAge(freshness?.ageMs)}`;
+
+    const pool = q('[data-snapshot="pool"]');
+    const price = q('[data-snapshot="price"]');
+    const liquidityUsd = q('[data-snapshot="liquidityUsd"]');
+    const swaps5m = q('[data-snapshot="swaps5m"]');
+    const deviationBps = q('[data-snapshot="deviationBps"]');
+    const sourceNode = q('[data-snapshot="source"]');
+    const badge = q('[data-snapshot="stateBadge"]');
+    const status = q('#lpStatus');
+    const helperNode = q('[data-snapshot="stateHelper"]');
+    const note = q('[data-snapshot="stateNote"]');
+
+    if (isEmpty(pool)) setText(pool, latest.poolLabel || latest.pool || 'XRP / RLUSD');
+    if (isEmpty(price)) setText(price, formatPrice(latest.price));
+    if (isEmpty(liquidityUsd)) setText(liquidityUsd, formatUsd(latest.liquidityUsd));
+    if (isEmpty(swaps5m)) setText(swaps5m, latest.swaps5m == null ? '—' : String(latest.swaps5m));
+    if (isEmpty(deviationBps)) setText(deviationBps, latest.deviationBps == null ? '—' : `${latest.deviationBps} bps`);
+    if (isEmpty(sourceNode)) setText(sourceNode, `${source} / ${freshnessState}`);
+    if (isEmpty(badge)) setText(badge, freshnessState === 'fresh' ? 'CURRENT' : freshnessState.toUpperCase());
+    if (isEmpty(status)) setText(status, `Status: ${helper}`);
+    if (isEmpty(helperNode)) setText(helperNode, helper);
+
+    if (note && freshnessState !== 'fresh') {
+      note.hidden = false;
+      setText(note, helper);
+    }
   }
 
   function applyFreshness(payload) {
@@ -79,7 +133,18 @@
     if (trend24 && /placeholder|warming|collecting|unavailable/i.test(trend24.textContent || '')) setText(trend24, `24h pulse · ${trendSuffix}`);
   }
 
+  async function refreshCurrent() {
+    try {
+      const res = await fetch(CURRENT_API, { cache: 'no-store', headers: { accept: 'application/json' } });
+      const payload = await res.json().catch(() => null);
+      applyCurrent(payload);
+    } catch {
+      // ignore current preload failure; core Liquidity Pulse renderer remains responsible for live reads
+    }
+  }
+
   async function refresh() {
+    await refreshCurrent();
     try {
       const res = await fetch(HISTORY_API, { cache: 'no-store', headers: { accept: 'application/json' } });
       const payload = await res.json().catch(() => null);
