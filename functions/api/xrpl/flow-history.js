@@ -4,6 +4,7 @@ import {
   getPreviousSnapshot,
   getRecentSnapshots,
   getHistorySummary,
+  summarizeFlowFreshness,
 } from '../../../shared/flow-alert-history-store.js';
 
 const PRIMARY_HISTORY_WINDOWS = new Set(['1h', '24h', '7d']);
@@ -32,6 +33,7 @@ function normalizeStaticPayload(payload, preset, window, limit) {
   const latest = payload?.latest || recent[recent.length - 1] || null;
   const previous = payload?.previous || (recent.length >= 2 ? recent[recent.length - 2] : null);
   const deltaSummary = payload?.deltaSummary || buildDeltaSummary(latest, previous);
+  const freshness = summarizeFlowFreshness(payload?.historyMeta?.newestTs ?? latest?.ts ?? null);
   const historyMeta = {
     count: payload?.historyMeta?.count ?? recentAll.length,
     oldestTs: payload?.historyMeta?.oldestTs ?? recentAll[0]?.ts ?? null,
@@ -40,12 +42,13 @@ function normalizeStaticPayload(payload, preset, window, limit) {
     window: payload?.historyMeta?.window || window,
     updatedAt: payload?.historyMeta?.updatedAt || null,
     storageMode: 'repo-json',
+    freshness,
   };
 
   return {
-    latest,
-    previous,
-    recent,
+    latest: latest ? { ...latest, freshness: summarizeFlowFreshness(latest.ts) } : null,
+    previous: previous ? { ...previous, freshness: summarizeFlowFreshness(previous.ts) } : null,
+    recent: recent.map((row) => ({ ...row, freshness: summarizeFlowFreshness(row.ts) })),
     deltaSummary,
     historyMeta,
   };
@@ -115,6 +118,7 @@ export async function onRequestGet({ request, env }) {
       recentNetSeries,
       recentEventCountSeries,
       historyMeta: staticHistory.historyMeta,
+      freshness: staticHistory.historyMeta?.freshness || null,
       source: 'repo-json',
       historyMode: 'primary',
     });
@@ -143,6 +147,7 @@ export async function onRequestGet({ request, env }) {
     recentNetSeries,
     recentEventCountSeries,
     historyMeta,
+    freshness: historyMeta?.freshness || latest?.freshness || null,
     source: storageMode,
     historyMode: shouldUseRepoHistory ? 'primary' : 'supplemental-live',
   });
