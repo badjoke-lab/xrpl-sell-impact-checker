@@ -167,7 +167,7 @@ async function fetchFreshSnapshot(preset) {
   throw new Error(lastError?.message || 'upstream_unreachable');
 }
 
-export async function onRequestGet({ request }) {
+export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const preset = resolvePool(url.searchParams.get('pool'));
 
@@ -187,7 +187,7 @@ export async function onRequestGet({ request }) {
   try {
     const fresh = await fetchFreshSnapshot(preset);
     try {
-      await appendSnapshot({ pool: preset.id, ...fresh });
+      await appendSnapshot({ pool: preset.id, ...fresh }, env);
     } catch {}
     cache.set(preset.id, { data: fresh, fetchedAt: now });
     return json(fresh);
