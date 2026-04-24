@@ -1,0 +1,53 @@
+name: Refresh Liquidity Pulse snapshots
+
+on:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger Liquidity Pulse snapshot refresh
+        env:
+          XSIC_URL: https://xsic.badjoke-lab.com
+        run: |
+          set -euo pipefail
+          response="$(curl -fsSL "$XSIC_URL/api/xrpl/amm-snapshot?pool=xrp-rlusd")"
+          echo "$response"
+          RESPONSE_JSON="$response" python3 - <<'PY'
+import json, os, sys
+payload = json.loads(os.environ['RESPONSE_JSON'])
+if payload.get('error'):
+    print(f"liquidity snapshot failed: {payload.get('error')}", file=sys.stderr)
+    sys.exit(1)
+if not payload.get('ts'):
+    print('liquidity snapshot failed: missing ts', file=sys.stderr)
+    sys.exit(1)
+print(f"liquidity snapshot ok: {payload.get('poolLabel') or payload.get('pool') or 'unknown'} @ {payload.get('ts')}")
+PY
+
+      - name: Verify Liquidity Pulse history rows
+        env:
+          XSIC_URL: https://xsic.badjoke-lab.com
+        run: |
+          set -euo pipefail
+          response="$(curl -fsSL "$XSIC_URL/api/xrpl/liquidity-history?pool=xrp-rlusd&limit=5")"
+          echo "$response"
+          RESPONSE_JSON="$response" python3 - <<'PY'
+import json, os, sys
+payload = json.loads(os.environ['RESPONSE_JSON'])
+if not payload.get('ok'):
+    print('liquidity history check failed: ok=false', file=sys.stderr)
+    sys.exit(1)
+meta = payload.get('historyMeta') or {}
+count = int(meta.get('count') or 0)
+if count <= 0:
+    print('liquidity history check failed: count<=0', file=sys.stderr)
+    sys.exit(1)
+source = payload.get('source') or meta.get('source') or 'unknown'
+freshness = (meta.get('freshness') or {}).get('state') or 'unknown'
+print(f"liquidity history ok: source={source}, count={count}, freshness={freshness}")
+PY
