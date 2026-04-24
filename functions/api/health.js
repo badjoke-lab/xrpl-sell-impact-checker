@@ -1,6 +1,7 @@
 import { getPopularPairs } from './_popular_pairs.js';
 import { getPairPrecomputeStats } from '../../shared/pair-precompute-store.js';
 import { getHistorySummary as getLiquidityHistorySummary } from '../../shared/liquidity-pulse-history-store.js';
+import { getHistorySummary as getFlowHistorySummary } from '../../shared/flow-alert-history-store.js';
 
 const XRPL_ENDPOINTS = [
   'https://xrplcluster.com/',
@@ -10,6 +11,8 @@ const XRPL_ENDPOINTS = [
 
 const UPSTREAM_TIMEOUT_MS = 4000;
 const LIQUIDITY_PULSE_POOL = 'xrp-rlusd';
+const FLOW_ALERT_PRESET = 'exchanges';
+const FLOW_ALERT_WINDOW = '5m';
 
 function jsonResponse(payload) {
   return new Response(JSON.stringify(payload), {
@@ -33,9 +36,10 @@ function safeFreshnessState(freshness) {
   return freshness?.state || 'missing';
 }
 
-function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats) {
+function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats) {
   const precomputeFreshness = precomputeStats?.freshness || null;
   const liquidityFreshness = liquidityStats?.freshness || null;
+  const flowFreshness = flowStats?.freshness || null;
   return {
     bindings,
     popular_pairs_count: popularPairs.length,
@@ -55,6 +59,15 @@ function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats
     liquidity_pulse_age_ms: liquidityFreshness?.ageMs ?? null,
     liquidity_pulse_warn_after_ms: liquidityFreshness?.warnAfterMs ?? null,
     liquidity_pulse_stale_after_ms: liquidityFreshness?.staleAfterMs ?? null,
+    flow_alert_preset: FLOW_ALERT_PRESET,
+    flow_alert_window: FLOW_ALERT_WINDOW,
+    flow_alert_source: flowStats?.storageMode || 'unknown',
+    flow_alert_history_count: Number(flowStats?.count || 0),
+    flow_alert_latest_ts: flowStats?.newestTs || null,
+    flow_alert_freshness: safeFreshnessState(flowFreshness),
+    flow_alert_age_ms: flowFreshness?.ageMs ?? null,
+    flow_alert_warn_after_ms: flowFreshness?.warnAfterMs ?? null,
+    flow_alert_stale_after_ms: flowFreshness?.staleAfterMs ?? null,
     quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
   };
 }
@@ -120,11 +133,12 @@ export async function onRequestGet({ env }) {
   const checkedAt = new Date().toISOString();
   const bindings = detectBindings(env);
   const popularPairs = getPopularPairs();
-  const [precomputeStats, liquidityStats] = await Promise.all([
+  const [precomputeStats, liquidityStats, flowStats] = await Promise.all([
     getPairPrecomputeStats(env),
     getLiquidityHistorySummary(LIQUIDITY_PULSE_POOL, env),
+    getFlowHistorySummary(FLOW_ALERT_PRESET, FLOW_ALERT_WINDOW, env),
   ]);
-  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats);
+  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats);
 
   try {
     let sawPartial = false;
@@ -160,6 +174,8 @@ export async function onRequestGet({ env }) {
             precompute_age_ms: foundation.precompute_age_ms,
             liquidity_pulse_freshness: foundation.liquidity_pulse_freshness,
             liquidity_pulse_age_ms: foundation.liquidity_pulse_age_ms,
+            flow_alert_freshness: foundation.flow_alert_freshness,
+            flow_alert_age_ms: foundation.flow_alert_age_ms,
             degraded_mode: false,
           },
           foundation,
@@ -187,6 +203,8 @@ export async function onRequestGet({ env }) {
         precompute_age_ms: foundation.precompute_age_ms,
         liquidity_pulse_freshness: foundation.liquidity_pulse_freshness,
         liquidity_pulse_age_ms: foundation.liquidity_pulse_age_ms,
+        flow_alert_freshness: foundation.flow_alert_freshness,
+        flow_alert_age_ms: foundation.flow_alert_age_ms,
         degraded_mode: true,
       },
       foundation,
@@ -207,6 +225,8 @@ export async function onRequestGet({ env }) {
         precompute_age_ms: foundation.precompute_age_ms,
         liquidity_pulse_freshness: foundation.liquidity_pulse_freshness,
         liquidity_pulse_age_ms: foundation.liquidity_pulse_age_ms,
+        flow_alert_freshness: foundation.flow_alert_freshness,
+        flow_alert_age_ms: foundation.flow_alert_age_ms,
         degraded_mode: true,
       },
       foundation,
