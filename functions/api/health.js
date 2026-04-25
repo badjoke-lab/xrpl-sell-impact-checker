@@ -72,6 +72,73 @@ function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats
   };
 }
 
+function buildFeatures(foundation) {
+  return {
+    sell_impact_precompute: {
+      role: 'Sell Impact initial preload and popular-pair route context',
+      source: 'd1:pair_precompute_current',
+      current_count: foundation.precompute_current_count,
+      latest_success_at: foundation.precompute_latest_success_at,
+      stale_count: foundation.precompute_stale_count,
+      freshness: foundation.precompute_freshness,
+      age_ms: foundation.precompute_age_ms,
+      warn_after_ms: foundation.precompute_warn_after_ms,
+      stale_after_ms: foundation.precompute_stale_after_ms,
+    },
+    liquidity_pulse: {
+      role: 'Liquidity Pulse current/history layer',
+      source: foundation.liquidity_pulse_source,
+      pool: foundation.liquidity_pulse_pool,
+      history_count: foundation.liquidity_pulse_history_count,
+      latest_ts: foundation.liquidity_pulse_latest_ts,
+      freshness: foundation.liquidity_pulse_freshness,
+      age_ms: foundation.liquidity_pulse_age_ms,
+      warn_after_ms: foundation.liquidity_pulse_warn_after_ms,
+      stale_after_ms: foundation.liquidity_pulse_stale_after_ms,
+    },
+    flow_alert: {
+      role: 'Flow Alert current/history layer',
+      source: foundation.flow_alert_source,
+      preset: foundation.flow_alert_preset,
+      window: foundation.flow_alert_window,
+      history_count: foundation.flow_alert_history_count,
+      latest_ts: foundation.flow_alert_latest_ts,
+      freshness: foundation.flow_alert_freshness,
+      age_ms: foundation.flow_alert_age_ms,
+      warn_after_ms: foundation.flow_alert_warn_after_ms,
+      stale_after_ms: foundation.flow_alert_stale_after_ms,
+    },
+  };
+}
+
+function buildOpsSummary({ bindings, features, upstreamStatus }) {
+  const warnings = [];
+  const degradedFeatures = [];
+
+  if (!bindings.d1_bound) warnings.push('D1 binding missing: paid current/history layers are unavailable.');
+  if (!bindings.kv_bound) warnings.push('KV binding missing: quote/cache layer is running cache-api-only.');
+  if (upstreamStatus !== 'ok') warnings.push(`XRPL upstream health is ${upstreamStatus}.`);
+
+  for (const [key, feature] of Object.entries(features)) {
+    if (feature.freshness === 'aging') warnings.push(`${key} is aging.`);
+    if (feature.freshness === 'stale' || feature.freshness === 'missing') {
+      degradedFeatures.push(key);
+      warnings.push(`${key} is ${feature.freshness}.`);
+    }
+  }
+
+  return {
+    status: warnings.length ? 'attention' : 'ok',
+    degraded_features: degradedFeatures,
+    warnings,
+    next_check: warnings.length ? 'Check scheduled workflow runs and feature endpoints.' : 'No immediate action needed.',
+  };
+}
+
+function featureFreshnessMap(features) {
+  return Object.fromEntries(Object.entries(features).map(([key, feature]) => [key, feature.freshness]));
+}
+
 async function fetchRpcHealth(endpoint) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
@@ -139,6 +206,8 @@ export async function onRequestGet({ env }) {
     getFlowHistorySummary(FLOW_ALERT_PRESET, FLOW_ALERT_WINDOW, env),
   ]);
   const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats);
+  const features = buildFeatures(foundation);
+  const featureFreshness = featureFreshnessMap(features);
 
   try {
     let sawPartial = false;
@@ -156,6 +225,7 @@ export async function onRequestGet({ env }) {
       });
 
       if (attempt.complete) {
+        const opsSummary = buildOpsSummary({ bindings, features, upstreamStatus: 'ok' });
         return jsonResponse({
           status: 'ok',
           checked_at: checkedAt,
@@ -176,9 +246,12 @@ export async function onRequestGet({ env }) {
             liquidity_pulse_age_ms: foundation.liquidity_pulse_age_ms,
             flow_alert_freshness: foundation.flow_alert_freshness,
             flow_alert_age_ms: foundation.flow_alert_age_ms,
-            degraded_mode: false,
+            feature_freshness: featureFreshness,
+            degraded_mode: opsSummary.status !== 'ok',
           },
           foundation,
+          features,
+          ops_summary: opsSummary,
         });
       }
 
@@ -187,8 +260,10 @@ export async function onRequestGet({ env }) {
       }
     }
 
+    const upstreamStatus = sawPartial ? 'stale' : 'down';
+    const opsSummary = buildOpsSummary({ bindings, features, upstreamStatus });
     return jsonResponse({
-      status: sawPartial ? 'stale' : 'down',
+      status: upstreamStatus,
       checked_at: checkedAt,
       details: {
         reason: sawPartial ? 'partial_upstream_response' : 'upstream_unreachable',
@@ -205,11 +280,15 @@ export async function onRequestGet({ env }) {
         liquidity_pulse_age_ms: foundation.liquidity_pulse_age_ms,
         flow_alert_freshness: foundation.flow_alert_freshness,
         flow_alert_age_ms: foundation.flow_alert_age_ms,
+        feature_freshness: featureFreshness,
         degraded_mode: true,
       },
       foundation,
+      features,
+      ops_summary: opsSummary,
     });
   } catch {
+    const opsSummary = buildOpsSummary({ bindings, features, upstreamStatus: 'down' });
     return jsonResponse({
       status: 'down',
       checked_at: checkedAt,
@@ -227,9 +306,12 @@ export async function onRequestGet({ env }) {
         liquidity_pulse_age_ms: foundation.liquidity_pulse_age_ms,
         flow_alert_freshness: foundation.flow_alert_freshness,
         flow_alert_age_ms: foundation.flow_alert_age_ms,
+        feature_freshness: featureFreshness,
         degraded_mode: true,
       },
       foundation,
+      features,
+      ops_summary: opsSummary,
     });
   }
 }
