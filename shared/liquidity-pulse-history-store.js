@@ -128,11 +128,6 @@ function sortByTs(rows) {
   return [...rows].sort((a, b) => toTs(a?.ts) - toTs(b?.ts));
 }
 
-function toFiniteOrNull(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
 function normalizeSnapshotForStore(snapshot, resolved) {
   return {
     ...snapshot,
@@ -158,19 +153,6 @@ function parseSnapshotJson(raw) {
   } catch {
     return null;
   }
-}
-
-function snapshotsEquivalent(a, b) {
-  if (!a || !b) return false;
-
-  return (
-    toFiniteOrNull(a?.price) === toFiniteOrNull(b?.price) &&
-    toFiniteOrNull(a?.liquidityUsd) === toFiniteOrNull(b?.liquidityUsd) &&
-    toFiniteOrNull(a?.reserves?.a) === toFiniteOrNull(b?.reserves?.a) &&
-    toFiniteOrNull(a?.reserves?.b) === toFiniteOrNull(b?.reserves?.b) &&
-    Boolean(a?.stale) === Boolean(b?.stale) &&
-    String(a?.source || '') === String(b?.source || '')
-  );
 }
 
 async function readD1Snapshots(resolved, env, limit = MAX_PER_KEY) {
@@ -218,9 +200,6 @@ async function appendD1Snapshot(snapshot, resolved, env) {
   if (!db) return null;
 
   const incoming = normalizeSnapshotForStore(snapshot, resolved);
-  const latest = await getLatestSnapshot(resolved.pool, env);
-  if (snapshotsEquivalent(latest, incoming)) return latest;
-
   const metricKey = metricKeyFor(resolved);
   const bucketTs = toBucketTs(incoming.ts);
   const valueJson = JSON.stringify(incoming);
@@ -263,12 +242,6 @@ export async function appendSnapshot(snapshot, env) {
 
   const prev = await readSnapshots(resolved, env);
   const incoming = normalizeSnapshotForStore(snapshot, resolved);
-
-  const latest = prev[prev.length - 1] || null;
-  if (snapshotsEquivalent(latest, incoming)) {
-    return latest;
-  }
-
   const merged = sortByTs(prev.concat([incoming]));
   const trimmed = merged.slice(Math.max(0, merged.length - MAX_PER_KEY));
   memoryStore.set(resolved.key, trimmed);
