@@ -21,6 +21,9 @@
       link.href = item.href;
       link.textContent = item.label;
       link.dataset.navItem = item.key;
+      if (item.key === 'donate') {
+        link.classList.add('site-nav__support');
+      }
       if (activeKey && activeKey === item.key) {
         link.classList.add('is-active');
         link.setAttribute('aria-current', 'page');
