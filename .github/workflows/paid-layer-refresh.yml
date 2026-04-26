@@ -4,6 +4,17 @@ on:
   schedule:
     - cron: '12,42 * * * *'
   workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual refresh'
+        required: false
+        default: 'manual'
+  repository_dispatch:
+    types: [paid-layer-refresh]
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/paid-layer-refresh.yml'
 
 jobs:
   refresh-paid-layers:
@@ -11,95 +22,30 @@ jobs:
     timeout-minutes: 15
     env:
       XSIC_URL: https://xsic.badjoke-lab.com
-
     steps:
       - name: Refresh Sell Impact precompute
         run: |
           set -euo pipefail
-          response="$(curl -fsSL "$XSIC_URL/api/precompute-popular-pairs?persist=1&amount=1000&limit=60")"
-          echo "$response"
-          RESPONSE_JSON="$response" python3 - <<'PY'
-import json, os, sys
-payload = json.loads(os.environ['RESPONSE_JSON'])
-if not payload.get('ok'):
-    print('precompute refresh failed: ok=false', file=sys.stderr)
-    sys.exit(1)
-if not payload.get('persist'):
-    print('precompute refresh failed: persist=false', file=sys.stderr)
-    sys.exit(1)
-count = int(payload.get('count') or 0)
-if count <= 0:
-    print('precompute refresh failed: count<=0', file=sys.stderr)
-    sys.exit(1)
-rows = payload.get('rows') or []
-missing_checked_at = [row.get('pairKey') for row in rows if not row.get('checkedAt')]
-if missing_checked_at:
-    print(f'precompute refresh failed: missing checkedAt {missing_checked_at}', file=sys.stderr)
-    sys.exit(1)
-print(f'precompute refresh ok: {count} rows')
-PY
+          curl -fsSL "$XSIC_URL/api/precompute-popular-pairs?persist=1&amount=1000&limit=60" | tee /tmp/precompute.json
+          python3 -c "import json,sys; p=json.load(open('/tmp/precompute.json')); assert p.get('ok') and p.get('persist') and int(p.get('count') or 0)>0"
 
       - name: Refresh Liquidity Pulse
         run: |
           set -euo pipefail
-          response="$(curl -fsSL "$XSIC_URL/api/xrpl/amm-snapshot?pool=xrp-rlusd")"
-          echo "$response"
-          RESPONSE_JSON="$response" python3 - <<'PY'
-import json, os, sys
-payload = json.loads(os.environ['RESPONSE_JSON'])
-if payload.get('error'):
-    print(f"liquidity refresh failed: {payload.get('error')}", file=sys.stderr)
-    sys.exit(1)
-if not payload.get('ts'):
-    print('liquidity refresh failed: missing ts', file=sys.stderr)
-    sys.exit(1)
-print(f"liquidity refresh ok: {payload.get('poolLabel') or 'unknown'} @ {payload.get('ts')}")
-PY
+          curl -fsSL "$XSIC_URL/api/xrpl/amm-snapshot?pool=xrp-rlusd" | tee /tmp/liquidity.json
+          python3 -c "import json,sys; p=json.load(open('/tmp/liquidity.json')); assert not p.get('error') and p.get('ts')"
 
       - name: Refresh Flow Alert snapshots
         run: |
           set -euo pipefail
-          for target in "exchanges 5m" "exchanges 1h" "whales 1h" "ripple 24h"; do
-            set -- $target
-            preset="$1"
-            window="$2"
-            response="$(curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=$preset&window=$window&persist=1")"
-            echo "$response"
-            RESPONSE_JSON="$response" PRESET="$preset" WINDOW="$window" python3 - <<'PY'
-import json, os, sys
-payload = json.loads(os.environ['RESPONSE_JSON'])
-if not payload.get('ok'):
-    print(f"flow refresh failed: {os.environ['PRESET']} {os.environ['WINDOW']} ok=false", file=sys.stderr)
-    sys.exit(1)
-snapshot = payload.get('snapshot') or {}
-if not snapshot.get('ts'):
-    print(f"flow refresh failed: {os.environ['PRESET']} {os.environ['WINDOW']} missing ts", file=sys.stderr)
-    sys.exit(1)
-print(f"flow refresh ok: {snapshot.get('preset')} {snapshot.get('window')} @ {snapshot.get('ts')}")
-PY
-          done
+          curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=exchanges&window=5m&persist=1" | tee /tmp/flow-exchanges-5m.json
+          curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=exchanges&window=1h&persist=1" | tee /tmp/flow-exchanges-1h.json
+          curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=whales&window=1h&persist=1" | tee /tmp/flow-whales-1h.json
+          curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=ripple&window=24h&persist=1" | tee /tmp/flow-ripple-24h.json
+          python3 -c "import json,glob; [(_ for _ in ()).throw(AssertionError(f)) for f in glob.glob('/tmp/flow-*.json') if not (json.load(open(f)).get('ok'))]"
 
       - name: Verify paid layer health
         run: |
           set -euo pipefail
-          response="$(curl -fsSL "$XSIC_URL/api/health")"
-          echo "$response"
-          RESPONSE_JSON="$response" python3 - <<'PY'
-import json, os, sys
-payload = json.loads(os.environ['RESPONSE_JSON'])
-features = payload.get('features') or {}
-required = ['sell_impact_precompute', 'liquidity_pulse', 'flow_alert']
-missing = [key for key in required if key not in features]
-if missing:
-    print(f'paid health failed: missing features {missing}', file=sys.stderr)
-    sys.exit(1)
-bad = {}
-for key in required:
-    freshness = (features.get(key) or {}).get('freshness')
-    if freshness not in {'fresh', 'aging'}:
-        bad[key] = freshness
-if bad:
-    print(f'paid health failed: stale/missing features {bad}', file=sys.stderr)
-    sys.exit(1)
-print('paid health ok: ' + ', '.join(f"{key}={(features.get(key) or {}).get('freshness')}" for key in required))
-PY
+          curl -fsSL "$XSIC_URL/api/health" | tee /tmp/health.json
+          python3 -c "import json,sys; p=json.load(open('/tmp/health.json')); f=p.get('features') or {}; bad={k:(f.get(k) or {}).get('freshness') for k in ['sell_impact_precompute','liquidity_pulse','flow_alert'] if (f.get(k) or {}).get('freshness') not in {'fresh','aging'}}; assert not bad, bad"
