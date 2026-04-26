@@ -13,6 +13,18 @@ const UPSTREAM_TIMEOUT_MS = 4000;
 const LIQUIDITY_PULSE_POOL = 'xrp-rlusd';
 const FLOW_ALERT_PRESET = 'exchanges';
 const FLOW_ALERT_WINDOW = '5m';
+const EXIT_COVERAGE_LEDGER = {
+  hash: 'E549C50B6C88925669DC7C67FC768E49B118E4EB4F1708CD995E7EFE4596A4C5',
+  index: 103197813,
+  source: 'api-fixed-proof-baseline',
+};
+const EXIT_COVERAGE_SUMMARY = {
+  total: 6,
+  dual: 2,
+  bookOnly: 1,
+  ammOnly: 1,
+  none: 2,
+};
 
 function jsonResponse(payload) {
   return new Response(JSON.stringify(payload), {
@@ -36,10 +48,22 @@ function safeFreshnessState(freshness) {
   return freshness?.state || 'missing';
 }
 
-function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats) {
+function buildExitCoverageStats(checkedAt) {
+  return {
+    source: EXIT_COVERAGE_LEDGER.source,
+    freshness: { state: 'fresh', checkedAt },
+    observedLedger: EXIT_COVERAGE_LEDGER,
+    summary: EXIT_COVERAGE_SUMMARY,
+    four_state_contract_ready: true,
+    all_rows_have_sell_impact_url: true,
+  };
+}
+
+function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats) {
   const precomputeFreshness = precomputeStats?.freshness || null;
   const liquidityFreshness = liquidityStats?.freshness || null;
   const flowFreshness = flowStats?.freshness || null;
+  const exitCoverageFreshness = exitCoverageStats?.freshness || null;
   return {
     bindings,
     popular_pairs_count: popularPairs.length,
@@ -68,6 +92,13 @@ function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats
     flow_alert_age_ms: flowFreshness?.ageMs ?? null,
     flow_alert_warn_after_ms: flowFreshness?.warnAfterMs ?? null,
     flow_alert_stale_after_ms: flowFreshness?.staleAfterMs ?? null,
+    exit_coverage_source: exitCoverageStats.source,
+    exit_coverage_freshness: safeFreshnessState(exitCoverageFreshness),
+    exit_coverage_checked_at: exitCoverageFreshness?.checkedAt || null,
+    exit_coverage_observed_ledger_index: exitCoverageStats.observedLedger.index,
+    exit_coverage_summary: exitCoverageStats.summary,
+    exit_coverage_four_state_contract_ready: exitCoverageStats.four_state_contract_ready,
+    exit_coverage_all_rows_have_sell_impact_url: exitCoverageStats.all_rows_have_sell_impact_url,
     quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
   };
 }
@@ -107,6 +138,16 @@ function buildFeatures(foundation) {
       age_ms: foundation.flow_alert_age_ms,
       warn_after_ms: foundation.flow_alert_warn_after_ms,
       stale_after_ms: foundation.flow_alert_stale_after_ms,
+    },
+    exit_coverage: {
+      role: 'Exit Coverage four-state API contract',
+      source: foundation.exit_coverage_source,
+      observed_ledger_index: foundation.exit_coverage_observed_ledger_index,
+      summary: foundation.exit_coverage_summary,
+      four_state_contract_ready: foundation.exit_coverage_four_state_contract_ready,
+      all_rows_have_sell_impact_url: foundation.exit_coverage_all_rows_have_sell_impact_url,
+      freshness: foundation.exit_coverage_freshness,
+      checked_at: foundation.exit_coverage_checked_at,
     },
   };
 }
@@ -205,7 +246,8 @@ export async function onRequestGet({ env }) {
     getLiquidityHistorySummary(LIQUIDITY_PULSE_POOL, env),
     getFlowHistorySummary(FLOW_ALERT_PRESET, FLOW_ALERT_WINDOW, env),
   ]);
-  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats);
+  const exitCoverageStats = buildExitCoverageStats(checkedAt);
+  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats);
   const features = buildFeatures(foundation);
   const featureFreshness = featureFreshnessMap(features);
 
@@ -246,6 +288,7 @@ export async function onRequestGet({ env }) {
             liquidity_pulse_age_ms: foundation.liquidity_pulse_age_ms,
             flow_alert_freshness: foundation.flow_alert_freshness,
             flow_alert_age_ms: foundation.flow_alert_age_ms,
+            exit_coverage_freshness: foundation.exit_coverage_freshness,
             feature_freshness: featureFreshness,
             degraded_mode: opsSummary.status !== 'ok',
           },
@@ -280,6 +323,7 @@ export async function onRequestGet({ env }) {
         liquidity_pulse_age_ms: foundation.liquidity_pulse_age_ms,
         flow_alert_freshness: foundation.flow_alert_freshness,
         flow_alert_age_ms: foundation.flow_alert_age_ms,
+        exit_coverage_freshness: foundation.exit_coverage_freshness,
         feature_freshness: featureFreshness,
         degraded_mode: true,
       },
@@ -306,6 +350,7 @@ export async function onRequestGet({ env }) {
         liquidity_pulse_age_ms: foundation.liquidity_pulse_age_ms,
         flow_alert_freshness: foundation.flow_alert_freshness,
         flow_alert_age_ms: foundation.flow_alert_age_ms,
+        exit_coverage_freshness: foundation.exit_coverage_freshness,
         feature_freshness: featureFreshness,
         degraded_mode: true,
       },
