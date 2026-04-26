@@ -6,7 +6,7 @@
     <title>XSIC | XRPL Signal & Insight Console</title>
     <meta
       name="description"
-      content="XSIC is an XRPL decision console for sell impact estimation, liquidity pulse checks, exit coverage checks, and exposure mapping before and after execution."
+      content="XSIC is an XRPL signal and insight console for checking sell impact, liquidity state, flow pressure, exit route coverage, issuer exposure, and emerging XRPL ecosystem signals before acting."
     />
     <link rel="canonical" href="https://xsic.badjoke-lab.com/" />
     <meta property="og:type" content="website" />
@@ -14,7 +14,7 @@
     <meta property="og:title" content="XSIC | XRPL Signal & Insight Console" />
     <meta
       property="og:description"
-      content="Use four XSIC apps to validate XRPL execution assumptions with one operational workflow."
+      content="XSIC is an XRPL signal and insight console for checking sell impact, liquidity state, flow pressure, exit route coverage, issuer exposure, and emerging XRPL ecosystem signals before acting."
     />
     <meta property="og:url" content="https://xsic.badjoke-lab.com/" />
     <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
@@ -22,10 +22,11 @@
     <meta name="twitter:title" content="XSIC | XRPL Signal & Insight Console" />
     <meta
       name="twitter:description"
-      content="Estimate impact, verify liquidity, confirm exit coverage, and inspect structural exposure in one XRPL console."
+      content="XSIC is an XRPL signal and insight console for checking sell impact, liquidity state, flow pressure, exit route coverage, issuer exposure, and emerging XRPL ecosystem signals before acting."
     />
     <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/home.css" />
     <link rel="icon" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
     <script type="application/ld+json">
@@ -33,8 +34,9 @@
         "@context": "https://schema.org",
         "@type": "WebSite",
         "name": "XSIC",
+        "alternateName": "XRPL Signal & Insight Console",
         "url": "https://xsic.badjoke-lab.com/",
-        "description": "XRPL Signal & Insight Console for sell impact, liquidity pulse, flow alert, and exposure graph workflows.",
+        "description": "XSIC is an XRPL signal and insight console for checking sell impact, liquidity state, flow pressure, exit route coverage, issuer exposure, and emerging XRPL ecosystem signals before acting.",
         "publisher": {
           "@type": "Organization",
           "name": "Badjoke-lab"
@@ -52,6 +54,11 @@
           },
           {
             "@type": "WebApplication",
+            "name": "Flow Alert",
+            "url": "https://xsic.badjoke-lab.com/apps/flow-alert/"
+          },
+          {
+            "@type": "WebApplication",
             "name": "Exit Coverage Map",
             "url": "https://xsic.badjoke-lab.com/apps/exit-coverage-map/"
           },
@@ -65,13 +72,14 @@
     </script>
   </head>
   <body data-nav-key="home">
-    <div class="app page console-page static-page">
+    <div class="app page console-page static-page home-page">
       <header class="app__header global-header">
         <div class="app__header-top">
           <a href="/" class="brand-link" aria-label="XSIC Home">
             <div class="app__brand">
               <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
-              <h1 class="app__title">XSIC</h1>
+              <span class="app__title">XSIC</span>
+              <span class="home-brand-subtitle">XRPL Signal &amp; Insight Console</span>
             </div>
           </a>
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
@@ -79,91 +87,149 @@
         </div>
       </header>
 
-      <main class="page__content static-content">
-        <section class="card console-hero" aria-labelledby="hero-heading">
-          <p class="eyebrow">XRPL decision console</p>
-          <h2 id="hero-heading" class="page__title">XSIC aligns pre-trade estimation, live context checks, and structural risk review in one operating flow.</h2>
-          <p class="page__lede">Use XSIC when execution decisions need bounded numbers plus context. Start with route-level impact, confirm that liquidity state is still valid, verify exit route coverage, then review concentration structure before size or timing changes.</p>
-        </section>
-
-        <section class="console-layout">
-          <section class="card" aria-labelledby="apps-heading">
-            <div class="card__header">
-              <div>
-                <p class="eyebrow">Core tools</p>
-                <h3 id="apps-heading">Four apps, one decision console</h3>
-              </div>
-            </div>
-            <div class="apps-grid">
-              <article class="app-card">
-                <h4>1) Sell Impact</h4>
-                <p>Estimate expected receive, impact range, and route dependence for a candidate execution size.</p>
-                <a class="secondary-button" href="/apps/sell-impact/">Open app</a>
-              </article>
-              <article class="app-card">
-                <h4>2) Liquidity Pulse</h4>
-                <p>Check whether observable depth posture is stable enough to support the same execution assumptions.</p>
-                <a class="secondary-button" href="/apps/liquidity-pulse/">Open app</a>
-              </article>
-              <article class="app-card">
-                <h4>3) Exit Coverage Map</h4>
-                <p>Check whether issuer tokens still have an XRP exit route through book, AMM, both, or neither before sizing execution.</p>
-                <a class="secondary-button" href="/apps/exit-coverage-map/">Open app</a>
-              </article>
-              <article class="app-card">
-                <h4>4) Exposure Graph</h4>
-                <p>Inspect issuer and trustline concentration to understand structural dependency behind the quoted market.</p>
-                <a class="secondary-button" href="/apps/exposure-graph/">Open app</a>
-              </article>
-            </div>
-          </section>
-
-          <aside class="card status-card" aria-labelledby="status-heading" data-status-strip="health">
-            <div class="card__header">
-              <div>
-                <p class="eyebrow">System state</p>
-                <h3 id="status-heading">Current service health</h3>
-              </div>
-            </div>
-            <p><strong>API:</strong> <span data-health="status">OK / stale / down</span></p>
-            <p><strong>Last refresh:</strong> <span data-health="last-refresh">—</span></p>
-            <details>
-              <summary>Details</summary>
-              <pre data-health="details">{}</pre>
-            </details>
-          </aside>
-        </section>
-
-        <section class="card" aria-labelledby="scope-heading">
-          <div class="card__header">
-            <div>
-              <p class="eyebrow">Usage boundary</p>
-              <h3 id="scope-heading">What XSIC does and does not do</h3>
+      <main class="page__content home-content">
+        <section class="home-hero card" aria-labelledby="hero-heading">
+          <div class="home-hero__copy">
+            <p class="eyebrow home-eyebrow">XRPL Signal &amp; Insight Console</p>
+            <h1 id="hero-heading" class="home-hero__title">Read XRPL market signals before you act.</h1>
+            <p class="home-hero__lede">XSIC combines sell impact, liquidity state, flow pressure, exit route coverage, and issuer exposure into one XRPL signal and insight console.</p>
+            <div class="home-hero__actions" aria-label="Primary actions">
+              <a class="primary-button home-button home-button--primary" href="/apps/sell-impact/">Start with Sell Impact <span aria-hidden="true">→</span></a>
+              <a class="secondary-button home-button" href="/apps/">View all apps <span aria-hidden="true">→</span></a>
+              <a class="secondary-button home-button" href="/methods/">Read methods <span aria-hidden="true">→</span></a>
             </div>
           </div>
-          <ul class="info-list">
-            <li><strong>XSIC does:</strong> provide estimation and context signals for execution planning and post-check discipline across four connected apps.</li>
-            <li><strong>XSIC does not:</strong> execute orders, guarantee fills, guarantee prices, or replace internal risk governance.</li>
-            <li><strong>Operator baseline:</strong> treat all outputs as decision inputs, not final truth; validate freshness and disagreement across apps before acting.</li>
-          </ul>
+          <div class="home-hero__visual" aria-hidden="true">
+            <div class="signal-orbit signal-orbit--outer"></div>
+            <div class="signal-orbit signal-orbit--inner"></div>
+            <div class="signal-node signal-node--one"></div>
+            <div class="signal-node signal-node--two"></div>
+            <div class="signal-node signal-node--three"></div>
+            <div class="signal-card signal-card--impact"><span>Sell Impact</span><strong>0.42%</strong><small>Est. slippage</small></div>
+            <div class="signal-card signal-card--liquidity"><span>Liquidity</span><strong>Healthy</strong><small>Depth stable</small></div>
+            <div class="signal-card signal-card--coverage"><span>Exit Coverage</span><strong>Both</strong><small>XRP route</small></div>
+          </div>
         </section>
 
-        <section class="card" aria-labelledby="links-heading">
-          <div class="card__header">
-            <div>
-              <p class="eyebrow">Reference pages</p>
-              <h3 id="links-heading">Read methods and policy before production use</h3>
-            </div>
+        <section class="home-status-strip card" data-status-strip="health" aria-label="Service status">
+          <div class="home-status-strip__main">
+            <span class="home-status-dot" aria-hidden="true">✓</span>
+            <strong>Service <span data-health="status">OK</span></strong>
+            <span class="home-status-separator">·</span>
+            <span>Free public XRPL tool</span>
+            <span class="home-status-separator">·</span>
+            <span>Donations help cover infrastructure</span>
+            <span class="home-status-separator">·</span>
+            <span>Last refresh: <span data-health="last-refresh">—</span></span>
           </div>
-          <p>These pages define interpretation rules, known limits, legal boundaries, and maintenance context for the full XSIC toolset.</p>
-          <ul class="inline-links">
-            <li><a href="/methods/">Methods</a></li>
-            <li><a href="/faq/">FAQ</a></li>
-            <li><a href="/disclaimer/">Disclaimer</a></li>
-            <li><a href="/credits/">Credits</a></li>
-            <li><a href="/donate/">Donate</a></li>
-          </ul>
+          <a class="secondary-button home-button home-status-strip__button" href="/donate/">♡ Support XSIC</a>
+          <details class="home-status-strip__details">
+            <summary>Details</summary>
+            <pre data-health="details">{}</pre>
+          </details>
         </section>
+
+        <section class="card home-section" aria-labelledby="workflow-heading">
+          <div class="home-section__header">
+            <h2 id="workflow-heading">Suggested workflow</h2>
+          </div>
+          <div class="workflow-grid">
+            <article class="workflow-card">
+              <span class="workflow-card__number">1</span>
+              <span class="workflow-card__icon">⌁</span>
+              <h3>Estimate impact</h3>
+              <p>See expected receive, slippage, and execution quality for your amount.</p>
+            </article>
+            <article class="workflow-card">
+              <span class="workflow-card__number">2</span>
+              <span class="workflow-card__icon">◌</span>
+              <h3>Check liquidity</h3>
+              <p>Confirm depth and short-horizon movement support your assumption.</p>
+            </article>
+            <article class="workflow-card">
+              <span class="workflow-card__number">3</span>
+              <span class="workflow-card__icon">≋</span>
+              <h3>Review flow pressure</h3>
+              <p>Review recent exchange, whale, and escrow-related flow pressure.</p>
+            </article>
+            <article class="workflow-card">
+              <span class="workflow-card__number">4</span>
+              <span class="workflow-card__icon">◇</span>
+              <h3>Confirm exit coverage</h3>
+              <p>Verify XRP exit routes through book, AMM, both, or neither.</p>
+            </article>
+            <article class="workflow-card">
+              <span class="workflow-card__number">5</span>
+              <span class="workflow-card__icon">⌬</span>
+              <h3>Inspect issuer exposure</h3>
+              <p>Inspect issuer concentration and trustline exposure behind the market.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="card home-section" aria-labelledby="apps-heading">
+          <div class="home-section__header">
+            <h2 id="apps-heading">Five core tools, one XRPL decision flow</h2>
+          </div>
+          <div class="home-tools-grid">
+            <article class="home-tool-card">
+              <span class="home-tool-card__icon">⌁</span>
+              <h3>Sell Impact</h3>
+              <p>Estimate receive, slippage, route mix, and execution quality for a token amount before trading.</p>
+              <a class="secondary-button home-button" href="/apps/sell-impact/">Estimate impact <span aria-hidden="true">→</span></a>
+            </article>
+            <article class="home-tool-card">
+              <span class="home-tool-card__icon">◌</span>
+              <h3>Liquidity Pulse</h3>
+              <p>Check whether current liquidity depth and short-horizon movement support the same execution assumption.</p>
+              <a class="secondary-button home-button" href="/apps/liquidity-pulse/">Check liquidity <span aria-hidden="true">→</span></a>
+            </article>
+            <article class="home-tool-card">
+              <span class="home-tool-card__icon">≋</span>
+              <h3>Flow Alert</h3>
+              <p>Review recent exchange, whale, and escrow-related flow pressure before interpreting market state.</p>
+              <a class="secondary-button home-button" href="/apps/flow-alert/">Open flow alerts <span aria-hidden="true">→</span></a>
+            </article>
+            <article class="home-tool-card">
+              <span class="home-tool-card__icon">◇</span>
+              <h3>Exit Coverage Map</h3>
+              <p>Check whether issuer tokens still have an XRP exit route through book, AMM, both, or neither.</p>
+              <a class="secondary-button home-button" href="/apps/exit-coverage-map/">Check exit coverage <span aria-hidden="true">→</span></a>
+            </article>
+            <article class="home-tool-card">
+              <span class="home-tool-card__icon">⌬</span>
+              <h3>Exposure Graph</h3>
+              <p>Inspect issuer concentration, trustline exposure, and issuer-control risk behind the quoted market.</p>
+              <a class="secondary-button home-button" href="/apps/exposure-graph/">Inspect exposure <span aria-hidden="true">→</span></a>
+            </article>
+          </div>
+        </section>
+
+        <section class="card home-support-card" aria-labelledby="support-heading">
+          <div class="home-support-card__icon" aria-hidden="true">♡</div>
+          <div class="home-support-card__copy">
+            <h2 id="support-heading">Support XSIC</h2>
+            <p>XSIC is free to use, but not free to operate. Donations help cover infrastructure, data refresh jobs, monitoring, maintenance, and continued development of XRPL signal tools.</p>
+            <p>Support is voluntary. Please use XSIC first and support it only if it is useful to you.</p>
+          </div>
+          <a class="primary-button home-button home-support-card__button" href="/donate/">♡ Donate</a>
+        </section>
+
+        <section class="card home-boundary-card" aria-labelledby="boundary-heading">
+          <div class="home-boundary-card__icon" aria-hidden="true">i</div>
+          <div>
+            <h2 id="boundary-heading">What XSIC does / does not do</h2>
+            <p>XSIC provides decision-support signals. It does not execute trades, guarantee fills, guarantee prices, or replace risk governance.</p>
+          </div>
+        </section>
+
+        <nav class="card home-reference-links" aria-label="Reference pages">
+          <a href="/methods/">Methods</a>
+          <a href="/faq/">FAQ</a>
+          <a href="/disclaimer/">Disclaimer</a>
+          <a href="/credits/">Credits</a>
+          <a href="/donate/">Donate</a>
+        </nav>
       </main>
       <div data-global-footer></div>
     </div>
