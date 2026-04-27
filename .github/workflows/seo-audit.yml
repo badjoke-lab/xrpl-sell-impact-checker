@@ -1,0 +1,36 @@
+name: SEO Audit
+
+on:
+  pull_request:
+    paths:
+      - '**/*.html'
+      - 'sitemap.xml'
+      - 'scripts/audit-seo.mjs'
+      - 'package.json'
+      - '.github/workflows/seo-audit.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.html'
+      - 'sitemap.xml'
+      - 'scripts/audit-seo.mjs'
+      - 'package.json'
+      - '.github/workflows/seo-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  audit-seo:
+    name: Audit SEO metadata and sitemap
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run SEO audit
+        run: node scripts/audit-seo.mjs
