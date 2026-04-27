@@ -43,7 +43,27 @@
   }
 
   const footerMount = document.querySelector('[data-global-footer]');
+
   if (footerMount) {
+    const path = window.location.pathname;
+    const isToolPage = /^\/apps\/[^/]+\/?$/.test(path);
+
+    if (isToolPage && !document.querySelector('[data-app-support-card]')) {
+      const supportCard = document.createElement('section');
+      supportCard.className = 'card app-support-card';
+      supportCard.dataset.appSupportCard = 'true';
+      supportCard.setAttribute('aria-labelledby', 'app-support-title');
+      supportCard.style.cssText = 'display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px;margin-top:4px;';
+      supportCard.innerHTML = `
+        <div style="display:grid;gap:8px;">
+          <p class="eyebrow" style="margin:0;">Support</p>
+          <h2 id="app-support-title" style="margin:0;font-size:1.15rem;">Keep XSIC running</h2>
+          <p style="margin:0;color:#475569;line-height:1.6;">If this tool helps your XRPL research or execution checks, consider supporting XSIC. Donations help cover infrastructure, refresh jobs, monitoring, and maintenance.</p>
+        </div>
+        <a class="primary-button" href="/donate/" style="width:auto;min-width:160px;text-align:center;text-decoration:none;">Support XSIC</a>`;
+      footerMount.parentNode?.insertBefore(supportCard, footerMount);
+    }
+
     footerMount.innerHTML = `
       <footer class="site-footer">
         <div class="site-footer__brand">
