@@ -44,8 +44,14 @@ jobs:
           curl -fsSL "$XSIC_URL/api/xrpl/flow-snapshot?preset=ripple&window=24h&persist=1" | tee /tmp/flow-ripple-24h.json
           python3 -c "import json,glob; [(_ for _ in ()).throw(AssertionError(f)) for f in glob.glob('/tmp/flow-*.json') if not (json.load(open(f)).get('ok'))]"
 
+      - name: Verify Exit Coverage API contract
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/exit-coverage?preset=expanded" | tee /tmp/exit-coverage.json
+          python3 -c "import json,sys; p=json.load(open('/tmp/exit-coverage.json')); s=p.get('summary') or {}; assert p.get('ok') and p.get('allRowsHaveSellImpactUrl') and s.get('dual')==2 and s.get('bookOnly')==1 and s.get('ammOnly')==1 and s.get('none')==2, p"
+
       - name: Verify paid layer health
         run: |
           set -euo pipefail
           curl -fsSL "$XSIC_URL/api/health" | tee /tmp/health.json
-          python3 -c "import json,sys; p=json.load(open('/tmp/health.json')); f=p.get('features') or {}; bad={k:(f.get(k) or {}).get('freshness') for k in ['sell_impact_precompute','liquidity_pulse','flow_alert'] if (f.get(k) or {}).get('freshness') not in {'fresh','aging'}}; assert not bad, bad"
+          python3 -c "import json,sys; p=json.load(open('/tmp/health.json')); f=p.get('features') or {}; required=['sell_impact_precompute','liquidity_pulse','flow_alert','exit_coverage']; missing=[k for k in required if k not in f]; assert not missing, missing; bad={k:(f.get(k) or {}).get('freshness') for k in required if (f.get(k) or {}).get('freshness') not in {'fresh','aging'}}; assert not bad, bad; ex=f.get('exit_coverage') or {}; assert ex.get('four_state_contract_ready') and ex.get('all_rows_have_sell_impact_url'), ex"
