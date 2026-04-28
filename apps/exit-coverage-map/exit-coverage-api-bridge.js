@@ -55,9 +55,14 @@
   function buildApiUrl() {
     const preset = q('#preset-select')?.value || 'expanded';
     const issuer = q('#issuer-input')?.value || '';
+    const currency = q('#currency-input')?.value || '';
     const normalizedIssuer = issuer.trim();
+    const normalizedCurrency = currency.trim();
     if (shouldUseLiveApi(normalizedIssuer, preset)) {
-      return `${LIVE_API}?issuer=${encodeURIComponent(normalizedIssuer)}`;
+      const url = new URL(LIVE_API, window.location.origin);
+      url.searchParams.set('issuer', normalizedIssuer);
+      if (normalizedCurrency) url.searchParams.set('currency', normalizedCurrency);
+      return `${url.pathname}${url.search}`;
     }
     return `${PROOF_API}?preset=${encodeURIComponent(preset)}&issuer=${encodeURIComponent(normalizedIssuer)}`;
   }
@@ -148,9 +153,9 @@
       setText(q('#detail-book'), '—');
       setText(q('#detail-amm'), '—');
       setText(q('#detail-key'), '—');
-      setText(q('#detail-explanation'), 'The issuer input is malformed or rejected by the runtime API.');
+      setText(q('#detail-explanation'), 'The issuer or currency input was rejected by the runtime API.');
       const list = q('#detail-evidence-list');
-      if (list) list.innerHTML = '<li>Expected failure: 404 / actMalformed.</li>';
+      if (list) list.innerHTML = `<li>${payload.invalidReason || 'Input rejected.'}</li>`;
       const link = q('#sell-impact-link');
       if (link) link.href = '/apps/sell-impact/';
       return;
@@ -206,16 +211,17 @@
     setText(q('#ledger-chip'), payload.mode === 'live' ? 'ledger: live/current' : `ledger: ${freshness.observedLedgerIndex || ledger.index || '—'}`);
     setText(q('#source-chip'), `source: ${payload.source || 'api'} / ${freshness.state || 'unknown'}`);
     setText(q('#issuer-chip'), `issuer: ${payload.issuer || '—'}`);
-    setText(q('#run-status'), payload.invalid ? 'INVALID ISSUER' : payload.mode === 'live' ? 'LIVE API READY' : 'API READY');
+    setText(q('#run-status'), payload.invalid ? 'INVALID INPUT' : payload.mode === 'live' ? 'LIVE API READY' : 'API READY');
     setText(q('#debug-preset'), payload.key || '—');
     setText(q('#debug-issuer'), payload.issuer || '—');
-    setText(q('#debug-ledger'), payload.mode === 'live' ? 'live/current / bounded seeded candidates' : `${freshness.observedLedgerHash || ledger.hash || '—'} / ${freshness.observedLedgerIndex || ledger.index || '—'}`);
+    setText(q('#debug-ledger'), payload.mode === 'live' ? 'live/current / bounded candidates' : `${freshness.observedLedgerHash || ledger.hash || '—'} / ${freshness.observedLedgerIndex || ledger.index || '—'}`);
     setText(q('#debug-json'), JSON.stringify({
       mode: payload.mode || 'proof',
       source: payload.source,
       freshness: payload.freshness,
       issuerCheck: payload.issuerCheck,
       summary: payload.summary,
+      limits: payload.limits,
       allRowsHaveSellImpactUrl: payload.allRowsHaveSellImpactUrl,
       selectedKey,
     }, null, 2));
@@ -255,7 +261,16 @@
   function mount() {
     q('#run-button')?.addEventListener('click', () => window.setTimeout(() => void loadFromApi(), 0));
     q('#preset-select')?.addEventListener('change', () => window.setTimeout(() => void loadFromApi(), 0));
-    q('#reset-button')?.addEventListener('click', () => window.setTimeout(() => void loadFromApi(), 0));
+    q('#currency-input')?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') window.setTimeout(() => void loadFromApi(), 0);
+    });
+    q('#issuer-input')?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') window.setTimeout(() => void loadFromApi(), 0);
+    });
+    q('#reset-button')?.addEventListener('click', () => {
+      if (q('#currency-input')) q('#currency-input').value = '';
+      window.setTimeout(() => void loadFromApi(), 0);
+    });
     void loadFromApi();
   }
 
