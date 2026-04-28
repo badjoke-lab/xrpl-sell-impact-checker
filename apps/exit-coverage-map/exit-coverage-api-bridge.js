@@ -1,5 +1,6 @@
 (() => {
-  const API = '/api/exit-coverage';
+  const PROOF_API = '/api/exit-coverage';
+  const LIVE_API = '/api/exit-coverage-live';
   const STATE_ORDER = { dual: 0, 'book-only': 1, 'amm-only': 2, none: 3 };
   let selectedKey = null;
   let lastRows = [];
@@ -42,6 +43,23 @@
 
   function displayIssuerCompact(value) {
     return compactMiddle(value, 10, 6);
+  }
+
+  function shouldUseLiveApi(issuer, preset) {
+    const normalizedIssuer = String(issuer || '').trim();
+    if (!normalizedIssuer) return false;
+    if (preset === 'invalid' || preset === 'empty') return false;
+    return true;
+  }
+
+  function buildApiUrl() {
+    const preset = q('#preset-select')?.value || 'expanded';
+    const issuer = q('#issuer-input')?.value || '';
+    const normalizedIssuer = issuer.trim();
+    if (shouldUseLiveApi(normalizedIssuer, preset)) {
+      return `${LIVE_API}?issuer=${encodeURIComponent(normalizedIssuer)}`;
+    }
+    return `${PROOF_API}?preset=${encodeURIComponent(preset)}&issuer=${encodeURIComponent(normalizedIssuer)}`;
   }
 
   function sortRows(rows) {
@@ -185,14 +203,15 @@
     const freshness = payload.freshness || {};
     const ledger = payload.observedLedger || {};
     setText(q('#proof-chip'), `runtime: ${payload.label || payload.key || 'coverage'}`);
-    setText(q('#ledger-chip'), `ledger: ${freshness.observedLedgerIndex || ledger.index || '—'}`);
+    setText(q('#ledger-chip'), payload.mode === 'live' ? 'ledger: live/current' : `ledger: ${freshness.observedLedgerIndex || ledger.index || '—'}`);
     setText(q('#source-chip'), `source: ${payload.source || 'api'} / ${freshness.state || 'unknown'}`);
     setText(q('#issuer-chip'), `issuer: ${payload.issuer || '—'}`);
-    setText(q('#run-status'), payload.invalid ? 'INVALID ISSUER' : 'API READY');
+    setText(q('#run-status'), payload.invalid ? 'INVALID ISSUER' : payload.mode === 'live' ? 'LIVE API READY' : 'API READY');
     setText(q('#debug-preset'), payload.key || '—');
     setText(q('#debug-issuer'), payload.issuer || '—');
-    setText(q('#debug-ledger'), `${freshness.observedLedgerHash || ledger.hash || '—'} / ${freshness.observedLedgerIndex || ledger.index || '—'}`);
+    setText(q('#debug-ledger'), payload.mode === 'live' ? 'live/current / bounded seeded candidates' : `${freshness.observedLedgerHash || ledger.hash || '—'} / ${freshness.observedLedgerIndex || ledger.index || '—'}`);
     setText(q('#debug-json'), JSON.stringify({
+      mode: payload.mode || 'proof',
       source: payload.source,
       freshness: payload.freshness,
       issuerCheck: payload.issuerCheck,
@@ -215,11 +234,9 @@
   }
 
   async function loadFromApi() {
-    const preset = q('#preset-select')?.value || 'expanded';
-    const issuer = q('#issuer-input')?.value || '';
     const status = q('#run-status');
     setText(status, 'API LOADING');
-    const url = `${API}?preset=${encodeURIComponent(preset)}&issuer=${encodeURIComponent(issuer)}`;
+    const url = buildApiUrl();
     try {
       const res = await fetch(url, { cache: 'no-store', headers: { accept: 'application/json' } });
       const payload = await res.json().catch(() => null);
