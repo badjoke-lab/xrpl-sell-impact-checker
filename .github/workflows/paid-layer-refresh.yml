@@ -62,6 +62,12 @@ jobs:
           curl -fsSL "$XSIC_URL/api/exit-coverage-live?issuer=rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq&currency=USD" | tee /tmp/exit-coverage-live-explicit.json
           python3 -c "import json,sys; p=json.load(open('/tmp/exit-coverage-live-explicit.json')); s=p.get('summary') or {}; rows=p.get('rows') or []; assert p.get('ok') and p.get('mode')=='live' and p.get('key')=='limited-live-explicit' and p.get('allRowsHaveSellImpactUrl') and int(s.get('total') or 0)==1 and rows and rows[0].get('currency')=='USD', p"
 
+      - name: Verify Route Compare API
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/route-compare?currency=USD&issuer=rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq&amount=1000&limit=60" | tee /tmp/route-compare.json
+          python3 -c "import json,sys; p=json.load(open('/tmp/route-compare.json')); routes=p.get('routes') or []; assert p.get('ok') and p.get('source')=='bounded-route-compare' and len(routes)==2 and p.get('rankedRouteIds') and p.get('sellImpactUrl') and p.get('limits',{}).get('allPairScanning') is False, p"
+
       - name: Verify paid layer health
         run: |
           set -euo pipefail
