@@ -56,6 +56,12 @@ jobs:
           curl -fsSL "$XSIC_URL/api/exit-coverage-live?issuer=rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq" | tee /tmp/exit-coverage-live.json
           python3 -c "import json,sys; p=json.load(open('/tmp/exit-coverage-live.json')); s=p.get('summary') or {}; assert p.get('ok') and p.get('mode')=='live' and p.get('allRowsHaveSellImpactUrl') and int(s.get('total') or 0)>0, p"
 
+      - name: Verify Exit Coverage explicit live endpoint
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/exit-coverage-live?issuer=rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq&currency=USD" | tee /tmp/exit-coverage-live-explicit.json
+          python3 -c "import json,sys; p=json.load(open('/tmp/exit-coverage-live-explicit.json')); s=p.get('summary') or {}; rows=p.get('rows') or []; assert p.get('ok') and p.get('mode')=='live' and p.get('key')=='limited-live-explicit' and p.get('allRowsHaveSellImpactUrl') and int(s.get('total') or 0)==1 and rows and rows[0].get('currency')=='USD', p"
+
       - name: Verify paid layer health
         run: |
           set -euo pipefail
