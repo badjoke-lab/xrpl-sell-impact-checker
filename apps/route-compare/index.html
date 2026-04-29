@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Route Compare — XSIC</title>
+    <meta
+      name="description"
+      content="Compare bounded XRPL order book and AMM exit routes for a token before continuing to Sell Impact."
+    />
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/route-compare/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:title" content="Route Compare — XSIC" />
+    <meta property="og:description" content="Compare bounded XRPL order book and AMM exit routes before continuing to Sell Impact." />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/route-compare/" />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Route Compare — XSIC" />
+    <meta name="twitter:description" content="Compare bounded XRPL order book and AMM exit routes before continuing to Sell Impact." />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/apps/route-compare/route-compare.css" />
+    <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <script type="application/ld+json">
+      [
+        {
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          "name": "Route Compare — XSIC",
+          "url": "https://xsic.badjoke-lab.com/apps/route-compare/",
+          "applicationCategory": "FinanceApplication",
+          "operatingSystem": "Web",
+          "isAccessibleForFree": true,
+          "description": "Compare bounded XRPL order book and AMM exit routes for a token before continuing to Sell Impact.",
+          "publisher": {"@type": "Organization", "name": "Badjoke-lab"}
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://xsic.badjoke-lab.com/"},
+            {"@type": "ListItem", "position": 2, "name": "Apps", "item": "https://xsic.badjoke-lab.com/apps/"},
+            {"@type": "ListItem", "position": 3, "name": "Route Compare", "item": "https://xsic.badjoke-lab.com/apps/route-compare/"}
+          ]
+        }
+      ]
+    </script>
+  </head>
+  <body data-nav-key="apps">
+    <noscript><p class="error-banner">JavaScript is required to use this tool.</p></noscript>
+    <div class="app page console-page route-compare-page">
+      <p class="error-banner" id="route-error" hidden></p>
+
+      <header class="app__header global-header">
+        <div class="app__header-top">
+          <a href="/" class="brand-link" aria-label="XSIC Home">
+            <div class="app__brand">
+              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+              <span class="app__title">XSIC</span>
+            </div>
+          </a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+          <div data-global-nav></div>
+        </div>
+      </header>
+
+      <main class="page__content">
+        <section class="hero-head">
+          <p class="eyebrow">Bounded route comparison / sell handoff</p>
+          <h1 class="page-title">Route Compare</h1>
+          <p class="page-subtitle">
+            Compare order book and AMM receive estimates for one issuer/currency pair. This is decision support only;
+            continue to Sell Impact for the full execution view.
+          </p>
+        </section>
+
+        <section class="card route-controls-card" aria-label="Route Compare controls">
+          <div class="route-controls-grid">
+            <label class="field">
+              Currency
+              <input id="rc-currency" autocomplete="off" value="USD" placeholder="USD or 40-char hex" />
+            </label>
+            <label class="field">
+              Issuer
+              <input id="rc-issuer" autocomplete="off" value="rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq" placeholder="Issuer address" />
+            </label>
+            <label class="field">
+              Amount
+              <input id="rc-amount" inputmode="decimal" value="1000" placeholder="1000" />
+            </label>
+            <label class="field">
+              Book depth limit
+              <input id="rc-limit" inputmode="numeric" value="60" placeholder="60" />
+            </label>
+            <button class="button button--primary primary-button" type="button" id="rc-run">Compare routes</button>
+            <div class="status-inline status">Status: <strong id="rc-status">READY</strong></div>
+          </div>
+          <div class="meta-chip-row">
+            <span class="meta-chip" id="rc-source-chip">source: bounded route compare</span>
+            <span class="meta-chip" id="rc-freshness-chip">freshness: —</span>
+            <span class="meta-chip" id="rc-limits-chip">all-pair scanning: off</span>
+          </div>
+        </section>
+
+        <section class="card route-summary-card" aria-labelledby="route-summary-heading">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Best observed route</p>
+              <h2 class="section-title" id="route-summary-heading">Route summary</h2>
+            </div>
+            <a class="button button--ghost secondary-button" id="rc-sell-impact-link" href="/apps/sell-impact/">Open Sell Impact</a>
+          </div>
+          <div class="route-summary-grid">
+            <div>
+              <p class="metric-label">Best route</p>
+              <p class="metric-value" id="rc-best-route">—</p>
+              <p class="metric-sub" id="rc-best-note">Waiting for comparison.</p>
+            </div>
+            <div>
+              <p class="metric-label">Best receive</p>
+              <p class="metric-value" id="rc-best-receive">—</p>
+              <p class="metric-sub">XRP estimated receive</p>
+            </div>
+            <div>
+              <p class="metric-label">Unavailable</p>
+              <p class="metric-value" id="rc-unavailable">—</p>
+              <p class="metric-sub">route families not observed</p>
+            </div>
+          </div>
+          <div class="flow-note flow-note--quiet" id="rc-advice">Run a bounded comparison to see route-level receive and slippage.</div>
+        </section>
+
+        <section class="route-card-grid" id="rc-routes" aria-label="Route candidates">
+          <article class="card route-card" data-route-card="book">
+            <div class="route-card__head">
+              <span class="route-card__label">Order book</span>
+              <span class="route-badge" data-route-field="availability">—</span>
+            </div>
+            <p class="route-card__value" data-route-field="receive">—</p>
+            <p class="route-card__sub">estimated XRP receive</p>
+            <dl class="route-detail-list">
+              <div><dt>Slippage</dt><dd data-route-field="slippage">—</dd></div>
+              <div><dt>Band</dt><dd data-route-field="band">—</dd></div>
+              <div><dt>Filled</dt><dd data-route-field="filled">—</dd></div>
+            </dl>
+            <ul class="route-evidence-list" data-route-field="evidence"><li>Waiting.</li></ul>
+          </article>
+
+          <article class="card route-card" data-route-card="amm">
+            <div class="route-card__head">
+              <span class="route-card__label">AMM</span>
+              <span class="route-badge" data-route-field="availability">—</span>
+            </div>
+            <p class="route-card__value" data-route-field="receive">—</p>
+            <p class="route-card__sub">estimated XRP receive</p>
+            <dl class="route-detail-list">
+              <div><dt>Slippage</dt><dd data-route-field="slippage">—</dd></div>
+              <div><dt>Band</dt><dd data-route-field="band">—</dd></div>
+              <div><dt>Filled</dt><dd data-route-field="filled">—</dd></div>
+            </dl>
+            <ul class="route-evidence-list" data-route-field="evidence"><li>Waiting.</li></ul>
+          </article>
+        </section>
+
+        <section class="card route-boundary-card">
+          <h2 class="section-title">Boundary</h2>
+          <p>
+            Route Compare is bounded to one pair and one amount. It does not discover all tokens, poll continuously,
+            store raw upstream bodies, or execute trades.
+          </p>
+        </section>
+      </main>
+
+      <div data-global-footer></div>
+    </div>
+    <script src="/shared/nav.js"></script>
+    <script src="/apps/route-compare/route-compare.js"></script>
+  </body>
+</html>
