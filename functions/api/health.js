@@ -25,6 +25,12 @@ const EXIT_COVERAGE_SUMMARY = {
   ammOnly: 1,
   none: 2,
 };
+const ROUTE_COMPARE_LIMITS = {
+  maxAmount: 1_000_000_000,
+  maxLimit: 120,
+  unboundedDiscovery: false,
+  allPairScanning: false,
+};
 
 function jsonResponse(payload) {
   return new Response(JSON.stringify(payload), {
@@ -59,11 +65,23 @@ function buildExitCoverageStats(checkedAt) {
   };
 }
 
-function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats) {
+function buildRouteCompareStats(checkedAt) {
+  return {
+    source: 'bounded-route-compare',
+    freshness: { state: 'fresh', checkedAt },
+    contract_ready: true,
+    route_families: ['book', 'amm'],
+    sell_impact_handoff_ready: true,
+    limits: ROUTE_COMPARE_LIMITS,
+  };
+}
+
+function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats) {
   const precomputeFreshness = precomputeStats?.freshness || null;
   const liquidityFreshness = liquidityStats?.freshness || null;
   const flowFreshness = flowStats?.freshness || null;
   const exitCoverageFreshness = exitCoverageStats?.freshness || null;
+  const routeCompareFreshness = routeCompareStats?.freshness || null;
   return {
     bindings,
     popular_pairs_count: popularPairs.length,
@@ -99,6 +117,13 @@ function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats
     exit_coverage_summary: exitCoverageStats.summary,
     exit_coverage_four_state_contract_ready: exitCoverageStats.four_state_contract_ready,
     exit_coverage_all_rows_have_sell_impact_url: exitCoverageStats.all_rows_have_sell_impact_url,
+    route_compare_source: routeCompareStats.source,
+    route_compare_freshness: safeFreshnessState(routeCompareFreshness),
+    route_compare_checked_at: routeCompareFreshness?.checkedAt || null,
+    route_compare_contract_ready: routeCompareStats.contract_ready,
+    route_compare_route_families: routeCompareStats.route_families,
+    route_compare_sell_impact_handoff_ready: routeCompareStats.sell_impact_handoff_ready,
+    route_compare_limits: routeCompareStats.limits,
     quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
   };
 }
@@ -148,6 +173,16 @@ function buildFeatures(foundation) {
       all_rows_have_sell_impact_url: foundation.exit_coverage_all_rows_have_sell_impact_url,
       freshness: foundation.exit_coverage_freshness,
       checked_at: foundation.exit_coverage_checked_at,
+    },
+    route_compare: {
+      role: 'Bounded book-vs-AMM route comparison',
+      source: foundation.route_compare_source,
+      route_families: foundation.route_compare_route_families,
+      contract_ready: foundation.route_compare_contract_ready,
+      sell_impact_handoff_ready: foundation.route_compare_sell_impact_handoff_ready,
+      limits: foundation.route_compare_limits,
+      freshness: foundation.route_compare_freshness,
+      checked_at: foundation.route_compare_checked_at,
     },
   };
 }
@@ -247,7 +282,8 @@ export async function onRequestGet({ env }) {
     getFlowHistorySummary(FLOW_ALERT_PRESET, FLOW_ALERT_WINDOW, env),
   ]);
   const exitCoverageStats = buildExitCoverageStats(checkedAt);
-  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats);
+  const routeCompareStats = buildRouteCompareStats(checkedAt);
+  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats);
   const features = buildFeatures(foundation);
   const featureFreshness = featureFreshnessMap(features);
 
@@ -289,6 +325,7 @@ export async function onRequestGet({ env }) {
             flow_alert_freshness: foundation.flow_alert_freshness,
             flow_alert_age_ms: foundation.flow_alert_age_ms,
             exit_coverage_freshness: foundation.exit_coverage_freshness,
+            route_compare_freshness: foundation.route_compare_freshness,
             feature_freshness: featureFreshness,
             degraded_mode: opsSummary.status !== 'ok',
           },
@@ -324,6 +361,7 @@ export async function onRequestGet({ env }) {
         flow_alert_freshness: foundation.flow_alert_freshness,
         flow_alert_age_ms: foundation.flow_alert_age_ms,
         exit_coverage_freshness: foundation.exit_coverage_freshness,
+        route_compare_freshness: foundation.route_compare_freshness,
         feature_freshness: featureFreshness,
         degraded_mode: true,
       },
@@ -351,6 +389,7 @@ export async function onRequestGet({ env }) {
         flow_alert_freshness: foundation.flow_alert_freshness,
         flow_alert_age_ms: foundation.flow_alert_age_ms,
         exit_coverage_freshness: foundation.exit_coverage_freshness,
+        route_compare_freshness: foundation.route_compare_freshness,
         feature_freshness: featureFreshness,
         degraded_mode: true,
       },
