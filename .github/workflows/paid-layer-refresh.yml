@@ -80,6 +80,12 @@ jobs:
           curl -fsSL "$XSIC_URL/api/retention-prune" | tee /tmp/retention-prune.json
           python3 -c "import json,sys; p=json.load(open('/tmp/retention-prune.json')); s=p.get('summary') or {}; retention=p.get('retention') or {}; plans=p.get('before') or []; keys={x.get('key') for x in plans}; assert p.get('ok') and p.get('dryRun') is True and s.get('status') in {'ok','attention'} and retention.get('rawUpstreamBodyRetention')=='forbidden', p; assert {'metric_hourly','metric_daily','flow_events','source_change_events','pair_precompute_current','source_current'} <= keys, keys"
 
+      - name: Apply retention prune
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/retention-prune?apply=1" | tee /tmp/retention-prune-apply.json
+          python3 -c "import json,sys; p=json.load(open('/tmp/retention-prune-apply.json')); s=p.get('summary') or {}; retention=p.get('retention') or {}; assert p.get('ok') and p.get('apply') is True and p.get('dryRun') is False and s.get('status') in {'ok','attention'} and retention.get('rawUpstreamBodyRetention')=='forbidden', p"
+
       - name: Verify paid layer health
         run: |
           set -euo pipefail
