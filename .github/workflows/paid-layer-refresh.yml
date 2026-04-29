@@ -68,6 +68,12 @@ jobs:
           curl -fsSL "$XSIC_URL/api/route-compare?currency=USD&issuer=rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq&amount=1000&limit=60" | tee /tmp/route-compare.json
           python3 -c "import json,sys; p=json.load(open('/tmp/route-compare.json')); routes=p.get('routes') or []; assert p.get('ok') and p.get('source')=='bounded-route-compare' and len(routes)==2 and p.get('rankedRouteIds') and p.get('sellImpactUrl') and p.get('limits',{}).get('allPairScanning') is False, p"
 
+      - name: Verify usage guard
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/usage-guard" | tee /tmp/usage-guard.json
+          python3 -c "import json,sys; p=json.load(open('/tmp/usage-guard.json')); summary=p.get('summary') or {}; policy=p.get('watcher_policy') or {}; retention=p.get('retention') or {}; assert p.get('ok') and summary.get('status') in {'ok','attention'} and not summary.get('critical'), p; assert policy.get('continuousPollingAllowed') is False and policy.get('unboundedDiscoveryAllowed') is False and policy.get('allPairScanningAllowed') is False, policy; assert retention.get('rawUpstreamBodyRetention')=='forbidden', retention"
+
       - name: Verify paid layer health
         run: |
           set -euo pipefail
