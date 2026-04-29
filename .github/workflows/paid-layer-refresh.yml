@@ -74,6 +74,12 @@ jobs:
           curl -fsSL "$XSIC_URL/api/usage-guard" | tee /tmp/usage-guard.json
           python3 -c "import json,sys; p=json.load(open('/tmp/usage-guard.json')); summary=p.get('summary') or {}; policy=p.get('watcher_policy') or {}; retention=p.get('retention') or {}; assert p.get('ok') and summary.get('status') in {'ok','attention'} and not summary.get('critical'), p; assert policy.get('continuousPollingAllowed') is False and policy.get('unboundedDiscoveryAllowed') is False and policy.get('allPairScanningAllowed') is False, policy; assert retention.get('rawUpstreamBodyRetention')=='forbidden', retention"
 
+      - name: Verify retention prune dry-run
+        run: |
+          set -euo pipefail
+          curl -fsSL "$XSIC_URL/api/retention-prune" | tee /tmp/retention-prune.json
+          python3 -c "import json,sys; p=json.load(open('/tmp/retention-prune.json')); s=p.get('summary') or {}; retention=p.get('retention') or {}; plans=p.get('before') or []; keys={x.get('key') for x in plans}; assert p.get('ok') and p.get('dryRun') is True and s.get('status') in {'ok','attention'} and retention.get('rawUpstreamBodyRetention')=='forbidden', p; assert {'metric_hourly','metric_daily','flow_events','source_change_events','pair_precompute_current','source_current'} <= keys, keys"
+
       - name: Verify paid layer health
         run: |
           set -euo pipefail
