@@ -31,6 +31,31 @@ const ROUTE_COMPARE_LIMITS = {
   unboundedDiscovery: false,
   allPairScanning: false,
 };
+const USAGE_GUARD_LIMITS = {
+  requestsMonthly: 1_800_000,
+  cpuMsMonthly: 5_500_000,
+  d1ReadsMonthly: 2_000_000_000,
+  d1WritesMonthly: 4_000_000,
+  d1StorageMb: 600,
+  kvReadsMonthly: 1_000_000,
+  kvWritesMonthly: 120_000,
+  kvStorageMb: 80,
+};
+const USAGE_GUARD_RETENTION = {
+  metricHourlyRowsPerKey: 720,
+  flowRowsPerPresetWindow: 200,
+  sourceChangeEventsDays: 30,
+  pairPrecomputeCurrentMode: 'upsert-current-only',
+  rawUpstreamBodyRetention: 'forbidden',
+};
+const USAGE_GUARD_WATCHER_POLICY = {
+  minRefreshSeconds: 60,
+  preferredRefreshSeconds: 300,
+  continuousPollingSeconds: 15,
+  continuousPollingAllowed: false,
+  unboundedDiscoveryAllowed: false,
+  allPairScanningAllowed: false,
+};
 
 function jsonResponse(payload) {
   return new Response(JSON.stringify(payload), {
@@ -76,12 +101,30 @@ function buildRouteCompareStats(checkedAt) {
   };
 }
 
-function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats) {
+function buildUsageGuardStats(checkedAt) {
+  return {
+    source: 'usage-guard',
+    endpoint: '/api/usage-guard',
+    freshness: { state: 'fresh', checkedAt },
+    contract_ready: true,
+    policy_ready: true,
+    limits: USAGE_GUARD_LIMITS,
+    retention: USAGE_GUARD_RETENTION,
+    watcher_policy: USAGE_GUARD_WATCHER_POLICY,
+    raw_body_retention_forbidden: USAGE_GUARD_RETENTION.rawUpstreamBodyRetention === 'forbidden',
+    continuous_polling_allowed: USAGE_GUARD_WATCHER_POLICY.continuousPollingAllowed,
+    unbounded_discovery_allowed: USAGE_GUARD_WATCHER_POLICY.unboundedDiscoveryAllowed,
+    all_pair_scanning_allowed: USAGE_GUARD_WATCHER_POLICY.allPairScanningAllowed,
+  };
+}
+
+function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats, usageGuardStats) {
   const precomputeFreshness = precomputeStats?.freshness || null;
   const liquidityFreshness = liquidityStats?.freshness || null;
   const flowFreshness = flowStats?.freshness || null;
   const exitCoverageFreshness = exitCoverageStats?.freshness || null;
   const routeCompareFreshness = routeCompareStats?.freshness || null;
+  const usageGuardFreshness = usageGuardStats?.freshness || null;
   return {
     bindings,
     popular_pairs_count: popularPairs.length,
@@ -124,6 +167,19 @@ function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats
     route_compare_route_families: routeCompareStats.route_families,
     route_compare_sell_impact_handoff_ready: routeCompareStats.sell_impact_handoff_ready,
     route_compare_limits: routeCompareStats.limits,
+    usage_guard_source: usageGuardStats.source,
+    usage_guard_endpoint: usageGuardStats.endpoint,
+    usage_guard_freshness: safeFreshnessState(usageGuardFreshness),
+    usage_guard_checked_at: usageGuardFreshness?.checkedAt || null,
+    usage_guard_contract_ready: usageGuardStats.contract_ready,
+    usage_guard_policy_ready: usageGuardStats.policy_ready,
+    usage_guard_limits: usageGuardStats.limits,
+    usage_guard_retention: usageGuardStats.retention,
+    usage_guard_watcher_policy: usageGuardStats.watcher_policy,
+    usage_guard_raw_body_retention_forbidden: usageGuardStats.raw_body_retention_forbidden,
+    usage_guard_continuous_polling_allowed: usageGuardStats.continuous_polling_allowed,
+    usage_guard_unbounded_discovery_allowed: usageGuardStats.unbounded_discovery_allowed,
+    usage_guard_all_pair_scanning_allowed: usageGuardStats.all_pair_scanning_allowed,
     quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
   };
 }
@@ -183,6 +239,22 @@ function buildFeatures(foundation) {
       limits: foundation.route_compare_limits,
       freshness: foundation.route_compare_freshness,
       checked_at: foundation.route_compare_checked_at,
+    },
+    usage_guard: {
+      role: 'Paid usage, retention, and watcher safety guard',
+      source: foundation.usage_guard_source,
+      endpoint: foundation.usage_guard_endpoint,
+      contract_ready: foundation.usage_guard_contract_ready,
+      policy_ready: foundation.usage_guard_policy_ready,
+      limits: foundation.usage_guard_limits,
+      retention: foundation.usage_guard_retention,
+      watcher_policy: foundation.usage_guard_watcher_policy,
+      raw_body_retention_forbidden: foundation.usage_guard_raw_body_retention_forbidden,
+      continuous_polling_allowed: foundation.usage_guard_continuous_polling_allowed,
+      unbounded_discovery_allowed: foundation.usage_guard_unbounded_discovery_allowed,
+      all_pair_scanning_allowed: foundation.usage_guard_all_pair_scanning_allowed,
+      freshness: foundation.usage_guard_freshness,
+      checked_at: foundation.usage_guard_checked_at,
     },
   };
 }
@@ -283,7 +355,8 @@ export async function onRequestGet({ env }) {
   ]);
   const exitCoverageStats = buildExitCoverageStats(checkedAt);
   const routeCompareStats = buildRouteCompareStats(checkedAt);
-  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats);
+  const usageGuardStats = buildUsageGuardStats(checkedAt);
+  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats, usageGuardStats);
   const features = buildFeatures(foundation);
   const featureFreshness = featureFreshnessMap(features);
 
@@ -326,6 +399,7 @@ export async function onRequestGet({ env }) {
             flow_alert_age_ms: foundation.flow_alert_age_ms,
             exit_coverage_freshness: foundation.exit_coverage_freshness,
             route_compare_freshness: foundation.route_compare_freshness,
+            usage_guard_freshness: foundation.usage_guard_freshness,
             feature_freshness: featureFreshness,
             degraded_mode: opsSummary.status !== 'ok',
           },
@@ -362,6 +436,7 @@ export async function onRequestGet({ env }) {
         flow_alert_age_ms: foundation.flow_alert_age_ms,
         exit_coverage_freshness: foundation.exit_coverage_freshness,
         route_compare_freshness: foundation.route_compare_freshness,
+        usage_guard_freshness: foundation.usage_guard_freshness,
         feature_freshness: featureFreshness,
         degraded_mode: true,
       },
@@ -390,6 +465,7 @@ export async function onRequestGet({ env }) {
         flow_alert_age_ms: foundation.flow_alert_age_ms,
         exit_coverage_freshness: foundation.exit_coverage_freshness,
         route_compare_freshness: foundation.route_compare_freshness,
+        usage_guard_freshness: foundation.usage_guard_freshness,
         feature_freshness: featureFreshness,
         degraded_mode: true,
       },
