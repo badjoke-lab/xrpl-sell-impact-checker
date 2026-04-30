@@ -1,5 +1,7 @@
 import { mountHeatmap } from '/shared/heatmap/heatmap-engine.js';
 
+const SNAPSHOT_VERSION = 1;
+
 const MODES = {
   market: {
     label: 'Market Mode',
@@ -29,15 +31,20 @@ const colorLabel = document.querySelector('[data-token-color-label]');
 const detailRoot = document.querySelector('[data-token-detail]');
 const rankingRoot = document.querySelector('[data-token-ranking]');
 const moveLabel = document.querySelector('[data-token-move-label]');
+const sourceLabel = document.querySelector('[data-token-source]');
+const countLabel = document.querySelector('[data-token-count-label]');
+const updatedLabel = document.querySelector('[data-token-updated]');
+const versionLabel = document.querySelector('[data-token-snapshot-version]');
 
 let currentMode = 'market';
 let moveMode = false;
-const demoTokens = makeDemoTokens(100);
+let snapshot = createDemoSnapshot();
+let tokens = snapshot.tokens;
 let heatmap = null;
 let selectedTokenId = null;
 
 function normalizeForMode(mode) {
-  return demoTokens.map((token) => ({
+  return tokens.map((token) => ({
     id: tokenId(token),
     label: token.currency,
     shortLabel: token.currency,
@@ -49,8 +56,11 @@ function normalizeForMode(mode) {
   }));
 }
 
-function boot() {
+async function boot() {
   if (!root) return;
+  snapshot = await loadSnapshot();
+  tokens = snapshot.tokens;
+  updateSnapshotStatus(snapshot);
   const items = normalizeForMode(currentMode);
   selectedTokenId = items[0]?.id || null;
   heatmap = mountHeatmap({
@@ -62,6 +72,56 @@ function boot() {
   });
   setMode(currentMode);
   updateRanking(items);
+}
+
+async function loadSnapshot() {
+  const fallback = createDemoSnapshot();
+  try {
+    const response = await fetch('/apps/token-heatmap/token-heatmap-snapshot.demo.json', { cache: 'no-store' });
+    if (!response.ok) return fallback;
+    const parsed = await response.json();
+    return normalizeSnapshot(parsed, fallback);
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function normalizeSnapshot(input, fallback) {
+  if (!input || typeof input !== 'object') return fallback;
+  const rawTokens = Array.isArray(input.tokens) ? input.tokens : [];
+  const safeTokens = rawTokens.map(normalizeToken).filter(Boolean).slice(0, 100);
+  if (!safeTokens.length) return fallback;
+  return {
+    snapshotVersion: Number(input.snapshotVersion) || SNAPSHOT_VERSION,
+    generatedAt: input.generatedAt || 'demo',
+    source: input.source || 'demo-json',
+    status: input.status || 'demo',
+    topLimit: Number(input.topLimit) || safeTokens.length,
+    note: input.note || '',
+    tokens: safeTokens,
+  };
+}
+
+function normalizeToken(token) {
+  if (!token || typeof token !== 'object') return null;
+  const currency = String(token.currency || '').trim();
+  const issuer = String(token.issuer || '').trim();
+  if (!currency || !issuer) return null;
+  const marketCap = toPositiveNumber(token.marketCap);
+  const liquidity = toPositiveNumber(token.liquidity);
+  const volume24h = toPositiveNumber(token.volume24h);
+  if (!marketCap && !liquidity && !volume24h) return null;
+  return {
+    currency,
+    issuer,
+    marketCap,
+    liquidity,
+    volume24h,
+    priceChange24h: toNumber(token.priceChange24h),
+    liquidityChange24h: toNumber(token.liquidityChange24h),
+    exitCoverage: normalizeExit(token.exitCoverage),
+    updatedAt: token.updatedAt || 'demo',
+  };
 }
 
 function setMode(mode) {
@@ -77,6 +137,16 @@ function setMode(mode) {
   const selected = items.find((item) => item.id === selectedTokenId) || items[0];
   updateDetail(selected);
   updateRanking(items);
+}
+
+function updateSnapshotStatus(current) {
+  if (sourceLabel) {
+    sourceLabel.textContent = current.status === 'demo' ? 'Demo data' : `Source: ${current.source}`;
+    sourceLabel.classList.toggle('token-chip--demo', current.status === 'demo');
+  }
+  if (countLabel) countLabel.textContent = `Showing top ${Math.min(current.topLimit || current.tokens.length, current.tokens.length)} XRPL tokens`;
+  if (updatedLabel) updatedLabel.textContent = `Last updated: ${current.generatedAt || '—'}`;
+  if (versionLabel) versionLabel.textContent = `snapshot v${current.snapshotVersion || SNAPSHOT_VERSION}`;
 }
 
 function updateDetail(node) {
@@ -100,7 +170,7 @@ function updateDetail(node) {
       <div class="token-metric"><dt>24h volume</dt><dd>${formatMoney(token.volume24h)}</dd></div>
       <div class="token-metric"><dt>24h change</dt><dd>${formatPct(token.priceChange24h)}</dd></div>
       <div class="token-metric"><dt>Liquidity 24h</dt><dd>${formatPct(token.liquidityChange24h)}</dd></div>
-      <div class="token-metric"><dt>Data status</dt><dd>Demo</dd></div>
+      <div class="token-metric"><dt>Data status</dt><dd>${escapeHtml(snapshot.status || 'demo')}</dd></div>
     </dl>
     <div class="token-link-grid" aria-label="Token actions">
       <a class="primary-button" href="${sellImpact}">Estimate sell impact</a>
@@ -143,6 +213,18 @@ countSelect?.addEventListener('change', () => {
 
 boot();
 
+function createDemoSnapshot() {
+  return {
+    snapshotVersion: SNAPSHOT_VERSION,
+    generatedAt: 'demo',
+    source: 'inline-demo',
+    status: 'demo',
+    topLimit: 100,
+    note: 'Synthetic data for layout and interaction preview only.',
+    tokens: makeDemoTokens(100),
+  };
+}
+
 function makeDemoTokens(count) {
   const symbols = ['XRPX','RLUSD','SOLO','CORE','CSC','ELS','XAH','VGB','BTCX','ETHX','USD','EUR','JPY','GOLD','SILV','ARMY','PHNIX','RPR','XRdoge','CNY','AUD','CAD','MXN','BRL','SGD','CHF','GBP','NZD','KRW','INR'];
   const exits = ['dual', 'book-only', 'amm-only', 'none'];
@@ -184,6 +266,11 @@ function shortIssuer(value) {
   return `${text.slice(0, 8)}…${text.slice(-6)}`;
 }
 
+function normalizeExit(value) {
+  if (value === 'dual' || value === 'book-only' || value === 'amm-only' || value === 'none') return value;
+  return 'unknown';
+}
+
 function exitScore(value) {
   if (value === 'dual') return 3;
   if (value === 'book-only') return 2;
@@ -198,6 +285,16 @@ function exitLabel(value) {
   if (value === 'amm-only') return 'AMM only';
   if (value === 'none') return 'No XRP exit observed';
   return 'Unknown';
+}
+
+function toNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function toPositiveNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
 }
 
 function formatMoney(value) {
