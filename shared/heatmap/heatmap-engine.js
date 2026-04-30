@@ -31,31 +31,46 @@ export function mountHeatmap(input) {
     overlayCtx: null,
   };
 
+  let redrawFrame = 0;
   const redraw = () => {
-    if (!state.tileCtx || !state.overlayCtx) return;
-    drawTilesLayer(state.tileCtx, state.nodes, state.camera, {
-      mode: state.mode,
-      selectedId: state.selectedId,
-      hoveredId: state.hoveredId,
-    });
-    drawOverlayLayer(state.overlayCtx, state.nodes, state.camera, {
-      selectedId: state.selectedId,
-      hoveredId: state.hoveredId,
+    cancelAnimationFrame(redrawFrame);
+    redrawFrame = requestAnimationFrame(() => {
+      if (!state.tileCtx || !state.overlayCtx) return;
+      drawTilesLayer(state.tileCtx, state.nodes, state.camera, {
+        mode: state.mode,
+        selectedId: state.selectedId,
+        hoveredId: state.hoveredId,
+      });
+      drawOverlayLayer(state.overlayCtx, state.nodes, state.camera, {
+        selectedId: state.selectedId,
+        hoveredId: state.hoveredId,
+      });
     });
   };
 
-  const relayout = () => {
+  const syncSelection = () => {
+    if (!state.nodes.length) {
+      state.selectedId = null;
+      input.onSelect?.(null);
+      return;
+    }
+    const existing = state.nodes.find((node) => node.id === state.selectedId);
+    const selected = existing || state.nodes[0];
+    state.selectedId = selected.id;
+    input.onSelect?.(selected);
+  };
+
+  const relayout = ({ preserveCamera = false } = {}) => {
     const rect = viewport.getBoundingClientRect();
     const width = Math.max(1, Math.floor(rect.width));
     const height = Math.max(1, Math.floor(rect.height));
-    state.camera = updateViewport(state.camera, width, height);
+    state.camera = preserveCamera
+      ? { ...state.camera, viewportWidth: width, viewportHeight: height }
+      : updateViewport(state.camera, width, height);
     state.nodes = buildSceneNodes(state.items, width, height);
     state.tileCtx = syncCanvasSize(tilesCanvas, width, height);
     state.overlayCtx = syncCanvasSize(overlayCanvas, width, height);
-    if (!state.selectedId && state.nodes[0]) {
-      state.selectedId = state.nodes[0].id;
-      input.onSelect?.(state.nodes[0]);
-    }
+    syncSelection();
     redraw();
   };
 
@@ -70,16 +85,16 @@ export function mountHeatmap(input) {
   let resizeFrame = 0;
   const resizeObserver = new ResizeObserver(() => {
     cancelAnimationFrame(resizeFrame);
-    resizeFrame = requestAnimationFrame(relayout);
+    resizeFrame = requestAnimationFrame(() => relayout());
   });
   resizeObserver.observe(viewport);
 
   relayout();
 
   return {
-    setItems(items) {
+    setItems(items, options = {}) {
       state.items = normalizeItems(items || []);
-      relayout();
+      relayout({ preserveCamera: Boolean(options.preserveCamera) });
     },
     setMode(mode) {
       state.mode = mode || 'market';
@@ -94,9 +109,13 @@ export function mountHeatmap(input) {
       state.camera = createFitCamera(rect.width, rect.height);
       redraw();
     },
+    getSelectedId() {
+      return state.selectedId;
+    },
     destroy() {
       resizeObserver.disconnect();
       cancelAnimationFrame(resizeFrame);
+      cancelAnimationFrame(redrawFrame);
       root.innerHTML = '';
     },
   };
