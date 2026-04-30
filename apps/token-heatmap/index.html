@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>XRPL Token Heatmap — XSIC</title>
+    <meta name="description" content="Explore a market, liquidity, and exit-route treemap for top XRPL tokens before opening deeper XSIC tools." />
+    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/token-heatmap/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="XSIC" />
+    <meta property="og:title" content="XRPL Token Heatmap — XSIC" />
+    <meta property="og:description" content="Explore top XRPL tokens by market, liquidity, and exit-route state." />
+    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/token-heatmap/" />
+    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="XRPL Token Heatmap — XSIC" />
+    <meta name="twitter:description" content="Explore top XRPL tokens by market, liquidity, and exit-route state." />
+    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/apps/token-heatmap/token-heatmap.css" />
+    <link rel="icon" href="/favicon.png" />
+  </head>
+  <body data-nav-key="apps">
+    <noscript><p class="error-banner">JavaScript is required to use this tool.</p></noscript>
+    <div class="app page console-page token-heatmap-page">
+      <header class="app__header global-header">
+        <div class="app__header-top">
+          <a href="/" class="brand-link" aria-label="XSIC Home">
+            <div class="app__brand">
+              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
+              <span class="app__title">XSIC</span>
+            </div>
+          </a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
+          <div data-global-nav></div>
+        </div>
+      </header>
+      <main class="page__content">
+        <section class="hero-head token-heatmap-hero">
+          <p class="eyebrow">Labs / Visualizer</p>
+          <h1 class="page-title">XRPL Token Heatmap</h1>
+          <p class="page-subtitle">Market, liquidity, and exit-route treemap for XRPL tokens. Start with Top 100 demo data, then expand after stability checks.</p>
+        </section>
+        <section class="card token-status-strip" aria-label="Snapshot status">
+          <div class="token-status-strip__main">
+            <span class="token-chip token-chip--demo">Demo data</span>
+            <span class="token-chip">Showing top 100 XRPL tokens</span>
+            <span class="token-chip" data-token-mode-label>Market Mode</span>
+            <span class="token-chip">Last updated: demo</span>
+          </div>
+        </section>
+        <section class="card token-controls-card" aria-label="Heatmap controls">
+          <div class="token-mode-row">
+            <div class="token-mode-buttons" role="group" aria-label="Heatmap display mode">
+              <button class="secondary-button token-mode-button" type="button" data-token-mode="market" aria-pressed="true">Market</button>
+              <button class="secondary-button token-mode-button" type="button" data-token-mode="liquidity" aria-pressed="false">Liquidity</button>
+              <button class="secondary-button token-mode-button" type="button" data-token-mode="exit" aria-pressed="false">Exit</button>
+            </div>
+            <div class="token-action-buttons">
+              <select class="token-count-select" data-token-count aria-label="Token count"><option value="100">Top 100</option><option value="200" disabled>Top 200 later</option><option value="300" disabled>Top 300 later</option></select>
+              <button class="secondary-button" type="button" data-token-reset>Reset zoom</button>
+              <button class="secondary-button" type="button" data-token-move>Control map</button>
+            </div>
+          </div>
+          <div class="token-chip-row"><span class="token-chip" data-token-area-label>Area: estimated market cap</span><span class="token-chip" data-token-color-label>Color: 24h price change</span><span class="token-chip" data-token-move-label>Page scroll</span></div>
+        </section>
+        <section class="token-map-layout" aria-label="Token heatmap and selected token detail">
+          <article class="card token-map-card">
+            <div class="token-map-head"><div><p class="eyebrow">Canvas treemap</p><h2 class="section-title">Token map</h2></div><p class="token-map-hint">Wheel scrolls page. Ctrl / Alt / Meta + wheel zooms the map.</p></div>
+            <div class="token-map-root" data-token-heatmap-root aria-label="XRPL token heatmap"></div>
+          </article>
+          <aside class="card token-detail-card" data-token-detail aria-live="polite"><p class="eyebrow">Selected token</p><h2 class="token-detail-symbol">—</h2><p class="token-detail-subtitle">Select a tile.</p></aside>
+        </section>
+        <section class="card" aria-labelledby="ranking-heading"><p class="eyebrow">Fallback list</p><h2 class="section-title" id="ranking-heading">Top tokens by selected size metric</h2><ol class="token-ranking-list" data-token-ranking></ol></section>
+        <section class="token-info-grid">
+          <article class="card"><p class="eyebrow">How to read</p><h2 class="section-title">Area is size. Color is signal.</h2><ul><li>Market Mode: size and price movement.</li><li>Liquidity Mode: depth and liquidity movement.</li><li>Exit Mode: observed XRP exit-route state.</li><li>Use focused XSIC tools before making assumptions.</li></ul></article>
+          <article class="card"><p class="eyebrow">Exit legend</p><h2 class="section-title">Route state is not a safety score</h2><div class="token-legend-row"><span class="token-legend-item"><span class="token-legend-swatch" style="background:#2f855a"></span>Book + AMM</span><span class="token-legend-item"><span class="token-legend-swatch" style="background:#3b82f6"></span>Book only</span><span class="token-legend-item"><span class="token-legend-swatch" style="background:#8b5cf6"></span>AMM only</span><span class="token-legend-item"><span class="token-legend-swatch" style="background:#b91c1c"></span>No XRP exit observed</span></div></article>
+        </section>
+      </main>
+      <div data-global-footer></div>
+    </div>
+    <script src="/shared/nav.js"></script>
+    <script type="module" src="/apps/token-heatmap/token-heatmap.js"></script>
+  </body>
+</html>
