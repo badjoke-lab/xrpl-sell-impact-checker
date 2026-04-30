@@ -56,6 +56,16 @@ const USAGE_GUARD_WATCHER_POLICY = {
   unboundedDiscoveryAllowed: false,
   allPairScanningAllowed: false,
 };
+const RETENTION_PRUNE_POLICY = {
+  endpoint: '/api/retention-prune',
+  dryRunEndpoint: '/api/retention-prune',
+  applyEndpoint: '/api/retention-prune?apply=1',
+  prunableTables: ['metric_hourly', 'metric_daily', 'flow_events', 'source_change_events'],
+  currentRowTables: ['pair_precompute_current', 'source_current'],
+  dryRunFirst: true,
+  scheduledApplyEnabled: true,
+  rawUpstreamBodyRetention: 'forbidden',
+};
 
 function jsonResponse(payload) {
   return new Response(JSON.stringify(payload), {
@@ -118,13 +128,35 @@ function buildUsageGuardStats(checkedAt) {
   };
 }
 
-function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats, usageGuardStats) {
+function buildRetentionPruneStats(checkedAt) {
+  return {
+    source: 'retention-prune',
+    endpoint: RETENTION_PRUNE_POLICY.endpoint,
+    freshness: { state: 'fresh', checkedAt },
+    contract_ready: true,
+    dry_run_ready: true,
+    apply_ready: true,
+    scheduled_apply_enabled: RETENTION_PRUNE_POLICY.scheduledApplyEnabled,
+    dry_run_first: RETENTION_PRUNE_POLICY.dryRunFirst,
+    prunable_tables: RETENTION_PRUNE_POLICY.prunableTables,
+    current_row_tables: RETENTION_PRUNE_POLICY.currentRowTables,
+    raw_body_retention_forbidden: RETENTION_PRUNE_POLICY.rawUpstreamBodyRetention === 'forbidden',
+    retention: {
+      ...USAGE_GUARD_RETENTION,
+      metricDailyDays: 400,
+      sourceCurrentMode: 'upsert-current-only',
+    },
+  };
+}
+
+function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats, usageGuardStats, retentionPruneStats) {
   const precomputeFreshness = precomputeStats?.freshness || null;
   const liquidityFreshness = liquidityStats?.freshness || null;
   const flowFreshness = flowStats?.freshness || null;
   const exitCoverageFreshness = exitCoverageStats?.freshness || null;
   const routeCompareFreshness = routeCompareStats?.freshness || null;
   const usageGuardFreshness = usageGuardStats?.freshness || null;
+  const retentionPruneFreshness = retentionPruneStats?.freshness || null;
   return {
     bindings,
     popular_pairs_count: popularPairs.length,
@@ -180,6 +212,19 @@ function buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats
     usage_guard_continuous_polling_allowed: usageGuardStats.continuous_polling_allowed,
     usage_guard_unbounded_discovery_allowed: usageGuardStats.unbounded_discovery_allowed,
     usage_guard_all_pair_scanning_allowed: usageGuardStats.all_pair_scanning_allowed,
+    retention_prune_source: retentionPruneStats.source,
+    retention_prune_endpoint: retentionPruneStats.endpoint,
+    retention_prune_freshness: safeFreshnessState(retentionPruneFreshness),
+    retention_prune_checked_at: retentionPruneFreshness?.checkedAt || null,
+    retention_prune_contract_ready: retentionPruneStats.contract_ready,
+    retention_prune_dry_run_ready: retentionPruneStats.dry_run_ready,
+    retention_prune_apply_ready: retentionPruneStats.apply_ready,
+    retention_prune_scheduled_apply_enabled: retentionPruneStats.scheduled_apply_enabled,
+    retention_prune_dry_run_first: retentionPruneStats.dry_run_first,
+    retention_prune_prunable_tables: retentionPruneStats.prunable_tables,
+    retention_prune_current_row_tables: retentionPruneStats.current_row_tables,
+    retention_prune_raw_body_retention_forbidden: retentionPruneStats.raw_body_retention_forbidden,
+    retention_prune_retention: retentionPruneStats.retention,
     quote_cache_mode: bindings.kv_bound ? 'kv+cache-api' : 'cache-api-only',
   };
 }
@@ -255,6 +300,22 @@ function buildFeatures(foundation) {
       all_pair_scanning_allowed: foundation.usage_guard_all_pair_scanning_allowed,
       freshness: foundation.usage_guard_freshness,
       checked_at: foundation.usage_guard_checked_at,
+    },
+    retention_prune: {
+      role: 'Bounded history pruning guard',
+      source: foundation.retention_prune_source,
+      endpoint: foundation.retention_prune_endpoint,
+      contract_ready: foundation.retention_prune_contract_ready,
+      dry_run_ready: foundation.retention_prune_dry_run_ready,
+      apply_ready: foundation.retention_prune_apply_ready,
+      scheduled_apply_enabled: foundation.retention_prune_scheduled_apply_enabled,
+      dry_run_first: foundation.retention_prune_dry_run_first,
+      prunable_tables: foundation.retention_prune_prunable_tables,
+      current_row_tables: foundation.retention_prune_current_row_tables,
+      raw_body_retention_forbidden: foundation.retention_prune_raw_body_retention_forbidden,
+      retention: foundation.retention_prune_retention,
+      freshness: foundation.retention_prune_freshness,
+      checked_at: foundation.retention_prune_checked_at,
     },
   };
 }
@@ -356,7 +417,8 @@ export async function onRequestGet({ env }) {
   const exitCoverageStats = buildExitCoverageStats(checkedAt);
   const routeCompareStats = buildRouteCompareStats(checkedAt);
   const usageGuardStats = buildUsageGuardStats(checkedAt);
-  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats, usageGuardStats);
+  const retentionPruneStats = buildRetentionPruneStats(checkedAt);
+  const foundation = buildFoundation(bindings, popularPairs, precomputeStats, liquidityStats, flowStats, exitCoverageStats, routeCompareStats, usageGuardStats, retentionPruneStats);
   const features = buildFeatures(foundation);
   const featureFreshness = featureFreshnessMap(features);
 
@@ -400,6 +462,7 @@ export async function onRequestGet({ env }) {
             exit_coverage_freshness: foundation.exit_coverage_freshness,
             route_compare_freshness: foundation.route_compare_freshness,
             usage_guard_freshness: foundation.usage_guard_freshness,
+            retention_prune_freshness: foundation.retention_prune_freshness,
             feature_freshness: featureFreshness,
             degraded_mode: opsSummary.status !== 'ok',
           },
@@ -437,6 +500,7 @@ export async function onRequestGet({ env }) {
         exit_coverage_freshness: foundation.exit_coverage_freshness,
         route_compare_freshness: foundation.route_compare_freshness,
         usage_guard_freshness: foundation.usage_guard_freshness,
+        retention_prune_freshness: foundation.retention_prune_freshness,
         feature_freshness: featureFreshness,
         degraded_mode: true,
       },
@@ -466,6 +530,7 @@ export async function onRequestGet({ env }) {
         exit_coverage_freshness: foundation.exit_coverage_freshness,
         route_compare_freshness: foundation.route_compare_freshness,
         usage_guard_freshness: foundation.usage_guard_freshness,
+        retention_prune_freshness: foundation.retention_prune_freshness,
         feature_freshness: featureFreshness,
         degraded_mode: true,
       },
