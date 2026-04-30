@@ -34,10 +34,11 @@ let currentMode = 'market';
 let moveMode = false;
 const demoTokens = makeDemoTokens(100);
 let heatmap = null;
+let selectedTokenId = null;
 
 function normalizeForMode(mode) {
   return demoTokens.map((token) => ({
-    id: `${token.currency}.${token.issuer}`,
+    id: tokenId(token),
     label: token.currency,
     shortLabel: token.currency,
     areaValue: mode === 'market' ? token.marketCap : token.liquidity,
@@ -51,14 +52,15 @@ function normalizeForMode(mode) {
 function boot() {
   if (!root) return;
   const items = normalizeForMode(currentMode);
+  selectedTokenId = items[0]?.id || null;
   heatmap = mountHeatmap({
     root,
     items,
+    selectedId: selectedTokenId,
     mode: currentMode,
     onSelect: updateDetail,
   });
   setMode(currentMode);
-  updateDetail(items[0]);
   updateRanking(items);
 }
 
@@ -70,14 +72,16 @@ function setMode(mode) {
   if (modeLabel) modeLabel.textContent = def.label;
   if (areaLabel) areaLabel.textContent = `Area: ${def.area}`;
   if (colorLabel) colorLabel.textContent = `Color: ${def.color}`;
-  heatmap?.setItems(items);
+  heatmap?.setItems(items, { preserveCamera: true });
   heatmap?.setMode(mode);
-  updateDetail(items[0]);
+  const selected = items.find((item) => item.id === selectedTokenId) || items[0];
+  updateDetail(selected);
   updateRanking(items);
 }
 
 function updateDetail(node) {
   if (!detailRoot || !node) return;
+  selectedTokenId = node.id || tokenId(node.meta || node);
   const token = node.meta || node;
   const sellImpact = `/apps/sell-impact/?currency=${encodeURIComponent(token.currency)}&issuer=${encodeURIComponent(token.issuer)}`;
   const routeCompare = `/apps/route-compare/?currency=${encodeURIComponent(token.currency)}&issuer=${encodeURIComponent(token.issuer)}`;
@@ -163,6 +167,10 @@ function makeDemoTokens(count) {
       updatedAt: 'demo',
     };
   });
+}
+
+function tokenId(token) {
+  return `${token.currency}.${token.issuer}`;
 }
 
 function demoIssuer(index) {
