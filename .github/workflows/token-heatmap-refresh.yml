@@ -62,7 +62,7 @@ jobs:
       - name: Commit snapshot if changed
         run: |
           set -euo pipefail
-          if git diff --quiet -- apps/token-heatmap/token-heatmap-snapshot.json; then
+          if [ -z "$(git status --porcelain -- apps/token-heatmap/token-heatmap-snapshot.json)" ]; then
             echo 'No token heatmap snapshot changes.'
             exit 0
           fi
