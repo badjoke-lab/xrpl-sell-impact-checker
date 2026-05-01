@@ -50,8 +50,8 @@ let selectedTokenId = null;
 function normalizeForMode(mode) {
   return tokens.map((token) => ({
     id: tokenId(token),
-    label: token.currency,
-    shortLabel: token.currency,
+    label: token.displayCurrency || token.currency,
+    shortLabel: token.displayCurrency || token.currency,
     areaValue: mode === 'market' ? token.marketCap : token.liquidity,
     colorValue: mode === 'market' ? token.priceChange24h : mode === 'liquidity' ? token.liquidityChange24h : exitScore(token.exitCoverage),
     secondaryValue: mode === 'market' ? token.volume24h : token.liquidity,
@@ -120,6 +120,7 @@ function normalizeToken(token) {
   if (!marketCap && !liquidity && !volume24h) return null;
   return {
     currency,
+    displayCurrency: String(token.displayCurrency || decodeCurrency(currency)).trim(),
     issuer,
     marketCap,
     liquidity,
@@ -160,6 +161,7 @@ function updateDetail(node) {
   if (!detailRoot || !node) return;
   selectedTokenId = node.id || tokenId(node.meta || node);
   const token = node.meta || node;
+  const label = token.displayCurrency || token.currency;
   const sellImpact = `/apps/sell-impact/?currency=${encodeURIComponent(token.currency)}&issuer=${encodeURIComponent(token.issuer)}`;
   const routeCompare = `/apps/route-compare/?currency=${encodeURIComponent(token.currency)}&issuer=${encodeURIComponent(token.issuer)}`;
   const liquidityPulse = `/apps/liquidity-pulse/?currency=${encodeURIComponent(token.currency)}&issuer=${encodeURIComponent(token.issuer)}`;
@@ -168,15 +170,15 @@ function updateDetail(node) {
   detailRoot.innerHTML = `
     <div class="token-detail-card__head">
       <p class="eyebrow">Selected token</p>
-      <h2 class="token-detail-symbol">${escapeHtml(token.currency)}</h2>
+      <h2 class="token-detail-symbol">${escapeHtml(label)}</h2>
       <p class="token-detail-subtitle">${escapeHtml(shortIssuer(token.issuer))} · ${escapeHtml(exitLabel(token.exitCoverage))}</p>
     </div>
     <dl class="token-metric-grid">
+      <div class="token-metric"><dt>Currency code</dt><dd>${escapeHtml(token.currency)}</dd></div>
       <div class="token-metric"><dt>Market cap</dt><dd>${formatMoney(token.marketCap)}</dd></div>
       <div class="token-metric"><dt>Liquidity</dt><dd>${formatMoney(token.liquidity)}</dd></div>
       <div class="token-metric"><dt>24h volume</dt><dd>${formatMoney(token.volume24h)}</dd></div>
       <div class="token-metric"><dt>24h change</dt><dd>${formatPct(token.priceChange24h)}</dd></div>
-      <div class="token-metric"><dt>Liquidity 24h</dt><dd>${formatPct(token.liquidityChange24h)}</dd></div>
       <div class="token-metric"><dt>Data status</dt><dd>${escapeHtml(snapshot.status || 'demo')}</dd></div>
     </dl>
     <div class="token-link-grid" aria-label="Token actions">
@@ -246,6 +248,7 @@ function makeDemoTokens(count) {
     const liquidityChange24h = Number((Math.cos(rank * 1.17) * 8.5).toFixed(2));
     return {
       currency: symbol,
+      displayCurrency: symbol,
       issuer: demoIssuer(index),
       marketCap,
       liquidity,
@@ -276,6 +279,18 @@ function shortIssuer(value) {
 function normalizeExit(value) {
   if (value === 'dual' || value === 'book-only' || value === 'amm-only' || value === 'none') return value;
   return 'unknown';
+}
+
+function decodeCurrency(value) {
+  const text = String(value || '').trim();
+  if (!/^[0-9A-Fa-f]{40}$/.test(text)) return text;
+  try {
+    const bytes = text.match(/.{2}/g).map((part) => Number.parseInt(part, 16)).filter((code) => code > 0);
+    const decoded = String.fromCharCode(...bytes).trim();
+    return /^[\x20-\x7E]{1,20}$/.test(decoded) ? decoded : text;
+  } catch (_) {
+    return text;
+  }
 }
 
 function exitScore(value) {

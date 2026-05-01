@@ -31,7 +31,7 @@ async function main() {
     }
   }
 
-  const best = chooseBestProbe(probes);
+  const best = chooseSnapshotProbe(probes, limit);
   if (!best || !best.normalized.length) {
     console.error(JSON.stringify({ ok: false, probes: probes.map((probe) => ({ url: probe.url, ok: probe.ok, error: probe.error || null, rows: probe.rows.length, normalized: probe.normalized.length })) }, null, 2));
     process.exitCode = 1;
@@ -59,17 +59,17 @@ async function fetchJson(url) {
   const response = await fetch(url, {
     headers: {
       accept: 'application/json',
-      'user-agent': 'xsic-token-heatmap-updater/1.0',
+      'user-agent': 'xsic-token-heatmap-updater/1.1',
     },
   });
   if (!response.ok) throw new Error(`fetch failed: ${response.status} ${response.statusText}`);
   return response.json();
 }
 
-function chooseBestProbe(probes) {
-  return probes
-    .filter((probe) => probe.ok)
-    .sort((a, b) => scoreRows(b.normalized) - scoreRows(a.normalized))[0] || null;
+function chooseSnapshotProbe(probes, limit) {
+  const successful = probes.filter((probe) => probe.ok);
+  const firstGood = successful.find((probe) => probe.normalized.length >= Math.min(50, limit) && probe.normalized.filter((row) => row.marketCap > 0).length >= Math.min(50, limit));
+  return firstGood || successful.sort((a, b) => scoreRows(b.normalized) - scoreRows(a.normalized))[0] || null;
 }
 
 function scoreRows(rows) {
@@ -105,9 +105,11 @@ function normalizeRow(row) {
   if (!marketCap && !liquidity && !volume24h) return null;
 
   const sourceScore = (marketCap > 0 ? 5 : 0) + (volume24h > 0 ? 4 : 0) + (liquidity > 0 ? 2 : 0) + (priceChange24h !== 0 ? 1 : 0);
+  const displayCurrency = firstString(row.displayCurrency, row.display_currency, row.ticker, row.symbol) || decodeCurrency(currency);
 
   return {
     currency,
+    displayCurrency,
     issuer,
     marketCap,
     liquidity,
@@ -118,6 +120,18 @@ function normalizeRow(row) {
     updatedAt: String(updatedAt),
     _sourceScore: sourceScore,
   };
+}
+
+function decodeCurrency(value) {
+  const text = String(value || '').trim();
+  if (!/^[0-9A-Fa-f]{40}$/.test(text)) return text;
+  try {
+    const bytes = text.match(/.{2}/g).map((part) => Number.parseInt(part, 16)).filter((code) => code > 0);
+    const decoded = String.fromCharCode(...bytes).trim();
+    return /^[\x20-\x7E]{1,20}$/.test(decoded) ? decoded : text;
+  } catch (_) {
+    return text;
+  }
 }
 
 function extractRows(payload) {

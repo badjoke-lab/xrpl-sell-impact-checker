@@ -40,6 +40,20 @@ The page reads snapshots in this order:
 
 This path still does not use D1, KV, or cron.
 
+## Source selection rule
+
+For the production-like static snapshot, prefer the market cap sorted XRPL.to response when it has enough usable rows. This keeps the default Market Mode aligned with normal heatmap expectations.
+
+The probe may still select a volume-sorted endpoint for diagnostics if it has better field coverage.
+
+## Currency display rule
+
+XRPL issued currency codes can appear as 40-character hex values. The generator keeps the canonical `currency` field for links and API use, and adds `displayCurrency` for human-readable labels when the hex value decodes to printable ASCII.
+
+Example:
+
+`524C555344000000000000000000000000000000` becomes `RLUSD` for display.
+
 ## Probe source candidates
 
 Run this from the repository root:
