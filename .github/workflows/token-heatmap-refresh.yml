@@ -1,0 +1,73 @@
+name: Refresh token heatmap snapshot
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual token heatmap refresh'
+        required: false
+        default: 'manual'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/token-heatmap-refresh.yml'
+      - 'scripts/update_token_heatmap_snapshot_from_xrplto.mjs'
+      - 'apps/token-heatmap/token-heatmap.js'
+      - 'apps/token-heatmap/SNAPSHOT_CONTRACT.md'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: token-heatmap-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-token-heatmap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate token heatmap snapshot
+        run: |
+          set -euo pipefail
+          node scripts/update_token_heatmap_snapshot_from_xrplto.mjs
+
+      - name: Validate token heatmap snapshot
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('fs');
+          const p = 'apps/token-heatmap/token-heatmap-snapshot.json';
+          const s = JSON.parse(fs.readFileSync(p, 'utf8'));
+          if (s.snapshotVersion !== 1) throw new Error('snapshotVersion must be 1');
+          if (!['fresh', 'partial'].includes(s.status)) throw new Error(`unexpected status: ${s.status}`);
+          if (!Array.isArray(s.tokens) || s.tokens.length < 50) throw new Error(`too few tokens: ${s.tokens && s.tokens.length}`);
+          const bad = s.tokens.filter((t) => !t.currency || !t.issuer || !t.displayCurrency || !(Number(t.marketCap) > 0));
+          if (bad.length) throw new Error(`invalid token rows: ${bad.length}`);
+          console.log(JSON.stringify({ ok: true, status: s.status, source: s.source, tokens: s.tokens.length }, null, 2));
+          NODE
+
+      - name: Commit snapshot if changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- apps/token-heatmap/token-heatmap-snapshot.json; then
+            echo 'No token heatmap snapshot changes.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/token-heatmap/token-heatmap-snapshot.json
+          git commit -m 'Refresh token heatmap snapshot'
+          git push
