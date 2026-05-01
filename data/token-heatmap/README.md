@@ -28,9 +28,11 @@ Run this from the repository root:
 
 `node scripts/probe_token_heatmap_sources.mjs`
 
-Default candidate endpoint:
+By default the probe checks multiple XRPL.to token-list sorts and chooses the best normalized result:
 
-`https://api.xrpl.to/v1/tokens?sortBy=marketcap&sortType=desc&limit=100`
+- marketcap descending
+- vol24h descending
+- vol24hxrp descending
 
 Default output directory:
 
@@ -56,7 +58,7 @@ For snapshot generation:
 
 For source probing:
 
-`--url` sets the source endpoint.
+`--url` checks a single source endpoint instead of the default multi-endpoint probe.
 
 `--output-dir` sets the probe output directory.
 
