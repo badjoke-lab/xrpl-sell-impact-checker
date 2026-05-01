@@ -5,42 +5,78 @@ import process from 'node:process';
 
 const DEFAULT_OUTPUT_DIR = 'data/token-heatmap/probe';
 const DEFAULT_LIMIT = 100;
-const DEFAULT_URL = 'https://api.xrpl.to/v1/tokens?sortBy=marketcap&sortType=desc&limit=100';
+const DEFAULT_URLS = [
+  'https://api.xrpl.to/v1/tokens?sortBy=marketcap&sortType=desc&limit=100',
+  'https://api.xrpl.to/v1/tokens?sortBy=vol24h&sortType=desc&limit=100',
+  'https://api.xrpl.to/v1/tokens?sortBy=vol24hxrp&sortType=desc&limit=100',
+];
 
 const args = parseArgs(process.argv.slice(2));
-const targetUrl = args.url || process.env.TOKEN_HEATMAP_PROBE_URL || DEFAULT_URL;
+const targetUrls = args.url ? [args.url] : DEFAULT_URLS;
 const outputDir = path.resolve(process.cwd(), args.outputDir || process.env.TOKEN_HEATMAP_PROBE_OUTPUT_DIR || DEFAULT_OUTPUT_DIR);
 const limit = clampInt(args.limit || process.env.TOKEN_HEATMAP_PROBE_LIMIT || DEFAULT_LIMIT, 1, 100);
 
 async function main() {
   await mkdir(outputDir, { recursive: true });
   const fetchedAt = new Date().toISOString();
-  const raw = await fetchJson(targetUrl);
-  const rows = extractRows(raw);
-  const normalized = rows.map(normalizeRow).filter(Boolean).slice(0, limit);
-  const report = buildReport({ fetchedAt, targetUrl, raw, rows, normalized });
-  const candidateSnapshot = buildCandidateSnapshot({ fetchedAt, sourceUrl: targetUrl, tokens: normalized, limit });
+  const probes = [];
+  for (const url of targetUrls) {
+    try {
+      const raw = await fetchJson(url);
+      const rows = extractRows(raw);
+      const normalized = rows.map(normalizeRow).filter(Boolean).slice(0, limit);
+      probes.push({ ok: true, url, raw, rows, normalized, report: buildReport({ fetchedAt, targetUrl: url, raw, rows, normalized }) });
+    } catch (error) {
+      probes.push({ ok: false, url, error: error instanceof Error ? `${error.name}: ${error.message}` : String(error), raw: null, rows: [], normalized: [], report: null });
+    }
+  }
 
-  await writeFile(path.join(outputDir, 'xrplto-raw.sample.json'), `${JSON.stringify(raw, null, 2)}\n`, 'utf8');
+  const best = chooseBestProbe(probes);
+  const report = {
+    fetchedAt,
+    candidates: probes.map((probe) => probe.ok ? probe.report : { targetUrl: probe.url, ok: false, error: probe.error }),
+    selectedUrl: best?.url || null,
+    selectedRows: best?.normalized?.length || 0,
+  };
+  const candidateSnapshot = buildCandidateSnapshot({
+    fetchedAt,
+    sourceUrl: best?.url || targetUrls[0],
+    tokens: best?.normalized || [],
+    limit,
+  });
+
+  await writeFile(path.join(outputDir, 'xrplto-raw.sample.json'), `${JSON.stringify(best?.raw || {}, null, 2)}\n`, 'utf8');
   await writeFile(path.join(outputDir, 'xrplto-candidates.json'), `${JSON.stringify(candidateSnapshot, null, 2)}\n`, 'utf8');
   await writeFile(path.join(outputDir, 'xrplto-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 
-  console.log(`[ok] fetched=${rows.length} normalized=${normalized.length}`);
+  console.log(`[ok] selected=${best?.url || 'none'} normalized=${best?.normalized?.length || 0}`);
   console.log(`[ok] report=${path.relative(process.cwd(), path.join(outputDir, 'xrplto-report.json'))}`);
   console.log(`[ok] candidates=${path.relative(process.cwd(), path.join(outputDir, 'xrplto-candidates.json'))}`);
+  if (!best?.normalized?.length) process.exitCode = 1;
 }
 
 async function fetchJson(url) {
   const response = await fetch(url, {
     headers: {
       accept: 'application/json',
-      'user-agent': 'xsic-token-heatmap-source-probe/1.0',
+      'user-agent': 'xsic-token-heatmap-source-probe/1.1',
     },
   });
   if (!response.ok) {
     throw new Error(`fetch failed: ${response.status} ${response.statusText}`);
   }
   return response.json();
+}
+
+function chooseBestProbe(probes) {
+  return probes
+    .filter((probe) => probe.ok)
+    .sort((a, b) => scoreProbe(b) - scoreProbe(a))[0] || null;
+}
+
+function scoreProbe(probe) {
+  const coverage = probe.report?.coverage || {};
+  return (coverage.currencyIssuer || 0) * 10 + (coverage.marketCap || 0) * 4 + (coverage.volume24h || 0) * 3 + (coverage.priceChange24h || 0) * 2 + (coverage.liquidity || 0);
 }
 
 function extractRows(payload) {
@@ -71,9 +107,9 @@ function normalizeRow(row) {
   if (!currency || !issuer) return null;
 
   const marketCap = positiveNumber(row.marketCap, row.marketcap, row.market_cap, row.mcap, row.mc);
-  const liquidity = positiveNumber(row.liquidity, row.liquidityUsd, row.liquidity_usd, row.reserve, row.tvl, row.ammLiquidity);
-  const volume24h = positiveNumber(row.volume24h, row.vol24h, row.volume_24h, row.volume24, row.volume, row['24hVolume']);
-  const priceChange24h = finiteNumber(row.priceChange24h, row.change24h, row.price_change_24h, row.change24, row.percentChange24h);
+  const liquidity = positiveNumber(row.liquidity, row.liquidityUsd, row.liquidity_usd, row.reserve, row.tvl, row.ammLiquidity, row.amount, row.supplyInXrp);
+  const volume24h = positiveNumber(row.volume24h, row.vol24h, row.volume_24h, row.volume24, row.volume, row['24hVolume'], row.vol24hxrp, row.vol24hXrp);
+  const priceChange24h = finiteNumber(row.priceChange24h, row.change24h, row.price_change_24h, row.change24, row.percentChange24h, row.pro24h);
   const updatedAt = firstString(row.updatedAt, row.lastUpdated, row.updated, row.ts, row.timestamp) || new Date().toISOString();
 
   if (!marketCap && !liquidity && !volume24h) return null;
@@ -90,7 +126,7 @@ function normalizeRow(row) {
     updatedAt: String(updatedAt),
     _probe: {
       directLiquidity: liquidity > 0,
-      rawKeys: Object.keys(row).slice(0, 40),
+      rawKeys: Object.keys(row).slice(0, 60),
     },
   };
 }
@@ -117,6 +153,7 @@ function buildReport({ fetchedAt, targetUrl, raw, rows, normalized }) {
     priceChange24h: normalized.filter((row) => Number.isFinite(row.priceChange24h) && row.priceChange24h !== 0).length,
   };
   return {
+    ok: true,
     fetchedAt,
     targetUrl,
     rawType: Array.isArray(raw) ? 'array' : typeof raw,
