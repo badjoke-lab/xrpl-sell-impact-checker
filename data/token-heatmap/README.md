@@ -22,13 +22,45 @@ Default output:
 
 `apps/token-heatmap/token-heatmap-snapshot.demo.json`
 
+## Probe source candidates
+
+Run this from the repository root:
+
+`node scripts/probe_token_heatmap_sources.mjs`
+
+Default candidate endpoint:
+
+`https://api.xrpl.to/v1/tokens?sortBy=marketcap&sortType=desc&limit=100`
+
+Default output directory:
+
+`data/token-heatmap/probe/`
+
+Probe output files:
+
+- `xrplto-raw.sample.json`
+- `xrplto-candidates.json`
+- `xrplto-report.json`
+
+The probe output is not used by the page automatically. Inspect the report before promoting any candidate data into the snapshot generator input.
+
 ## Optional arguments
+
+For snapshot generation:
 
 `--input` sets the seed file path.
 
 `--output` sets the snapshot output path.
 
 `--top-limit` caps the generated token count. The current maximum is 100.
+
+For source probing:
+
+`--url` sets the source endpoint.
+
+`--output-dir` sets the probe output directory.
+
+`--limit` caps normalized probe output. The current maximum is 100.
 
 ## Future real-data step
 
