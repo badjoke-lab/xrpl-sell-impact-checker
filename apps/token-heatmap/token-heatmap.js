@@ -1,6 +1,10 @@
 import { mountHeatmap } from '/shared/heatmap/heatmap-engine.js';
 
 const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_URLS = [
+  '/apps/token-heatmap/token-heatmap-snapshot.json',
+  '/apps/token-heatmap/token-heatmap-snapshot.demo.json',
+];
 
 const MODES = {
   market: {
@@ -76,14 +80,17 @@ async function boot() {
 
 async function loadSnapshot() {
   const fallback = createDemoSnapshot();
-  try {
-    const response = await fetch('/apps/token-heatmap/token-heatmap-snapshot.demo.json', { cache: 'no-store' });
-    if (!response.ok) return fallback;
-    const parsed = await response.json();
-    return normalizeSnapshot(parsed, fallback);
-  } catch (_) {
-    return fallback;
+  for (const url of SNAPSHOT_URLS) {
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) continue;
+      const parsed = await response.json();
+      return normalizeSnapshot(parsed, fallback);
+    } catch (_) {
+      // Try the next snapshot URL before falling back to inline demo data.
+    }
   }
+  return fallback;
 }
 
 function normalizeSnapshot(input, fallback) {
