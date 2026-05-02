@@ -40,6 +40,44 @@ The page reads snapshots in this order:
 
 This path still does not use D1, KV, or cron.
 
+## Probe Top20 exit coverage
+
+Run this from the repository root after a real snapshot exists:
+
+`node scripts/probe_token_heatmap_exit_coverage.mjs`
+
+Default input:
+
+`apps/token-heatmap/token-heatmap-snapshot.json`
+
+Default output directory:
+
+`data/token-heatmap/probe/`
+
+Probe output files:
+
+- `exit-coverage-top20-report.json`
+- `exit-coverage-top20-patch.json`
+
+The probe checks only Top20 by default. It calls XRPL RPC `book_offers` and `amm_info` against XRP and classifies each token as:
+
+- `dual`
+- `book-only`
+- `amm-only`
+- `none`
+
+This probe output is not used by the page automatically. Review the report before mixing exit coverage into the generated snapshot.
+
+## Exit coverage rollout plan
+
+1. Probe Top20 and inspect runtime, errors, and distribution.
+2. If stable, merge Top20 exitCoverage into the static snapshot generator.
+3. Keep Top21-100 as `unknown` / `Exit check pending`.
+4. Add UI distinction for `checked Top20` vs `pending others`.
+5. Only after that consider Top50, then Top100.
+
+The final UI pass is required after data mixing. It should make the checked/pending split obvious in the status strip, detail card, legend, and fallback list.
+
 ## Source selection rule
 
 For the production-like static snapshot, prefer the market cap sorted XRPL.to response when it has enough usable rows. This keeps the default Market Mode aligned with normal heatmap expectations.
@@ -95,6 +133,16 @@ For static XRPL.to snapshot generation:
 `--output` sets the output path.
 
 `--limit` caps normalized output. The current maximum is 100.
+
+For exit coverage probing:
+
+`--input` sets the snapshot input path.
+
+`--output-dir` sets the probe output directory.
+
+`--limit` caps checked tokens. The current maximum is 20.
+
+`--delay-ms` adds delay between token checks.
 
 For source probing:
 
