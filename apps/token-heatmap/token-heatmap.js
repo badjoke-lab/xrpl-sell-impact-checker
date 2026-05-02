@@ -20,11 +20,12 @@ const MODES = {
   exit: {
     label: 'Exit Mode',
     area: 'observed liquidity',
-    color: 'XRP exit coverage',
+    color: 'route check state',
   },
 };
 
 const root = document.querySelector('[data-token-heatmap-root]');
+const heroSubtitle = document.querySelector('.token-heatmap-hero .page-subtitle');
 const modeButtons = Array.from(document.querySelectorAll('[data-token-mode]'));
 const countSelect = document.querySelector('[data-token-count]');
 const resetButton = document.querySelector('[data-token-reset]');
@@ -65,6 +66,7 @@ async function boot() {
   snapshot = await loadSnapshot();
   tokens = snapshot.tokens;
   updateSnapshotStatus(snapshot);
+  updateHeroCopy(snapshot);
   const items = normalizeForMode(currentMode);
   selectedTokenId = items[0]?.id || null;
   heatmap = mountHeatmap({
@@ -136,10 +138,11 @@ function setMode(mode) {
   currentMode = mode;
   const def = MODES[mode] || MODES.market;
   const items = normalizeForMode(mode);
+  const hasKnownExit = tokens.some((token) => token.exitCoverage && token.exitCoverage !== 'unknown');
   modeButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.tokenMode === mode)));
   if (modeLabel) modeLabel.textContent = def.label;
   if (areaLabel) areaLabel.textContent = `Area: ${def.area}`;
-  if (colorLabel) colorLabel.textContent = `Color: ${def.color}`;
+  if (colorLabel) colorLabel.textContent = mode === 'exit' && !hasKnownExit ? 'Color: route check pending' : `Color: ${def.color}`;
   heatmap?.setItems(items, { preserveCamera: true });
   heatmap?.setMode(mode);
   const selected = items.find((item) => item.id === selectedTokenId) || items[0];
@@ -149,12 +152,20 @@ function setMode(mode) {
 
 function updateSnapshotStatus(current) {
   if (sourceLabel) {
-    sourceLabel.textContent = current.status === 'demo' ? 'Demo data' : `Source: ${current.source}`;
+    sourceLabel.textContent = current.status === 'demo' ? 'Demo data' : `Source: ${formatSource(current.source)}`;
+    sourceLabel.title = current.source || '';
     sourceLabel.classList.toggle('token-chip--demo', current.status === 'demo');
   }
   if (countLabel) countLabel.textContent = `Showing top ${Math.min(current.topLimit || current.tokens.length, current.tokens.length)} XRPL tokens`;
   if (updatedLabel) updatedLabel.textContent = `Last updated: ${current.generatedAt || '—'}`;
   if (versionLabel) versionLabel.textContent = `snapshot v${current.snapshotVersion || SNAPSHOT_VERSION}`;
+}
+
+function updateHeroCopy(current) {
+  if (!heroSubtitle) return;
+  heroSubtitle.textContent = current.status === 'demo'
+    ? 'Preview the XRPL token treemap with demo data. Real snapshots load automatically when available.'
+    : 'Explore the current Top 100 XRPL tokens by market size, observed liquidity, 24h movement, and route-check status before opening focused XSIC tools.';
 }
 
 function updateDetail(node) {
@@ -306,7 +317,18 @@ function exitLabel(value) {
   if (value === 'book-only') return 'Book only';
   if (value === 'amm-only') return 'AMM only';
   if (value === 'none') return 'No XRP exit observed';
-  return 'Unknown';
+  return 'Exit check pending';
+}
+
+function formatSource(value) {
+  const source = String(value || '');
+  if (source.includes('api.xrpl.to')) {
+    if (source.includes('sortBy=marketcap')) return 'XRPL.to marketcap';
+    if (source.includes('sortBy=vol24hxrp')) return 'XRPL.to 24h XRP volume';
+    if (source.includes('sortBy=vol24h')) return 'XRPL.to 24h volume';
+    return 'XRPL.to';
+  }
+  return source || 'unknown';
 }
 
 function toNumber(value) {
