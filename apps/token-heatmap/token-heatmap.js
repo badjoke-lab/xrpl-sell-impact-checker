@@ -67,6 +67,7 @@ async function boot() {
   tokens = snapshot.tokens;
   updateSnapshotStatus(snapshot);
   updateHeroCopy(snapshot);
+  updateStaticGuideCopy();
   const items = normalizeForMode(currentMode);
   selectedTokenId = items[0]?.id || null;
   heatmap = mountHeatmap({
@@ -166,6 +167,15 @@ function updateHeroCopy(current) {
   heroSubtitle.textContent = current.status === 'demo'
     ? 'Preview the XRPL token treemap with demo data. Real snapshots load automatically when available.'
     : 'Explore the current Top 100 XRPL tokens by market size, observed liquidity, 24h movement, and route-check status before opening focused XSIC tools.';
+}
+
+function updateStaticGuideCopy() {
+  const guideItems = Array.from(document.querySelectorAll('.token-info-grid article:first-child li'));
+  if (guideItems[2]) guideItems[2].textContent = 'Exit Mode: route-check status. Most tokens are pending until XSIC exit checks are connected.';
+  const legendTitle = document.querySelector('.token-info-grid article:nth-child(2) .section-title');
+  if (legendTitle) legendTitle.textContent = 'Route state is not a safety score';
+  const legendItems = Array.from(document.querySelectorAll('.token-info-grid article:nth-child(2) .token-legend-item'));
+  if (legendItems[3]) legendItems[3].lastChild.textContent = 'Exit check pending';
 }
 
 function updateDetail(node) {
