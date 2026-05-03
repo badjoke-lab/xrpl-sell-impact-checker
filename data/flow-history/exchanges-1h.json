@@ -1,5 +1,43 @@
 {
   "latest": {
+    "ts": 1777803341529,
+    "preset": "exchanges",
+    "window": "1h",
+    "source": "xrpl:rpc",
+    "stale": true,
+    "staleReason": "error",
+    "summary": {
+      "inflowXrp": 0,
+      "outflowXrp": 0,
+      "netXrp": 0,
+      "inflowUsd": null,
+      "outflowUsd": null,
+      "netUsd": null
+    },
+    "metrics": {
+      "paymentsScanned": 771,
+      "ledgersScanned": 19,
+      "matchedEvents": 0,
+      "rpcCalls": 32
+    },
+    "latestEvent": null,
+    "escrow": {
+      "nextAmountXrp": null,
+      "recentCount": 0,
+      "stats": {
+        "sumXrp": 0,
+        "count": 0,
+        "avgXrp": 0,
+        "maxXrp": 0
+      }
+    },
+    "debugSummary": {
+      "strategy": "1h_baseline_C",
+      "degradeLevel": "C",
+      "warningCount": 2
+    }
+  },
+  "previous": {
     "ts": 1777798623120,
     "preset": "exchanges",
     "window": "1h",
@@ -37,83 +75,7 @@
       "warningCount": 2
     }
   },
-  "previous": {
-    "ts": 1777790434244,
-    "preset": "exchanges",
-    "window": "1h",
-    "source": "xrpl:rpc",
-    "stale": true,
-    "staleReason": "error",
-    "summary": {
-      "inflowXrp": 0,
-      "outflowXrp": 0,
-      "netXrp": 0,
-      "inflowUsd": null,
-      "outflowUsd": null,
-      "netUsd": null
-    },
-    "metrics": {
-      "paymentsScanned": 693,
-      "ledgersScanned": 20,
-      "matchedEvents": 0,
-      "rpcCalls": 33
-    },
-    "latestEvent": null,
-    "escrow": {
-      "nextAmountXrp": null,
-      "recentCount": 0,
-      "stats": {
-        "sumXrp": 0,
-        "count": 0,
-        "avgXrp": 0,
-        "maxXrp": 0
-      }
-    },
-    "debugSummary": {
-      "strategy": "1h_baseline_C",
-      "degradeLevel": "C",
-      "warningCount": 2
-    }
-  },
   "recent": [
-    {
-      "ts": 1776705530461,
-      "preset": "exchanges",
-      "window": "1h",
-      "source": "xrpl:rpc",
-      "stale": false,
-      "staleReason": null,
-      "summary": {
-        "inflowXrp": 80.01098299999998,
-        "outflowXrp": 819.98,
-        "netXrp": -739.969017,
-        "inflowUsd": 114.72134764505998,
-        "outflowUsd": 1175.7037236,
-        "netUsd": -1060.9823759549402
-      },
-      "metrics": {
-        "paymentsScanned": 2728,
-        "ledgersScanned": 60,
-        "matchedEvents": 0,
-        "rpcCalls": 125
-      },
-      "latestEvent": null,
-      "escrow": {
-        "nextAmountXrp": null,
-        "recentCount": 0,
-        "stats": {
-          "sumXrp": 0,
-          "count": 0,
-          "avgXrp": 0,
-          "maxXrp": 0
-        }
-      },
-      "debugSummary": {
-        "strategy": "1h_baseline_A",
-        "degradeLevel": "A",
-        "warningCount": 7
-      }
-    },
     {
       "ts": 1776713573216,
       "preset": "exchanges",
@@ -6489,6 +6451,44 @@
         "degradeLevel": "C",
         "warningCount": 2
       }
+    },
+    {
+      "ts": 1777803341529,
+      "preset": "exchanges",
+      "window": "1h",
+      "source": "xrpl:rpc",
+      "stale": true,
+      "staleReason": "error",
+      "summary": {
+        "inflowXrp": 0,
+        "outflowXrp": 0,
+        "netXrp": 0,
+        "inflowUsd": null,
+        "outflowUsd": null,
+        "netUsd": null
+      },
+      "metrics": {
+        "paymentsScanned": 771,
+        "ledgersScanned": 19,
+        "matchedEvents": 0,
+        "rpcCalls": 32
+      },
+      "latestEvent": null,
+      "escrow": {
+        "nextAmountXrp": null,
+        "recentCount": 0,
+        "stats": {
+          "sumXrp": 0,
+          "count": 0,
+          "avgXrp": 0,
+          "maxXrp": 0
+        }
+      },
+      "debugSummary": {
+        "strategy": "1h_baseline_C",
+        "degradeLevel": "C",
+        "warningCount": 2
+      }
     }
   ],
   "deltaSummary": {
@@ -6499,10 +6499,10 @@
   },
   "historyMeta": {
     "count": 168,
-    "oldestTs": 1776705530461,
-    "newestTs": 1777798623120,
+    "oldestTs": 1776713573216,
+    "newestTs": 1777803341529,
     "preset": "exchanges",
     "window": "1h",
-    "updatedAt": "2026-05-03T08:57:03.168Z"
+    "updatedAt": "2026-05-03T10:15:41.561Z"
   }
 }
