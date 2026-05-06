@@ -1,5 +1,43 @@
 {
   "latest": {
+    "ts": 1778108836122,
+    "preset": "exchanges",
+    "window": "7d",
+    "source": "xrpl:rpc",
+    "stale": true,
+    "staleReason": "sampled",
+    "summary": {
+      "inflowXrp": 36.690832,
+      "outflowXrp": 0,
+      "netXrp": 36.690832,
+      "inflowUsd": 52.03934084224,
+      "outflowUsd": 0,
+      "netUsd": 52.03934084224
+    },
+    "metrics": {
+      "paymentsScanned": 1596,
+      "ledgersScanned": 32,
+      "matchedEvents": 0,
+      "rpcCalls": 70
+    },
+    "latestEvent": null,
+    "escrow": {
+      "nextAmountXrp": null,
+      "recentCount": 0,
+      "stats": {
+        "sumXrp": 0,
+        "count": 0,
+        "avgXrp": 0,
+        "maxXrp": 0
+      }
+    },
+    "debugSummary": {
+      "strategy": "7d_trend_none",
+      "degradeLevel": "none",
+      "warningCount": 3
+    }
+  },
+  "previous": {
     "ts": 1778105381942,
     "preset": "exchanges",
     "window": "7d",
@@ -37,83 +75,7 @@
       "warningCount": 3
     }
   },
-  "previous": {
-    "ts": 1778100322527,
-    "preset": "exchanges",
-    "window": "7d",
-    "source": "xrpl:rpc",
-    "stale": true,
-    "staleReason": "sampled",
-    "summary": {
-      "inflowXrp": 0.003353,
-      "outflowXrp": 0,
-      "netXrp": 0.003353,
-      "inflowUsd": 0.00476947485,
-      "outflowUsd": 0,
-      "netUsd": 0.00476947485
-    },
-    "metrics": {
-      "paymentsScanned": 1014,
-      "ledgersScanned": 26,
-      "matchedEvents": 0,
-      "rpcCalls": 70
-    },
-    "latestEvent": null,
-    "escrow": {
-      "nextAmountXrp": null,
-      "recentCount": 0,
-      "stats": {
-        "sumXrp": 0,
-        "count": 0,
-        "avgXrp": 0,
-        "maxXrp": 0
-      }
-    },
-    "debugSummary": {
-      "strategy": "7d_trend_none",
-      "degradeLevel": "none",
-      "warningCount": 6
-    }
-  },
   "recent": [
-    {
-      "ts": 1776946197742,
-      "preset": "exchanges",
-      "window": "7d",
-      "source": "xrpl:rpc",
-      "stale": true,
-      "staleReason": "sampled",
-      "summary": {
-        "inflowXrp": 1,
-        "outflowXrp": 1,
-        "netXrp": 0,
-        "inflowUsd": 1.41813,
-        "outflowUsd": 1.41813,
-        "netUsd": 0
-      },
-      "metrics": {
-        "paymentsScanned": 635,
-        "ledgersScanned": 31,
-        "matchedEvents": 0,
-        "rpcCalls": 70
-      },
-      "latestEvent": null,
-      "escrow": {
-        "nextAmountXrp": null,
-        "recentCount": 0,
-        "stats": {
-          "sumXrp": 0,
-          "count": 0,
-          "avgXrp": 0,
-          "maxXrp": 0
-        }
-      },
-      "debugSummary": {
-        "strategy": "7d_trend_none",
-        "degradeLevel": "none",
-        "warningCount": 4
-      }
-    },
     {
       "ts": 1776953422651,
       "preset": "exchanges",
@@ -6471,20 +6433,58 @@
         "degradeLevel": "none",
         "warningCount": 3
       }
+    },
+    {
+      "ts": 1778108836122,
+      "preset": "exchanges",
+      "window": "7d",
+      "source": "xrpl:rpc",
+      "stale": true,
+      "staleReason": "sampled",
+      "summary": {
+        "inflowXrp": 36.690832,
+        "outflowXrp": 0,
+        "netXrp": 36.690832,
+        "inflowUsd": 52.03934084224,
+        "outflowUsd": 0,
+        "netUsd": 52.03934084224
+      },
+      "metrics": {
+        "paymentsScanned": 1596,
+        "ledgersScanned": 32,
+        "matchedEvents": 0,
+        "rpcCalls": 70
+      },
+      "latestEvent": null,
+      "escrow": {
+        "nextAmountXrp": null,
+        "recentCount": 0,
+        "stats": {
+          "sumXrp": 0,
+          "count": 0,
+          "avgXrp": 0,
+          "maxXrp": 0
+        }
+      },
+      "debugSummary": {
+        "strategy": "7d_trend_none",
+        "degradeLevel": "none",
+        "warningCount": 3
+      }
     }
   ],
   "deltaSummary": {
-    "inflowXrpDelta": 40212.447719,
+    "inflowXrpDelta": -40175.76024,
     "outflowXrpDelta": 0,
-    "netXrpDelta": 40212.447719,
+    "netXrpDelta": -40175.76024,
     "matchedEventsDelta": 0
   },
   "historyMeta": {
     "count": 168,
-    "oldestTs": 1776946197742,
-    "newestTs": 1778105381942,
+    "oldestTs": 1776953422651,
+    "newestTs": 1778108836122,
     "preset": "exchanges",
     "window": "7d",
-    "updatedAt": "2026-05-06T22:09:41.966Z"
+    "updatedAt": "2026-05-06T23:07:16.136Z"
   }
 }
