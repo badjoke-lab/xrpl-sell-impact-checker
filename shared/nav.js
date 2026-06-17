@@ -22,9 +22,7 @@
         color: var(--color-primary-ink, #4c4198);
         background: rgba(111, 99, 194, 0.08);
       }
-      .site-nav a.site-nav__support::before {
-        content: "♡ ";
-      }
+      .site-nav a.site-nav__support::before { content: "♡ "; }
       .site-nav a.site-nav__support:hover {
         color: var(--color-primary-strong, #5d52b7);
         border-color: rgba(111, 99, 194, 0.36);
@@ -37,38 +35,20 @@
         gap: 16px;
         margin-top: 4px;
       }
-      .app-support-card__copy {
-        display: grid;
-        gap: 8px;
-      }
-      .app-support-card__title {
-        margin: 0;
-        font-size: 1.15rem;
-      }
-      .app-support-card__text {
-        margin: 0;
-        color: #475569;
-        line-height: 1.6;
-      }
-      .app-support-card__button {
-        width: auto;
-        min-width: 160px;
-        text-align: center;
-        text-decoration: none;
-      }
+      .app-support-card__copy { display: grid; gap: 8px; }
+      .app-support-card__title { margin: 0; font-size: 1.15rem; }
+      .app-support-card__text { margin: 0; color: #475569; line-height: 1.6; }
+      .app-support-card__button { width: auto; min-width: 160px; text-align: center; text-decoration: none; }
       @media (max-width: 700px) {
-        .app-support-card {
-          grid-template-columns: 1fr !important;
-        }
-        .app-support-card__button {
-          width: 100% !important;
-        }
+        .app-support-card { grid-template-columns: 1fr !important; }
+        .app-support-card__button { width: 100% !important; }
       }
     `;
     document.head.appendChild(style);
   };
 
   ensureSupportStyles();
+  void import('/shared/accessibility.js');
 
   if (navMount) {
     const nav = document.createElement('nav');
@@ -81,9 +61,7 @@
       link.href = item.href;
       link.textContent = item.label;
       link.dataset.navItem = item.key;
-      if (item.key === 'donate') {
-        link.classList.add('site-nav__support');
-      }
+      if (item.key === 'donate') link.classList.add('site-nav__support');
       if (activeKey && activeKey === item.key) {
         link.classList.add('is-active');
         link.setAttribute('aria-current', 'page');
@@ -103,7 +81,6 @@
   }
 
   const footerMount = document.querySelector('[data-global-footer]');
-
   if (footerMount) {
     const path = window.location.pathname;
     const isToolPage = /^\/apps\/[^/]+\/?$/.test(path);
@@ -145,8 +122,6 @@
   ];
   const currentPath = window.location.pathname;
   for (const [prefix, modulePath] of guardrailLoaders) {
-    if (currentPath.startsWith(prefix)) {
-      void import(modulePath);
-    }
+    if (currentPath.startsWith(prefix)) void import(modulePath);
   }
 })();
