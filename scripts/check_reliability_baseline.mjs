@@ -26,6 +26,9 @@ const requiredFiles = [
   'functions/api/_upstream.cjs',
   'functions/api/_rpc.cjs',
   'functions/api/book_offers.cjs',
+  'functions/api/runtime_freshness.cjs',
+  'functions/api/runtime_request.cjs',
+  'functions/api/runtime_endpoint.js',
   'functions/api/xrpl/amm-snapshot.js',
   'functions/api/xrpl/liquidity-history.js',
   'functions/api/xrpl/flow-history.js',
@@ -36,6 +39,7 @@ const requiredFiles = [
   'apps/token-heatmap/token-heatmap-snapshot.json',
   'scripts/audit-seo.mjs',
   'scripts/check_upstream_contract.cjs',
+  'scripts/check_runtime_contract.cjs',
 ];
 
 const apiFiles = requiredFiles.filter((file) => file.startsWith('functions/api/'));
@@ -104,6 +108,9 @@ for (const [file, links] of Object.entries(expectedLinks)) {
 
 const upstream = spawnSync(process.execPath, ['scripts/check_upstream_contract.cjs'], { cwd: root, encoding: 'utf8' });
 assert(upstream.status === 0, `Upstream contract check failed:\n${upstream.stdout}${upstream.stderr}`);
+
+const runtime = spawnSync(process.execPath, ['scripts/check_runtime_contract.cjs'], { cwd: root, encoding: 'utf8' });
+assert(runtime.status === 0, `Runtime contract check failed:\n${runtime.stdout}${runtime.stderr}`);
 
 const seo = spawnSync(process.execPath, ['scripts/audit-seo.mjs'], { cwd: root, encoding: 'utf8' });
 assert(seo.status === 0, `SEO audit failed:\n${seo.stdout}${seo.stderr}`);
