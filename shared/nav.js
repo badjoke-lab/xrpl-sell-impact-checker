@@ -138,4 +138,15 @@
         </nav>
       </footer>`;
   }
+
+  const guardrailLoaders = [
+    ['/apps/exposure-graph/', '/apps/exposure-graph/exposure-guardrails.js'],
+    ['/apps/token-heatmap/', '/apps/token-heatmap/token-heatmap-guardrails.js'],
+  ];
+  const currentPath = window.location.pathname;
+  for (const [prefix, modulePath] of guardrailLoaders) {
+    if (currentPath.startsWith(prefix)) {
+      void import(modulePath);
+    }
+  }
 })();
