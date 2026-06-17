@@ -76,6 +76,64 @@ function validateInteger(value, options = {}) {
   return { ok: true, value: numeric };
 }
 
+function validateEnum(value, options = {}) {
+  const field = options.field || "value";
+  const allowed = Array.isArray(options.allowed) ? options.allowed : [];
+  const raw = String(value == null ? "" : value).trim();
+  if (!raw) return options.required === false ? { ok: true, value: options.defaultValue } : invalid("missing_parameter", field, `${field} is required`);
+  if (!allowed.includes(raw)) return invalid(`invalid_${field}`, field, `${field} must be one of: ${allowed.join(", ")}`, { allowed });
+  return { ok: true, value: raw };
+}
+
+function validateWindow(value, options = {}) {
+  return validateEnum(value, { field: "window", allowed: ["1h", "6h", "24h", "7d"], ...options });
+}
+
+function validatePreset(value, options = {}) {
+  return validateEnum(value, { field: "preset", allowed: ["exchanges", "whales", "ripple"], ...options });
+}
+
+function validateIdentifier(value, options = {}) {
+  const field = options.field || "id";
+  const maxLength = Number.isInteger(options.maxLength) ? options.maxLength : 256;
+  const raw = String(value == null ? "" : value).trim();
+  if (!raw) return options.required === false ? { ok: true, value: "" } : invalid("missing_parameter", field, `${field} is required`);
+  if (raw.length > maxLength) return invalid("invalid_identifier", field, `${field} is too long`);
+  return { ok: true, value: raw };
+}
+
+function validatePair(value) {
+  const raw = String(value == null ? "" : value).trim();
+  const parts = raw.split("|");
+  if (parts.length !== 2) return invalid("invalid_pair", "pair", "pair must use currency|issuer format");
+  const currency = validateCurrency(parts[0]);
+  if (!currency.ok) return invalid(currency.code, "pair", currency.message);
+  const issuer = validateIssuer(parts[1]);
+  if (!issuer.ok) return invalid(issuer.code, "pair", issuer.message);
+  return { ok: true, value: `${currency.value}|${issuer.value}`, currency: currency.value, issuer: issuer.value };
+}
+
+async function readInput(request) {
+  const input = Object.fromEntries(new URL(request.url).searchParams.entries());
+  if (["POST", "PUT", "PATCH"].includes(request.method)) {
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) return { ok: false, status: 415, error: invalid("unsupported_media_type", "content-type", "Request body must use application/json") };
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return { ok: false, status: 400, error: invalid("invalid_json", "body", "Request body is not valid JSON") };
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return { ok: false, status: 400, error: invalid("invalid_json_object", "body", "Request body must be a JSON object") };
+    Object.assign(input, body);
+  }
+  return { ok: true, input };
+}
+
+function firstValidationError(results) {
+  return results.find((result) => result && !result.ok) || null;
+}
+
 module.exports = {
   ERROR_CONTRACT,
   requestIdFrom,
@@ -85,4 +143,10 @@ module.exports = {
   validateIssuer,
   validateAmount,
   validateInteger,
+  validateWindow,
+  validatePreset,
+  validateIdentifier,
+  validatePair,
+  readInput,
+  firstValidationError,
 };
