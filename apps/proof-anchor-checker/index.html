@@ -1,1 +1,27 @@
-<!DOCTYPE html><html><head><title>Proof Anchor Checker — XSIC</title></head><body></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Proof Anchor Checker — XSIC</title>
+<meta name="description" content="Compare public proof-side records, XRPL testnet anchor registry records, verifier availability, and unresolved linkage without claiming cryptographic verification." />
+<link rel="canonical" href="https://xsic.badjoke-lab.com/apps/proof-anchor-checker/" />
+<meta property="og:type" content="website" /><meta property="og:site_name" content="XSIC" /><meta property="og:title" content="Proof Anchor Checker — XSIC" /><meta property="og:description" content="Separate chain, proof, verifier, and linkage evidence without issuing a verified verdict." /><meta property="og:url" content="https://xsic.badjoke-lab.com/apps/proof-anchor-checker/" /><meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+<meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="Proof Anchor Checker — XSIC" /><meta name="twitter:description" content="Compare public proof and XRPL anchor records while keeping unresolved linkage explicit." /><meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+<link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/apps/watch-tools.css" /><link rel="icon" href="/favicon.png" />
+</head>
+<body data-nav-key="apps"><div class="app page console-page">
+<header class="app__header global-header"><div class="app__header-top"><a href="/" class="brand-link" aria-label="XSIC Home"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><span class="app__title">XSIC</span></div></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button><div data-global-nav></div></div></header>
+<main class="page__content watch-page">
+<section class="watch-hero"><p class="eyebrow">Labs / Evidence comparison</p><h1 class="page-title">Proof Anchor Checker</h1><p class="page-subtitle">Compare public chain-registry and proof-side records. This tool does not prove that a proof and XRPL transaction are the same record.</p></section>
+<section class="card"><label for="proof-input"><strong>Proof ID, UUID, XRPL hash, URL, or raw text</strong></label><div class="watch-refresh-row"><input id="proof-input" class="flow-control watch-mono" value="67fe39b1" autocomplete="off" /><button id="proof-run" class="primary-button" type="button">Compare evidence</button><span id="proof-status" class="watch-chip">Not checked</span></div><div class="watch-refresh-row"><button class="secondary-button sample-input" data-value="67fe39b1" type="button">proof 67fe39b1</button><button class="secondary-button sample-input" data-value="5923559f-95de-4d4f-a25d-79e74f04870b" type="button">proof UUID</button><button class="secondary-button sample-input" data-value="0A847CC56520B80E886615BEECA2462F2DAA23C4821ADC326669A6A458715B52" type="button">chain hash</button></div></section>
+<section class="watch-summary-grid"><article class="watch-stat"><p class="eyebrow">Chain</p><strong id="status-chain">—</strong></article><article class="watch-stat"><p class="eyebrow">Proof side</p><strong id="status-proof">—</strong></article><article class="watch-stat"><p class="eyebrow">Verifier</p><strong id="status-verifier">—</strong></article><article class="watch-stat"><p class="eyebrow">Linkage</p><strong id="status-linkage">—</strong></article></section>
+<section class="watch-detail-grid">
+<article class="card watch-panel"><div class="watch-panel__head"><h2 class="section-title">XRPL anchor registry</h2><span id="chain-source-state" class="watch-chip">—</span></div><dl id="chain-detail" class="watch-meta"></dl></article>
+<article class="card watch-panel"><div class="watch-panel__head"><h2 class="section-title">Proof-side record</h2><span id="proof-source-state" class="watch-chip">—</span></div><dl id="proof-detail" class="watch-meta"></dl></article>
+<article class="card watch-panel"><div class="watch-panel__head"><h2 class="section-title">Verifier endpoint</h2><span id="verifier-source-state" class="watch-chip watch-chip--unresolved">—</span></div><dl id="verifier-detail" class="watch-meta"></dl></article>
+<article class="card watch-panel"><div class="watch-panel__head"><h2 class="section-title">Linkage</h2><span id="linkage-source-state" class="watch-chip watch-chip--unresolved">—</span></div><dl id="linkage-detail" class="watch-meta"></dl><p id="linkage-conclusion" class="watch-muted"></p></article>
+</section>
+<section class="card"><h2 class="section-title">Interpretation boundary</h2><p>The allowed outcomes are record found, verifier unresolved, no strong public link, or not enough evidence. This release never emits Verified, Matched, Chain-confirmed proof, or Same record confirmed.</p><p id="proof-checked" class="watch-muted">Last checked: —</p></section>
+</main><div data-global-footer></div></div>
+<script src="/shared/nav.js"></script><script src="/apps/proof-anchor-checker/proof-anchor-checker.js"></script>
+</body></html>
