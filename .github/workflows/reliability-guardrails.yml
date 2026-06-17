@@ -24,3 +24,13 @@ jobs:
             exit 1
           fi
           echo "No Cloudflare scheduled trigger configuration found."
+
+  reliability-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run deterministic reliability baseline
+        run: node scripts/check_reliability_baseline.mjs
