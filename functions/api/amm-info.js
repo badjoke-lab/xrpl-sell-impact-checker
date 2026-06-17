@@ -1,4 +1,5 @@
 import contractModule from './_contract.cjs';
+import { executeShared, normalizedContext } from './runtime_endpoint.js';
 
 const contract = contractModule.default || contractModule;
 let modPromise;
@@ -8,30 +9,44 @@ async function loadModule() {
   return modPromise;
 }
 
-function invalidQuery(context) {
-  const url = new URL(context.request.url);
-  const checks = [
-    contract.validateCurrency(url.searchParams.get('currency')),
-    contract.validateIssuer(url.searchParams.get('issuer')),
-  ];
-  const issue = contract.firstValidationError(checks);
-  if (!issue) return null;
-  return contract.errorResponse({
-    status: 400,
-    code: issue.code,
-    message: issue.message,
-    field: issue.field,
-    details: issue.details,
-    requestId: contract.requestIdFrom(context.request),
-    source: 'amm-info',
+function validateInput(context, input) {
+  const currency = contract.validateCurrency(input.currency);
+  const issuer = contract.validateIssuer(input.issuer);
+  const issue = contract.firstValidationError([currency, issuer]);
+  if (issue) {
+    return {
+      response: contract.errorResponse({
+        status: 400,
+        code: issue.code,
+        message: issue.message,
+        field: issue.field,
+        details: issue.details,
+        requestId: contract.requestIdFrom(context.request),
+        source: 'amm-info',
+      }),
+    };
+  }
+  return {
+    values: {
+      currency: currency.value,
+      issuer: issuer.value,
+    },
+  };
+}
+
+async function run(context, input) {
+  const checked = validateInput(context, input);
+  if (checked.response) return checked.response;
+  const nextContext = normalizedContext(context, checked.values);
+  return executeShared(nextContext, async () => {
+    const mod = await loadModule();
+    return mod.onRequestGet(nextContext);
   });
 }
 
 export async function onRequestGet(context) {
-  const invalid = invalidQuery(context);
-  if (invalid) return invalid;
-  const mod = await loadModule();
-  return mod.onRequestGet(context);
+  const input = Object.fromEntries(new URL(context.request.url).searchParams.entries());
+  return run(context, input);
 }
 
 export async function onRequestPost(context) {
@@ -42,20 +57,10 @@ export async function onRequestPost(context) {
       code: parsed.error.code,
       message: parsed.error.message,
       field: parsed.error.field,
+      details: parsed.error.details,
       requestId: contract.requestIdFrom(context.request),
       source: 'amm-info',
     });
   }
-  const url = new URL(context.request.url);
-  url.searchParams.set('currency', parsed.input.currency || '');
-  url.searchParams.set('issuer', parsed.input.issuer || '');
-  const nextContext = {
-    request: new Request(url.toString(), { method: 'GET', headers: context.request.headers }),
-    env: context.env,
-    params: context.params,
-    data: context.data,
-    waitUntil: context.waitUntil,
-    next: context.next,
-  };
-  return onRequestGet(nextContext);
+  return run(context, parsed.input);
 }
