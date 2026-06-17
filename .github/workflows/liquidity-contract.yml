@@ -1,0 +1,22 @@
+name: Liquidity Contract
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check Liquidity Pulse runtime
+        run: |
+          node --check apps/liquidity-pulse/liquidity-pulse.js
+          node --check apps/liquidity-pulse/liquidity-pulse-runtime.js
+          node --check apps/liquidity-pulse/liquidity-freshness-bridge.js
+          node scripts/check_liquidity_pulse_contract.cjs
