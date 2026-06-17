@@ -1,9 +1,16 @@
+const {
+  delay,
+  fetchJsonWithRetry,
+  DEFAULT_TIMEOUT_MS,
+  DEFAULT_MAX_RESPONSE_BYTES,
+  DEFAULT_RETRIES,
+} = require("./_upstream.cjs");
+
 const RPC_ENDPOINTS = [
   "https://xrplcluster.com/",
   "https://s1.ripple.com:51234/",
   "https://s2.ripple.com:51234/",
 ];
-
 const CACHE_TTL_SECONDS = 30;
 
 function isHex40(v) {
@@ -22,8 +29,7 @@ function toHex40FromAscii(code) {
 function normalizeCurrencyInput(input) {
   const raw = String(input || "").trim();
   if (!raw) return { currencyInput: "", currencyNormalized: "" };
-  const normalized = toHex40FromAscii(raw);
-  return { currencyInput: raw.toUpperCase(), currencyNormalized: normalized };
+  return { currencyInput: raw.toUpperCase(), currencyNormalized: toHex40FromAscii(raw) };
 }
 function normalizeIssuerInput(input) {
   return String(input || "").trim();
@@ -44,79 +50,61 @@ function isoAgeMs(isoString) {
   return Math.max(0, Date.now() - parsed);
 }
 function buildFreshnessMeta({ observedAt, cacheTtlSeconds = CACHE_TTL_SECONDS, isStale = false, source = "runtime" } = {}) {
-  return {
-    observedAt: observedAt || null,
-    ageMs: isoAgeMs(observedAt),
-    cacheTtlSeconds,
-    source,
-    isStale: Boolean(isStale),
-  };
+  return { observedAt: observedAt || null, ageMs: isoAgeMs(observedAt), cacheTtlSeconds, source, isStale: Boolean(isStale) };
+}
+function buildResponseState({ ok = false, isStale = false, partial = false } = {}) {
+  if (isStale) return "stale";
+  if (partial) return "partial";
+  return ok ? "fresh" : "degraded";
 }
 function jsonResponse(obj, { status = 200, cacheSeconds = 0 } = {}) {
   const headers = {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
+    "cache-control": cacheSeconds > 0 ? `public, max-age=${cacheSeconds}` : "no-store",
   };
-  headers["cache-control"] = cacheSeconds > 0 ? `public, max-age=${cacheSeconds}` : "no-store";
   return new Response(JSON.stringify(obj), { status, headers });
 }
-async function fetchJsonWithTimeout(url, payload, timeoutMs) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(new Error("timeout")), timeoutMs);
-  const start = performance.now();
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
+
+async function hedgedRpcCall(payload, options = {}) {
+  const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : DEFAULT_TIMEOUT_MS;
+  const staggerMs = Number.isFinite(options.staggerMs) ? options.staggerMs : 700;
+  const maxResponseBytes = Number.isFinite(options.maxResponseBytes) ? options.maxResponseBytes : DEFAULT_MAX_RESPONSE_BYTES;
+  const retries = Number.isInteger(options.retries) ? options.retries : DEFAULT_RETRIES;
+  const attempts = [];
+
+  const runners = RPC_ENDPOINTS.map(async (endpoint, index) => {
+    if (index > 0) await delay(index * staggerMs);
+    const result = await fetchJsonWithRetry(endpoint, payload, { timeoutMs, maxResponseBytes, retries });
+    attempts.push({
+      endpoint,
+      ok: Boolean(result.ok),
+      status: result.status,
+      elapsedMs: result.elapsedMs,
+      contentType: result.contentType || "",
+      bytes: result.bytes || 0,
+      retryCount: result.retryCount || 0,
+      error: result.error || null,
     });
-    const text = await res.text();
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      json = { _invalid_json: true, _raw: text.slice(0, 200) };
-    }
-    return { ok: res.ok, status: res.status, elapsedMs: Math.round(performance.now() - start), json };
-  } catch (e) {
-    return { ok: false, status: 0, elapsedMs: Math.round(performance.now() - start), error: e?.message || "fetch_failed" };
-  } finally {
-    clearTimeout(t);
+    const hasRpcShape = result.json && (result.json.result || result.json.error);
+    if (result.ok || hasRpcShape) return { endpointUsed: endpoint, result };
+    throw new Error(result.error || "upstream_failed");
+  });
+
+  try {
+    const winner = await Promise.any(runners);
+    return { endpointUsed: winner.endpointUsed, result: winner.result, attempts };
+  } catch {
+    await Promise.allSettled(runners);
+    return { endpointUsed: "", result: { ok: false, status: 0, elapsedMs: 0, error: "all_failed", json: null }, attempts };
   }
 }
-async function hedgedRpcCall(payload, { timeoutMs = 6000, staggerMs = 700 } = {}) {
-  const attempts = [];
-  let settled = false;
-  const runners = RPC_ENDPOINTS.map((endpoint, idx) => {
-    const delay = idx * staggerMs;
-    return new Promise((resolve) => {
-      setTimeout(async () => {
-        if (settled) return resolve(null);
-        const result = await fetchJsonWithTimeout(endpoint, payload, timeoutMs);
-        attempts.push({ endpoint, ok: !!result.ok, status: result.status, elapsedMs: result.elapsedMs, error: result.error || null });
-        const hasRpcShape = result?.json && (result.json.result || result.json.error);
-        if (!settled && (result.ok || hasRpcShape)) {
-          settled = true;
-          return resolve({ endpointUsed: endpoint, result });
-        }
-        return resolve(null);
-      }, delay);
-    });
-  });
-  const winner = await Promise.race(runners);
-  if (winner && winner.result) return { endpointUsed: winner.endpointUsed, result: winner.result, attempts };
-  const all = (await Promise.all(runners)).filter(Boolean);
-  const fallback = all.find((x) => x?.result?.ok) || all[0] || null;
-  if (fallback) return { endpointUsed: fallback.endpointUsed, result: fallback.result, attempts };
-  return { endpointUsed: "", result: { ok: false, status: 0, elapsedMs: 0, error: "all_failed", json: null }, attempts };
-}
+
 function buildCacheKeyRequest(request) {
   const url = new URL(request.url);
   const sortedParams = [...url.searchParams.entries()].sort(([aKey, aValue], [bKey, bValue]) => {
     const keyDiff = aKey.localeCompare(bKey);
-    if (keyDiff !== 0) return keyDiff;
-    return aValue.localeCompare(bValue);
+    return keyDiff !== 0 ? keyDiff : aValue.localeCompare(bValue);
   });
   url.search = new URLSearchParams(sortedParams).toString();
   return new Request(url.toString(), { method: request.method });
@@ -133,6 +121,9 @@ async function cacheGet(request, { markStale = false } = {}) {
       ...payload,
       cached: true,
       isStale: true,
+      partial: Boolean(payload.partial),
+      state: "stale",
+      sourceMode: "cache-fallback",
       staleReason: payload.staleReason || "upstream_refresh_failed",
       freshness: buildFreshnessMeta({
         observedAt: payload.observedAt || payload.freshness?.observedAt || null,
@@ -154,19 +145,21 @@ async function cachePut(request, body) {
       observedAt,
       cached: true,
       isStale: false,
+      partial: Boolean(body?.partial),
+      state: buildResponseState({ ok: body?.ok, partial: body?.partial }),
+      sourceMode: body?.sourceMode || "cache",
       freshness: buildFreshnessMeta({ observedAt, cacheTtlSeconds: CACHE_TTL_SECONDS, isStale: false, source: "cache-api" }),
     };
-    await caches.default.put(
-      buildCacheKeyRequest(request),
-      jsonResponse(cachedBody, { status: 200, cacheSeconds: CACHE_TTL_SECONDS })
-    );
+    await caches.default.put(buildCacheKeyRequest(request), jsonResponse(cachedBody, { status: 200, cacheSeconds: CACHE_TTL_SECONDS }));
   } catch {}
 }
+
 module.exports = {
   normalizeCurrencyInput,
   normalizeIssuerInput,
   buildPairKey,
   buildFreshnessMeta,
+  buildResponseState,
   nowIso,
   hedgedRpcCall,
   jsonResponse,
