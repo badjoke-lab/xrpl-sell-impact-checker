@@ -17,10 +17,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          matches="$(find . -type f \( -name 'wrangler*.toml' -o -name 'wrangler*.json' -o -name 'wrangler*.jsonc' \) -not -path './node_modules/*' -not -path './.git/*' -print0 | xargs -0 -r grep -En '^\s*\[\s*triggers\s*\]\s*$|^\s*crons\s*=|["'"']crons["'"']\s*:' || true)"
-          if [ -n "$matches" ]; then
+          toml_matches="$(find . -type f -name 'wrangler*.toml' -not -path './node_modules/*' -not -path './.git/*' -print0 | xargs -0 -r grep -En '^[[:space:]]*\[[[:space:]]*triggers[[:space:]]*\][[:space:]]*$|^[[:space:]]*crons[[:space:]]*=' || true)"
+          json_matches="$(find . -type f \( -name 'wrangler*.json' -o -name 'wrangler*.jsonc' \) -not -path './node_modules/*' -not -path './.git/*' -print0 | xargs -0 -r grep -En '"crons"[[:space:]]*:' || true)"
+          if [ -n "${toml_matches}${json_matches}" ]; then
             echo "Cloudflare scheduled triggers are not allowed in XSIC configuration."
-            echo "$matches"
+            printf '%s\n%s\n' "$toml_matches" "$json_matches"
             exit 1
           fi
           echo "No Cloudflare scheduled trigger configuration found."
+
+  reliability-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run deterministic reliability baseline
+        run: node scripts/check_reliability_baseline.mjs
