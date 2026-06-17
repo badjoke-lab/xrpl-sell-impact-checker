@@ -36,6 +36,28 @@ export async function onRequestGet(context) {
 }
 
 export async function onRequestPost(context) {
-  const mod = await loadModule();
-  return mod.onRequestPost(context);
+  const parsed = await contract.readInput(context.request);
+  if (!parsed.ok) {
+    return contract.errorResponse({
+      status: parsed.status,
+      code: parsed.error.code,
+      message: parsed.error.message,
+      field: parsed.error.field,
+      requestId: contract.requestIdFrom(context.request),
+      source: 'book-offers',
+    });
+  }
+  const url = new URL(context.request.url);
+  url.searchParams.set('currency', parsed.input.currency || '');
+  url.searchParams.set('issuer', parsed.input.issuer || '');
+  url.searchParams.set('limit', parsed.input.limit || '200');
+  const nextContext = {
+    request: new Request(url.toString(), { method: 'GET', headers: context.request.headers }),
+    env: context.env,
+    params: context.params,
+    data: context.data,
+    waitUntil: context.waitUntil,
+    next: context.next,
+  };
+  return onRequestGet(nextContext);
 }
