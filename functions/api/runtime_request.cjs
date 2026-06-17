@@ -1,3 +1,5 @@
+const activeRequests = new Map();
+
 function normalizeField(key, value) {
   const raw = String(value == null ? "" : value).trim();
   if (key === "currency") return raw.toUpperCase();
@@ -17,4 +19,22 @@ function canonicalRequestKey(request) {
   return `${request.method.toUpperCase()}|${url.origin}|${url.pathname}|${url.search}`;
 }
 
-module.exports = { normalizeField, canonicalRequestKey };
+function stableObjectKey(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableObjectKey).join(",")}]`;
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableObjectKey(value[key])}`).join(",")}}`;
+}
+
+async function shareRequest(key, factory) {
+  if (activeRequests.has(key)) return activeRequests.get(key);
+  const promise = Promise.resolve().then(factory);
+  activeRequests.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    if (activeRequests.get(key) === promise) activeRequests.delete(key);
+  }
+}
+
+module.exports = { normalizeField, canonicalRequestKey, stableObjectKey, shareRequest };
