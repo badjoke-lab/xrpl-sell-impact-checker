@@ -1,0 +1,26 @@
+name: Reliability Guardrails
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  no-cloudflare-scheduled-trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject Cloudflare scheduled trigger configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          matches="$(find . -type f \( -name 'wrangler*.toml' -o -name 'wrangler*.json' -o -name 'wrangler*.jsonc' \) -not -path './node_modules/*' -not -path './.git/*' -print0 | xargs -0 -r grep -En '^\s*\[\s*triggers\s*\]\s*$|^\s*crons\s*=|["'"']crons["'"']\s*:' || true)"
+          if [ -n "$matches" ]; then
+            echo "Cloudflare scheduled triggers are not allowed in XSIC configuration."
+            echo "$matches"
+            exit 1
+          fi
+          echo "No Cloudflare scheduled trigger configuration found."
