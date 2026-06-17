@@ -34,4 +34,8 @@ jobs:
         with:
           node-version: '24'
       - name: Run deterministic reliability baseline
-        run: node scripts/check_reliability_baseline.mjs
+        run: |
+          node scripts/check_reliability_baseline.mjs
+          node --check apps/sell-impact/precompute-summary-bridge.js
+          node --check apps/sell-impact/precompute-freshness-bridge.js
+          node scripts/check_sell_impact_contract.cjs

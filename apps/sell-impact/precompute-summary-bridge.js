@@ -1,465 +1,426 @@
 const PRECOMPUTE_API = '/api/precompute-pair';
 const DEBOUNCE_MS = 240;
 
-function byResult(name) {
-  return document.querySelector(`[data-result="${name}"]`);
+function allResults(name) {
+  return [...document.querySelectorAll(`[data-result="${name}"]`)];
 }
 
-function setText(target, value) {
-  if (target) target.textContent = value ?? '';
+function firstResult(name) {
+  return allResults(name)[0] || null;
 }
 
-function setList(target, items) {
+function setText(name, value) {
+  allResults(name).forEach((target) => {
+    target.textContent = value ?? '';
+  });
+}
+
+function setList(name, items) {
+  const target = firstResult(name);
   if (!target) return;
-  while (target.firstChild) target.removeChild(target.firstChild);
-  const safeItems = Array.isArray(items) && items.length ? items : ['Unavailable in this snapshot.'];
-  safeItems.forEach((item) => {
+  target.replaceChildren();
+  const values = Array.isArray(items) && items.length ? items : ['Unavailable in this snapshot.'];
+  values.forEach((item) => {
     const li = document.createElement('li');
     li.textContent = item;
     target.appendChild(li);
   });
 }
 
-function setBar(target, pct) {
-  if (!target) return;
-  const clamped = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
-  target.style.setProperty('--w', `${clamped}%`);
+function setBar(name, value) {
+  const width = Math.max(0, Math.min(100, Number.isFinite(Number(value)) ? Number(value) : 0));
+  allResults(name).forEach((target) => target.style.setProperty('--w', `${width}%`));
 }
 
-function setWidth(target, pct) {
-  if (!target) return;
-  const clamped = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
-  target.style.width = `${clamped}%`;
+function setWidth(name, value) {
+  const width = Math.max(0, Math.min(100, Number.isFinite(Number(value)) ? Number(value) : 0));
+  allResults(name).forEach((target) => {
+    target.style.width = `${width}%`;
+  });
 }
 
-function formatNumber(value, maximumFractionDigits = 2) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '—';
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits }).format(n);
+function formatNumber(value, digits = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: digits }).format(number);
 }
 
-function formatPercent(value, maximumFractionDigits = 1) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '—';
-  return `${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits }).format(n)}%`;
+function formatPercent(value, digits = 1) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: digits }).format(number)}%`;
 }
 
-function decodeCurrencyHexToAscii(hex) {
-  const v = String(hex || '').trim();
-  if (!/^[0-9A-Fa-f]{40}$/.test(v)) return v.toUpperCase();
-  const bytes = v.match(/.{2}/g)?.map((b) => parseInt(b, 16)) || [];
-  let out = '';
-  for (const b of bytes) {
-    if (b === 0x00) continue;
-    if (b >= 0x20 && b <= 0x7e) out += String.fromCharCode(b);
+function normalizeAmount(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function decodeCurrency(code) {
+  const value = String(code || '').trim();
+  if (!/^[0-9A-Fa-f]{40}$/.test(value)) return value.toUpperCase();
+  const bytes = value.match(/.{2}/g)?.map((part) => Number.parseInt(part, 16)) || [];
+  return bytes
+    .filter((byte) => byte >= 0x20 && byte <= 0x7e)
+    .map((byte) => String.fromCharCode(byte))
+    .join('')
+    .trim()
+    .toUpperCase() || value.toUpperCase();
+}
+
+function currentInput() {
+  const currencyInput = document.getElementById('currency-input');
+  const issuerInput = document.getElementById('issuer-input');
+  const amountInput = document.getElementById('sell-amount-input');
+  return {
+    currency: decodeCurrency(currencyInput?.dataset.currencyRaw || currencyInput?.value || ''),
+    issuer: String(issuerInput?.value || '').trim(),
+    amount: normalizeAmount(amountInput?.value),
+  };
+}
+
+function pairKey(input) {
+  if (!input.currency || !input.issuer) return '';
+  return `${input.currency}|${input.issuer}`;
+}
+
+function fullInputKey(input) {
+  return `${pairKey(input)}|${input.amount ?? ''}`;
+}
+
+function summaryPairKey(summary, row) {
+  if (row?.pairKey) {
+    const [currency, issuer] = String(row.pairKey).split('|');
+    return currency && issuer ? `${decodeCurrency(currency)}|${issuer}` : '';
   }
-  return out.trim() ? out.trim().toUpperCase() : v.toUpperCase();
+  const currency = decodeCurrency(summary?.currency || '');
+  const issuer = String(summary?.issuer || '').trim();
+  return currency && issuer ? `${currency}|${issuer}` : '';
 }
 
-function formatCurrencyDisplay(code) {
-  if (!code) return '';
-  return /^[0-9A-Fa-f]{40}$/.test(String(code).trim())
-    ? decodeCurrencyHexToAscii(code)
-    : String(code).trim().toUpperCase();
-}
-
-function isPlaceholderText(text) {
-  const value = String(text || '').trim();
-  if (!value) return true;
-  return value === '—' || value === '…' || /Unavailable/i.test(value) || /waiting/i.test(value);
-}
-
-function buildPairKey(rawCurrency, issuer) {
-  const currency = String(rawCurrency || '').trim().toUpperCase();
-  const normalizedIssuer = String(issuer || '').trim();
-  if (!currency || !normalizedIssuer) return '';
-  return `${currency}|${normalizedIssuer}`;
-}
-
-function normalizeRouteName(route) {
+function routeLabel(route) {
   if (route === 'book') return 'Orderbook';
   if (route === 'amm') return 'AMM';
   if (route === 'none') return 'No executable route';
   return 'Unavailable';
 }
 
-function computeConfidence(summary) {
-  if (!summary) return 0;
-  const bookAvail = Boolean(summary.book?.available);
-  const ammAvail = Boolean(summary.amm?.available);
-  if (bookAvail && ammAvail) return 82;
-  if (bookAvail || ammAvail) return 68;
-  return 18;
+function routeRecord(summary, route) {
+  if (route === 'book') return summary?.book || null;
+  if (route === 'amm') return summary?.amm || null;
+  return null;
 }
 
-function computeShare(summary) {
-  const book = Number(summary?.book?.receiveXrp || 0);
-  const amm = Number(summary?.amm?.receiveXrp || 0);
-  const total = book + amm;
-  if (!Number.isFinite(total) || total <= 0) {
-    return { bookPct: 0, ammPct: 0, bridgePct: 0 };
-  }
-  const bookPct = (book / total) * 100;
-  const ammPct = (amm / total) * 100;
-  return {
-    bookPct,
-    ammPct,
-    bridgePct: Math.max(0, 100 - bookPct - ammPct),
-  };
+function seedState(summary, input) {
+  const seededAmount = normalizeAmount(summary?.sellAmount);
+  const requestedAmount = input.amount;
+  if (!seededAmount || !requestedAmount) return { seededAmount, requestedAmount, matches: true };
+  const relativeDifference = Math.abs(requestedAmount - seededAmount) / Math.max(requestedAmount, seededAmount);
+  return { seededAmount, requestedAmount, matches: relativeDifference <= 0.001 };
 }
 
-function computeDepth(summary) {
-  const offersCount = Number(summary?.offersCount || 0);
-  const bookAvailable = Boolean(summary?.book?.available);
-  const ammAvailable = Boolean(summary?.amm?.available);
-  const touchPct = bookAvailable ? Math.min(92, 48 + offersCount * 3) : 0;
-  const innerPct = bookAvailable ? Math.min(86, 34 + offersCount * 2.4) : 0;
-  const ammPct = ammAvailable ? 58 : 8;
-  const bridgePct = summary?.bestRoute === 'none' ? 74 : 6;
-  return { touchPct, innerPct, ammPct, bridgePct };
+function isPlaceholder(value) {
+  const text = String(value || '').trim();
+  return !text || text === '—' || /unavailable|waiting/i.test(text);
 }
 
-function getRequestedAmount() {
-  const amountInput = document.getElementById('sell-amount-input');
-  const raw = String(amountInput?.value || '').trim();
-  if (!raw) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+function isPrecomputeOwned() {
+  return /precompute/i.test(firstResult('endpoint')?.textContent || '');
 }
 
-function buildSeedState(summary) {
-  const seededAmount = Number(summary?.sellAmount || 0);
-  const requestedAmount = getRequestedAmount();
-  if (!Number.isFinite(seededAmount) || seededAmount <= 0) {
-    return { seededAmount: null, requestedAmount, matchesInput: true };
-  }
-  if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
-    return { seededAmount, requestedAmount, matchesInput: true };
-  }
-  const relativeDiff = Math.abs(requestedAmount - seededAmount) / Math.max(requestedAmount, seededAmount);
-  return {
-    seededAmount,
-    requestedAmount,
-    matchesInput: relativeDiff <= 0.001,
-  };
+let lastLiveInputKey = '';
+
+function canApplyPrecompute(input, expectedPairLabel) {
+  const endpoint = String(firstResult('endpoint')?.textContent || '').trim();
+  const currentPairLabel = String(firstResult('pair-label')?.textContent || '').trim();
+  const currentKey = fullInputKey(input);
+  if (isPrecomputeOwned()) return true;
+  if (isPlaceholder(endpoint)) return true;
+  if (currentPairLabel && currentPairLabel !== expectedPairLabel) return true;
+  return currentKey !== lastLiveInputKey;
 }
 
-function resolveCurrentPairLabel() {
-  return String(byResult('pair-label')?.textContent || '').trim();
+function setCandidate(prefix, config) {
+  setText(`${prefix}-title`, config.title);
+  setText(`${prefix}-role`, config.role);
+  setText(`${prefix}-output`, config.output);
+  setText(`${prefix}-impact`, config.impact);
+  setText(`${prefix}-bottleneck`, config.bottleneck);
+  setText(`${prefix}-reason`, config.reason);
+  setText(`${prefix}-confidence`, config.confidence || 'Not scored');
+  setBar(`${prefix}-confidence-bar`, 0);
+  const card = document.querySelector(`[data-route-card="${prefix.slice(-1)}"]`);
+  card?.classList.toggle('is-selected', Boolean(config.selected));
+  card?.classList.toggle('is-unavailable', Boolean(config.unavailable));
 }
 
-function isPrecomputeOwnedView() {
-  const endpoint = String(byResult('endpoint')?.textContent || '').trim();
-  const venue = String(byResult('used-venue-summary')?.textContent || '').trim();
-  return /precompute/i.test(endpoint) || /Precomputed/i.test(venue);
-}
-
-function shouldApplySummary(summary) {
-  const orderCount = byResult('order-count');
-  const usedVenue = byResult('used-venue-summary');
-  const snapshotHeadline = byResult('snapshot-headline');
-  const expectedPairLabel = `${formatCurrencyDisplay(summary?.currency)} / XRP`;
-  const currentPairLabel = resolveCurrentPairLabel();
-  if (currentPairLabel && expectedPairLabel && currentPairLabel !== expectedPairLabel) {
-    return true;
-  }
-  return isPrecomputeOwnedView() || [orderCount, usedVenue, snapshotHeadline].some((el) => isPlaceholderText(el?.textContent));
-}
-
-function applyCandidate(prefix, config) {
-  setText(byResult(`${prefix}-title`), config.title);
-  setText(byResult(`${prefix}-role`), config.role);
-  setText(byResult(`${prefix}-output`), config.output);
-  setText(byResult(`${prefix}-impact`), config.impact);
-  setText(byResult(`${prefix}-bottleneck`), config.bottleneck);
-  setText(byResult(`${prefix}-reason`), config.reason);
-  setText(byResult(`${prefix}-confidence`), `confidence ${formatPercent(config.confidence, 0)}`);
-  setBar(byResult(`${prefix}-confidence-bar`), config.confidence);
-}
-
-function applyHeroCards(summary, routeLabel, checkedAt, seedState) {
-  const selectedSlippage = summary.bestRoute === 'amm'
-    ? summary.amm?.slippagePct ?? null
-    : summary.book?.slippagePct ?? null;
-  const bestReceive = summary.bestReceiveXrp;
-  const seededAmountLabel = formatNumber(seedState.seededAmount || summary.sellAmount || 0, 0);
-  const requestedAmountLabel = Number.isFinite(seedState.requestedAmount)
-    ? formatNumber(seedState.requestedAmount, 0)
-    : null;
-
-  if (seedState.matchesInput) {
-    const receiveText = bestReceive != null ? `${formatNumber(bestReceive, 6)} XRP` : 'Unavailable';
-    setText(byResult('receive'), receiveText);
-    setText(byResult('slippage'), selectedSlippage != null ? formatPercent(selectedSlippage) : '—');
-    setText(byResult('sellability'), summary.bestRoute === 'none' ? 'Unavailable' : 'Seeded');
-    setText(byResult('filled-line'), `Seed row ${seededAmountLabel} / ${seededAmountLabel}`);
-    setText(byResult('fiat-rate'), 'Precompute snapshot only · live fiat estimate pending.');
-    setText(byResult('max-sell-value'), summary.bestRoute === 'none' ? 'No route' : `${routeLabel} seeded`);
-    setText(byResult('mix-summary'), `seed ${seededAmountLabel}`);
-    setText(byResult('max-sell-note'), 'Seeded proxy only. Run Estimate for live max-sell bounds.');
-    setText(byResult('slippage-help'), `Seed-size ${routeLabel.toLowerCase()} impact from current precompute row.`);
-  } else {
-    setText(byResult('receive'), `Seed preview ${bestReceive != null ? `${formatNumber(bestReceive, 6)} XRP` : 'Unavailable'}`);
-    setText(
-      byResult('slippage'),
-      selectedSlippage != null ? `Seed ${formatPercent(selectedSlippage)} @ ${seededAmountLabel}` : `Seed @ ${seededAmountLabel}`
-    );
-    setText(byResult('sellability'), 'Seed preview');
-    setText(byResult('filled-line'), `Input ${requestedAmountLabel} differs from seed ${seededAmountLabel}`);
-    setText(byResult('fiat-rate'), 'Run Estimate for live output at the current amount.');
-    setText(byResult('max-sell-value'), 'Run Estimate');
-    setText(byResult('mix-summary'), `seed ${seededAmountLabel}`);
-    setText(byResult('max-sell-note'), `Current input ${requestedAmountLabel} is outside the seeded preview size ${seededAmountLabel}.`);
-    setText(byResult('slippage-help'), `Precompute preview is only for seed size ${seededAmountLabel}.`);
-  }
-
-  setText(byResult('best-price'), summary.book?.bestPrice != null ? formatNumber(summary.book.bestPrice, 8) : '—');
-  setText(byResult('worst-price'), summary.bestRoute === 'none' ? '—' : 'Tail worst price needs live depth.');
-  setText(byResult('order-count'), formatNumber(summary.offersCount, 0));
-  setText(byResult('data-fetched'), `precompute checked ${checkedAt}`);
-}
-
-function applyMixAndDepth(summary, shares, routeLabel, seedState) {
-  const depth = computeDepth(summary);
-  const seededAmountLabel = formatNumber(seedState.seededAmount || summary.sellAmount || 0, 0);
-  const requestedAmountLabel = Number.isFinite(seedState.requestedAmount)
-    ? formatNumber(seedState.requestedAmount, 0)
-    : null;
-
-  setText(byResult('mix-book'), `Book ${formatPercent(shares.bookPct, 0)}`);
-  setText(byResult('mix-amm'), `AMM ${formatPercent(shares.ammPct, 0)}`);
-  setText(byResult('mix-bridge'), `Bridge ${formatPercent(shares.bridgePct, 0)}`);
-  setWidth(byResult('mix-book-segment'), shares.bookPct);
-  setWidth(byResult('mix-amm-segment'), shares.ammPct);
-  setWidth(byResult('mix-bridge-segment'), shares.bridgePct);
-
-  setText(byResult('depth-summary'), summary.bestRoute === 'none'
-    ? 'Current precompute row does not show an executable XRP exit route.'
-    : `${routeLabel} leads in the current precompute row with visible seeded depth.`);
-  setText(byResult('depth-touch-label'), summary.book?.available ? 'Book-led' : 'Unavailable');
-  setText(byResult('depth-inner-label'), summary.offersCount > 0 ? `${formatNumber(summary.offersCount, 0)} offers` : 'Unavailable');
-  setText(byResult('depth-amm-label'), summary.amm?.available ? 'Available' : 'No path');
-  setText(byResult('depth-bridge-label'), shares.bridgePct > 0 ? formatPercent(shares.bridgePct, 0) : 'None');
-  setBar(byResult('depth-touch-bar'), depth.touchPct);
-  setBar(byResult('depth-inner-bar'), depth.innerPct);
-  setBar(byResult('depth-amm-bar'), depth.ammPct);
-  setBar(byResult('depth-bridge-bar'), depth.bridgePct);
-  setText(
-    byResult('depth-caption'),
-    seedState.matchesInput
-      ? 'Seeded snapshot only. Run Estimate for live depth curve and tail behavior.'
-      : `Showing seeded depth for ${seededAmountLabel}. Run Estimate for live depth at ${requestedAmountLabel}.`
-  );
-}
-
-function applySummary(summary) {
-  if (!summary || !shouldApplySummary(summary)) return;
-  const checkedAt = summary.checkedAt ? new Date(summary.checkedAt).toLocaleTimeString('en-US', {
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  }) : '—';
-  const routeLabel = normalizeRouteName(summary.bestRoute);
-  const worstRouteLabel = normalizeRouteName(summary.worstRoute);
-  const confidence = computeConfidence(summary);
-  const pairLabel = `${formatCurrencyDisplay(summary.currency)} / XRP`;
-  const shares = computeShare(summary);
-  const seedState = buildSeedState(summary);
-  const seededAmountLabel = formatNumber(seedState.seededAmount || summary.sellAmount || 0, 0);
-  const requestedAmountLabel = Number.isFinite(seedState.requestedAmount)
-    ? formatNumber(seedState.requestedAmount, 0)
-    : null;
-
-  applyHeroCards(summary, routeLabel, checkedAt, seedState);
-  applyMixAndDepth(summary, shares, routeLabel, seedState);
-  setText(byResult('used-venue-summary'), `Precomputed best route: ${routeLabel}`);
-  setText(byResult('used-venue-details'), `Seed size ${seededAmountLabel} · offers ${formatNumber(summary.offersCount, 0)}`);
-  setText(
-    byResult('used-venue-note'),
-    seedState.matchesInput
-      ? `Checked ${checkedAt}. Run Estimate to replace this with live route reasoning.`
-      : `Checked ${checkedAt}. Seed row is ${seededAmountLabel}; run Estimate for live reasoning at ${requestedAmountLabel}.`
-  );
-  setText(byResult('endpoint'), `precompute snapshot · ${checkedAt}`);
-  setText(byResult('endpoint-details'), `precompute current row · ${pairLabel}`);
-  setText(byResult('pair-label'), pairLabel);
-  setText(byResult('pair-meta'), `precompute seed ${seededAmountLabel} · route ${summary.bestRoute}`);
-  setText(byResult('liquidity-split'), `Book ${formatPercent(shares.bookPct, 0)} / AMM ${formatPercent(shares.ammPct, 0)}`);
-  setText(byResult('amm-reserves'), summary.amm?.available ? 'Precomputed AMM path available.' : 'No AMM path in current precompute row.');
-  setText(byResult('amm-fee'), summary.amm?.slippagePct != null ? `impact ${formatPercent(summary.amm.slippagePct)}` : '—');
-
-  setText(byResult('snapshot-headline'), `${routeLabel} leads for ${pairLabel} at the seeded size.`);
-  setText(
-    byResult('snapshot-body'),
-    seedState.matchesInput
-      ? `This precompute row was built from ${seededAmountLabel} units and ${formatNumber(summary.offersCount, 0)} visible book levels. Live estimate can still differ.`
-      : `This precompute row was built from ${seededAmountLabel} units and ${formatNumber(summary.offersCount, 0)} visible book levels. Your current input is ${requestedAmountLabel}, so treat this as a seeded preview only.`
-  );
-  setList(byResult('snapshot-bullets'), [
-    `Best route: ${routeLabel}`,
-    `Worst route: ${worstRouteLabel}`,
-    `Best receive at seed ${seededAmountLabel}: ${summary.bestReceiveXrp != null ? `${formatNumber(summary.bestReceiveXrp, 6)} XRP` : 'unavailable'}`,
-  ]);
-
-  const confidenceCard = byResult('route-confidence-card');
+function clearDerivedScores() {
+  setText('route-confidence-score', 'Not scored');
+  setText('route-confidence-summary', 'Precompute does not provide a route-confidence score. Run Estimate for live route reasoning.');
+  const confidenceCard = firstResult('route-confidence-card');
   if (confidenceCard) confidenceCard.hidden = false;
-  setText(byResult('route-confidence-score'), `${Math.round(confidence)} / 100`);
-  setBar(byResult('route-confidence-bar'), confidence);
-  setText(
-    byResult('route-confidence-summary'),
-    seedState.matchesInput
-      ? `Precomputed from D1 current row · checked ${checkedAt} · rerun Estimate for live execution values.`
-      : `Precomputed from D1 current row · seed ${seededAmountLabel} only · rerun Estimate for live execution at ${requestedAmountLabel}.`
-  );
-
-  setText(byResult('path-headline'), `${routeLabel} is currently the strongest precomputed path.`);
-  setText(byResult('why'), `Precompute favors ${routeLabel} because it currently offers the strongest bounded receive at the seed size. Live execution may shift with fresh depth.`);
-  setText(byResult('risk-book'), summary.book?.available ? 'low' : 'high');
-  setText(byResult('risk-amm'), summary.amm?.available ? 'watch' : 'low');
-  setText(byResult('risk-bridge'), 'low');
-  setText(byResult('risk-depth'), summary.offersCount > 0 ? 'contained' : 'high');
-  setBar(byResult('risk-book-bar'), summary.book?.available ? 32 : 82);
-  setBar(byResult('risk-amm-bar'), summary.amm?.available ? 48 : 10);
-  setBar(byResult('risk-bridge-bar'), 8);
-  setBar(byResult('risk-depth-bar'), summary.offersCount > 0 ? 28 : 84);
-  setList(byResult('path-bullets'), [
-    `Book route available: ${summary.book?.available ? 'yes' : 'no'}`,
-    `AMM route available: ${summary.amm?.available ? 'yes' : 'no'}`,
-    seedState.matchesInput
-      ? 'This is a stable precompute snapshot, not the final live estimate.'
-      : `This is a stable precompute snapshot for ${seededAmountLabel}, not the final live estimate for ${requestedAmountLabel}.`,
-  ]);
-
-  applyCandidate('candidate-a', {
-    title: `Route A · ${routeLabel}`,
-    role: 'Selected',
-    output: summary.bestReceiveXrp != null ? `${formatNumber(summary.bestReceiveXrp, 6)} XRP` : 'Unavailable',
-    impact: summary.bestRoute === 'amm' ? formatPercent(summary.amm?.slippagePct) : formatPercent(summary.book?.slippagePct),
-    bottleneck: summary.offersCount > 0 ? `Observed offers ${formatNumber(summary.offersCount, 0)}` : 'No visible executable depth.',
-    reason: seedState.matchesInput
-      ? `Current D1 precompute row selects ${routeLabel.toLowerCase()} at the seed size.`
-      : `Current D1 precompute row selects ${routeLabel.toLowerCase()} at the seed size ${seededAmountLabel}.`,
-    confidence,
+  setBar('route-confidence-bar', 0);
+  ['book', 'amm', 'bridge', 'depth'].forEach((key) => {
+    setText(`risk-${key}`, 'Not scored');
+    setBar(`risk-${key}-bar`, 0);
   });
-
-  const alternativeOutput = summary.bestRoute === 'book'
-    ? (summary.amm?.receiveXrp != null ? `${formatNumber(summary.amm.receiveXrp, 6)} XRP` : 'Unavailable')
-    : (summary.book?.receiveXrp != null ? `${formatNumber(summary.book.receiveXrp, 6)} XRP` : 'Unavailable');
-  const alternativeImpact = summary.bestRoute === 'book'
-    ? formatPercent(summary.amm?.slippagePct)
-    : formatPercent(summary.book?.slippagePct);
-  applyCandidate('candidate-b', {
-    title: `Route B · ${summary.bestRoute === 'book' ? 'AMM alternative' : 'Orderbook alternative'}`,
-    role: 'Alternative',
-    output: alternativeOutput,
-    impact: alternativeImpact,
-    bottleneck: summary.bestRoute === 'book' ? 'AMM path not leading in current row.' : 'Orderbook path not leading in current row.',
-    reason: seedState.matchesInput
-      ? 'Shown from the current precompute row only.'
-      : `Shown from the current precompute row only. Current input ${requestedAmountLabel} still needs live calculation.`,
-    confidence: Math.max(24, confidence - 18),
-  });
-
-  const fallbackReceive = summary.bestReceiveXrp != null ? summary.bestReceiveXrp * 0.82 : null;
-  applyCandidate('candidate-c', {
-    title: 'Route C · Bounded fallback',
-    role: 'Fallback',
-    output: fallbackReceive != null ? `${formatNumber(fallbackReceive, 6)} XRP` : 'Unavailable',
-    impact: summary.bestRoute === 'none' ? 'Unavailable' : 'higher than selected',
-    bottleneck: 'Fallback shown for continuity only.',
-    reason: seedState.matchesInput
-      ? 'Precompute fallback is indicative only until live estimate runs.'
-      : `Precompute fallback is indicative only until live estimate runs for ${requestedAmountLabel}.`,
-    confidence: Math.max(12, confidence - 34),
-  });
-
-  setText(byResult('snapshot-output-note'), `Precompute checked ${checkedAt}.`);
-  setText(
-    byResult('snapshot-impact-note'),
-    seedState.matchesInput
-      ? `Seed-size impact ${summary.bestRoute === 'amm' ? formatPercent(summary.amm?.slippagePct) : formatPercent(summary.book?.slippagePct)}.`
-      : `Seed-size impact ${summary.bestRoute === 'amm' ? formatPercent(summary.amm?.slippagePct) : formatPercent(summary.book?.slippagePct)} at ${seededAmountLabel}.`
-  );
-  setText(byResult('snapshot-context-note'), `Book ${formatPercent(shares.bookPct, 0)} / AMM ${formatPercent(shares.ammPct, 0)}.`);
-  setList(byResult('snapshot-note-current'), [
-    `Precompute route: ${routeLabel}`,
-    `Offers seen: ${formatNumber(summary.offersCount, 0)}`,
-    `Checked at: ${checkedAt}`,
-  ]);
-  setList(byResult('snapshot-note-delta'), seedState.matchesInput
-    ? [
-        'Live estimate has not run yet for this pair in the current view.',
-        'Use Estimate to refresh route quality with live orderbook and AMM reads.',
-      ]
-    : [
-        `Current input ${requestedAmountLabel} differs from precompute seed ${seededAmountLabel}.`,
-        'Use Estimate to refresh route quality with live orderbook and AMM reads.',
-      ]);
 }
 
-function createHydrator() {
+function applyNoRoute(summary, input, seed, checkedAt, expectedPairLabel) {
+  const seedLabel = seed.seededAmount ? formatNumber(seed.seededAmount, 0) : 'unknown';
+  setText('receive', 'Unavailable');
+  setText('slippage', '—');
+  setText('sellability', 'No route');
+  setText('filled-line', `No executable route in precompute row · seed ${seedLabel}`);
+  setText('fiat-rate', 'No book or AMM output was returned by the precompute source.');
+  setText('max-sell-value', 'No route');
+  setText('max-sell-note', 'Run Estimate to confirm the current live no-liquidity state.');
+  setText('used-venue-summary', 'Precomputed route state: none');
+  setText('used-venue-details', `Seed size ${seedLabel} · offers ${formatNumber(summary.offersCount, 0)}`);
+  setText('used-venue-note', `Checked ${checkedAt}. This is route-presence context, not a live execution result.`);
+  setText('warning', 'No executable XRP route appears in the current precompute row. Run Estimate to confirm live liquidity.');
+  setText('snapshot-headline', `No executable route is materialized for ${expectedPairLabel}.`);
+  setText('snapshot-body', 'The current precompute row contains neither a usable orderbook result nor a usable AMM result.');
+  setList('snapshot-bullets', [
+    'Orderbook route: unavailable',
+    'AMM route: unavailable',
+    'Live confirmation required before treating this as final.',
+  ]);
+  setText('path-headline', 'No selected route');
+  setText('why', 'No route can be selected from this precompute row because neither book nor AMM output is available.');
+  setList('path-bullets', ['No selected route.', 'No alternative route.', 'No fallback route was returned.']);
+  ['candidate-a', 'candidate-b', 'candidate-c'].forEach((prefix, index) => setCandidate(prefix, {
+    title: `Route ${String.fromCharCode(65 + index)} · Unavailable`,
+    role: 'Unavailable',
+    output: 'Unavailable',
+    impact: 'Unavailable',
+    bottleneck: 'No executable route returned.',
+    reason: 'The precompute source did not materialize this route.',
+    unavailable: true,
+  }));
+  setText('depth-summary', 'No executable route in the precompute row.');
+  setText('depth-touch-label', 'No book route');
+  setText('depth-inner-label', 'No book route');
+  setText('depth-amm-label', 'No AMM route');
+  setText('depth-bridge-label', 'Not evaluated');
+  setText('depth-caption', 'Run Estimate to perform current live liquidity checks.');
+  clearDerivedScores();
+}
+
+function applyRouteSummary(summary, input, seed, checkedAt, expectedPairLabel) {
+  const selectedRoute = summary.bestRoute;
+  const selected = routeRecord(summary, selectedRoute);
+  const alternativeRoute = selectedRoute === 'book' ? 'amm' : 'book';
+  const alternative = routeRecord(summary, alternativeRoute);
+  const seedLabel = seed.seededAmount ? formatNumber(seed.seededAmount, 0) : 'unknown';
+  const inputLabel = seed.requestedAmount ? formatNumber(seed.requestedAmount, 0) : null;
+  const selectedName = routeLabel(selectedRoute);
+  const selectedReceive = Number(selected?.receiveXrp ?? summary.bestReceiveXrp);
+  const selectedImpact = selected?.slippagePct;
+
+  setText('receive', Number.isFinite(selectedReceive)
+    ? `${seed.matches ? '' : 'Seed preview '}${formatNumber(selectedReceive, 6)} XRP`
+    : 'Unavailable');
+  setText('slippage', Number.isFinite(Number(selectedImpact))
+    ? `${seed.matches ? '' : 'Seed '}${formatPercent(selectedImpact)}${seed.matches ? '' : ` @ ${seedLabel}`}`
+    : '—');
+  setText('sellability', seed.matches ? 'Seeded preview' : 'Seed preview');
+  setText('filled-line', seed.matches
+    ? `Seed row ${seedLabel} / ${seedLabel}`
+    : `Input ${inputLabel} differs from seed ${seedLabel}`);
+  setText('fiat-rate', seed.matches
+    ? 'Precompute snapshot only · live values replace this after Estimate.'
+    : 'Run Estimate for live output at the current amount.');
+  setText('max-sell-value', seed.matches ? `${selectedName} seeded` : 'Run Estimate');
+  setText('max-sell-note', 'Precompute does not establish live maximum sell bounds.');
+  setText('slippage-help', `Seed-size ${selectedName.toLowerCase()} impact from the current precompute row.`);
+  setText('best-price', summary.book?.bestPrice != null ? formatNumber(summary.book.bestPrice, 8) : '—');
+  setText('worst-price', 'Requires live depth');
+  setText('order-count', formatNumber(summary.offersCount, 0));
+  setText('used-venue-summary', `Precomputed best route: ${selectedName}`);
+  setText('used-venue-details', `Seed size ${seedLabel} · offers ${formatNumber(summary.offersCount, 0)}`);
+  setText('used-venue-note', seed.matches
+    ? `Checked ${checkedAt}. Run Estimate to replace this preview with live route reasoning.`
+    : `Checked ${checkedAt}. The row is seeded at ${seedLabel}; current input is ${inputLabel}.`);
+
+  setText('liquidity-split', 'Alternative-route comparison; not an execution split');
+  setText('mix-book', selectedRoute === 'book' ? 'Book candidate selected' : 'Book alternative');
+  setText('mix-amm', selectedRoute === 'amm' ? 'AMM candidate selected' : 'AMM alternative');
+  setText('mix-bridge', 'Bridge not materialized');
+  setWidth('mix-book-segment', selectedRoute === 'book' ? 100 : 0);
+  setWidth('mix-amm-segment', selectedRoute === 'amm' ? 100 : 0);
+  setWidth('mix-bridge-segment', 0);
+
+  setText('depth-summary', 'Precompute confirms route availability but does not provide a live depth curve.');
+  setText('depth-touch-label', summary.book?.available ? 'Book available' : 'No book route');
+  setText('depth-inner-label', summary.book?.available ? `${formatNumber(summary.offersCount, 0)} offers observed` : 'No book route');
+  setText('depth-amm-label', summary.amm?.available ? 'AMM available' : 'No AMM route');
+  setText('depth-bridge-label', 'Not evaluated');
+  ['depth-touch-bar', 'depth-inner-bar', 'depth-amm-bar', 'depth-bridge-bar'].forEach((name) => setBar(name, 0));
+  setText('depth-caption', 'Run Estimate for current depth, tail behavior, and route mix.');
+
+  setText('snapshot-headline', `${selectedName} leads the current seeded comparison for ${expectedPairLabel}.`);
+  setText('snapshot-body', seed.matches
+    ? `This row was calculated for ${seedLabel} units. It is a preview, not a live quote.`
+    : `This row was calculated for ${seedLabel} units, while the current input is ${inputLabel}.`);
+  setList('snapshot-bullets', [
+    `Selected candidate: ${selectedName}`,
+    `Alternative candidate: ${alternative?.available ? routeLabel(alternativeRoute) : 'unavailable'}`,
+    'No third fallback route is inferred unless the source explicitly returns one.',
+  ]);
+  setText('path-headline', `${selectedName} is the selected precompute candidate.`);
+  setText('why', `The precompute source returned the highest bounded receive for ${selectedName} at the seed amount. Live execution may differ.`);
+  setList('path-bullets', [
+    `Orderbook available: ${summary.book?.available ? 'yes' : 'no'}`,
+    `AMM available: ${summary.amm?.available ? 'yes' : 'no'}`,
+    'Confidence and bottleneck scores are not inferred from route presence alone.',
+  ]);
+
+  setCandidate('candidate-a', {
+    title: `Route A · ${selectedName}`,
+    role: 'Selected preview',
+    output: Number.isFinite(selectedReceive) ? `${formatNumber(selectedReceive, 6)} XRP` : 'Unavailable',
+    impact: Number.isFinite(Number(selectedImpact)) ? formatPercent(selectedImpact) : 'Unavailable',
+    bottleneck: 'Requires live depth analysis.',
+    reason: `Selected by the current precompute row at seed ${seedLabel}.`,
+    selected: true,
+  });
+
+  setCandidate('candidate-b', alternative?.available ? {
+    title: `Route B · ${routeLabel(alternativeRoute)}`,
+    role: 'Alternative preview',
+    output: Number.isFinite(Number(alternative.receiveXrp)) ? `${formatNumber(alternative.receiveXrp, 6)} XRP` : 'Unavailable',
+    impact: Number.isFinite(Number(alternative.slippagePct)) ? formatPercent(alternative.slippagePct) : 'Unavailable',
+    bottleneck: 'Requires live depth analysis.',
+    reason: 'Returned by the source as the non-leading route at the seed amount.',
+  } : {
+    title: 'Route B · Unavailable',
+    role: 'Unavailable',
+    output: 'Unavailable',
+    impact: 'Unavailable',
+    bottleneck: 'Alternative route not returned.',
+    reason: 'The precompute source did not materialize an alternative route.',
+    unavailable: true,
+  });
+
+  const fallback = summary.fallback;
+  setCandidate('candidate-c', fallback?.available ? {
+    title: 'Route C · Source-provided fallback',
+    role: 'Fallback preview',
+    output: Number.isFinite(Number(fallback.receiveXrp)) ? `${formatNumber(fallback.receiveXrp, 6)} XRP` : 'Unavailable',
+    impact: Number.isFinite(Number(fallback.slippagePct)) ? formatPercent(fallback.slippagePct) : 'Unavailable',
+    bottleneck: fallback.bottleneck || 'Source-provided fallback.',
+    reason: fallback.reason || 'Fallback explicitly returned by the precompute source.',
+  } : {
+    title: 'Route C · Not materialized',
+    role: 'Unavailable',
+    output: 'Unavailable',
+    impact: 'Not materialized',
+    bottleneck: 'No third route in precompute row.',
+    reason: 'No fallback output is inferred or fabricated.',
+    unavailable: true,
+  });
+
+  clearDerivedScores();
+  setText('snapshot-output-note', `Precompute checked ${checkedAt}.`);
+  setText('snapshot-impact-note', Number.isFinite(Number(selectedImpact)) ? `Seed-size impact ${formatPercent(selectedImpact)}.` : 'Impact unavailable.');
+  setText('snapshot-context-note', 'Selected and alternative routes are compared independently.');
+  setList('snapshot-note-current', [`Precompute route: ${selectedName}`, `Offers seen: ${formatNumber(summary.offersCount, 0)}`, `Checked at: ${checkedAt}`]);
+  setList('snapshot-note-delta', seed.matches
+    ? ['Live estimate has not run for this view.', 'Use Estimate for current route, depth, and execution values.']
+    : [`Current input ${inputLabel} differs from seed ${seedLabel}.`, 'Use Estimate for the current amount.']);
+}
+
+function applyFreshness(freshness) {
+  if (!freshness || freshness.state === 'fresh' || freshness.status === 'fresh') return;
+  const state = freshness.state || freshness.status || 'missing';
+  const age = Number(freshness.ageMs);
+  const ageText = Number.isFinite(age) ? `${Math.round(age / 60000)}m old` : 'unknown age';
+  const message = state === 'aging'
+    ? `Aging precompute snapshot (${ageText}). Run Estimate for current values.`
+    : state === 'stale'
+      ? `Stale precompute snapshot (${ageText}). Treat it as context only until Estimate runs.`
+      : 'No recent precompute snapshot is available. Run Estimate for live values.';
+  setText('warning', message);
+  setText('data-fetched', `precompute ${state} · ${ageText}`);
+}
+
+function applyResponse(data, requestedInput) {
+  const summary = data?.row?.summary;
+  if (!data?.ok || !data?.found || !summary) return;
+  if (summaryPairKey(summary, data.row) !== pairKey(requestedInput)) return;
+  const expectedPairLabel = `${requestedInput.currency} / XRP`;
+  if (!canApplyPrecompute(requestedInput, expectedPairLabel)) return;
+
+  const checkedAt = summary.checkedAt
+    ? new Date(summary.checkedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+    : '—';
+  const seed = seedState(summary, requestedInput);
+
+  setText('endpoint', `precompute snapshot · ${checkedAt}`);
+  setText('endpoint-details', `precompute current row · ${expectedPairLabel}`);
+  setText('pair-label', expectedPairLabel);
+  setText('pair-meta', `precompute seed ${seed.seededAmount ? formatNumber(seed.seededAmount, 0) : 'unknown'} · route ${summary.bestRoute || 'none'}`);
+  setText('data-fetched', `precompute checked ${checkedAt}`);
+  setText('amm-reserves', summary.amm?.available ? 'AMM route present in precompute row.' : 'No AMM route in precompute row.');
+  setText('amm-fee', Number.isFinite(Number(summary.amm?.slippagePct)) ? `seed impact ${formatPercent(summary.amm.slippagePct)}` : '—');
+
+  if (summary.bestRoute === 'none' || (!summary.book?.available && !summary.amm?.available)) {
+    applyNoRoute(summary, requestedInput, seed, checkedAt, expectedPairLabel);
+  } else {
+    applyRouteSummary(summary, requestedInput, seed, checkedAt, expectedPairLabel);
+  }
+  applyFreshness(data.freshness || data.row?.freshness || null);
+  window.dispatchEvent(new CustomEvent('xsic:precompute-applied', { detail: { pairKey: pairKey(requestedInput), seed, freshness: data.freshness || data.row?.freshness || null } }));
+}
+
+function mount() {
   const currencyInput = document.getElementById('currency-input');
   const issuerInput = document.getElementById('issuer-input');
   const amountInput = document.getElementById('sell-amount-input');
   const estimateButton = document.querySelector('.primary-button');
-  if (!currencyInput || !issuerInput || !estimateButton) return null;
+  if (!currencyInput || !issuerInput || !amountInput || !estimateButton) return;
 
   let timer = null;
-  let seq = 0;
+  let generation = 0;
 
-  async function run() {
-    const rawCurrency = currencyInput.dataset.currencyRaw || currencyInput.value || '';
-    const issuer = issuerInput.value || '';
-    const pairKey = buildPairKey(rawCurrency, issuer);
-    if (!pairKey) return;
-    if (estimateButton.disabled) return;
-    const requestSeq = ++seq;
-    try {
-      const url = `${PRECOMPUTE_API}?currency=${encodeURIComponent(rawCurrency)}&issuer=${encodeURIComponent(issuer)}`;
-      const res = await fetch(url, { cache: 'no-store' });
-      const data = await res.json().catch(() => null);
-      if (requestSeq !== seq) return;
-      if (!data?.ok || !data?.found || !data?.row?.summary) return;
-      applySummary(data.row.summary);
-    } catch {
-      // ignore hydration failures
-    }
-  }
+  const schedule = (immediate = false) => {
+    generation += 1;
+    const scheduledGeneration = generation;
+    if (timer) clearTimeout(timer);
+    const run = async () => {
+      if (scheduledGeneration !== generation || estimateButton.disabled) return;
+      const input = currentInput();
+      if (!pairKey(input)) return;
+      try {
+        const url = `${PRECOMPUTE_API}?currency=${encodeURIComponent(input.currency)}&issuer=${encodeURIComponent(input.issuer)}`;
+        const response = await fetch(url, { cache: 'no-store' });
+        const data = await response.json().catch(() => null);
+        if (scheduledGeneration !== generation) return;
+        const latestInput = currentInput();
+        if (pairKey(latestInput) !== pairKey(input) || latestInput.amount !== input.amount) return;
+        applyResponse(data, latestInput);
+      } catch {
+        // Live Estimate remains available when hydration fails.
+      }
+    };
+    if (immediate) void run();
+    else timer = setTimeout(run, DEBOUNCE_MS);
+  };
 
-  function schedule(immediate = false) {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-    if (immediate) {
-      void run();
-      return;
-    }
-    timer = setTimeout(() => {
-      timer = null;
-      void run();
-    }, DEBOUNCE_MS);
-  }
+  estimateButton.addEventListener('click', () => {
+    lastLiveInputKey = fullInputKey(currentInput());
+    generation += 1;
+    if (timer) clearTimeout(timer);
+  }, { capture: true });
 
-  return { schedule, amountInput };
+  [currencyInput, issuerInput, amountInput].forEach((input) => {
+    input.addEventListener('input', () => schedule(false));
+    input.addEventListener('blur', () => schedule(true));
+  });
+  window.addEventListener('pageshow', () => schedule(true));
+  schedule(true);
 }
 
-function mount() {
-  const hydrator = createHydrator();
-  if (!hydrator) return;
-  const currencyInput = document.getElementById('currency-input');
-  const issuerInput = document.getElementById('issuer-input');
-  const amountInput = hydrator.amountInput;
-  currencyInput?.addEventListener('input', () => hydrator.schedule(false));
-  issuerInput?.addEventListener('input', () => hydrator.schedule(false));
-  amountInput?.addEventListener('input', () => hydrator.schedule(false));
-  currencyInput?.addEventListener('blur', () => hydrator.schedule(true));
-  issuerInput?.addEventListener('blur', () => hydrator.schedule(true));
-  amountInput?.addEventListener('blur', () => hydrator.schedule(true));
-  window.addEventListener('pageshow', () => hydrator.schedule(true));
-  hydrator.schedule(true);
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', mount);
-} else {
-  mount();
-}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
+else mount();
