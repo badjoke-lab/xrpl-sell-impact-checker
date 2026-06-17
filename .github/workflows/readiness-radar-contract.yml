@@ -1,0 +1,20 @@
+name: Readiness Radar Contract
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check Institutional Readiness Radar
+        run: |
+          node --check apps/institutional-readiness-radar/institutional-readiness-radar.js
+          node scripts/check_readiness_radar_contract.cjs

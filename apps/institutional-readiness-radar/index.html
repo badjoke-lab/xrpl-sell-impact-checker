@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Institutional Readiness Radar — XSIC</title>
+<meta name="description" content="Review public-source readiness evidence for XRPL-linked projects across eight separate institutional-use dimensions without a composite score." />
+<link rel="canonical" href="https://xsic.badjoke-lab.com/apps/institutional-readiness-radar/" />
+<meta property="og:type" content="website" /><meta property="og:site_name" content="XSIC" /><meta property="og:title" content="Institutional Readiness Radar — XSIC" /><meta property="og:description" content="Separate technical maturity, production readiness, verifiability, operations, sources, and adoption signals." /><meta property="og:url" content="https://xsic.badjoke-lab.com/apps/institutional-readiness-radar/" /><meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+<meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="Institutional Readiness Radar — XSIC" /><meta name="twitter:description" content="Review eight public-source readiness dimensions without an institutional-ready verdict." /><meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+<link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/apps/watch-tools.css" /><link rel="icon" href="/favicon.png" />
+</head>
+<body data-nav-key="apps"><div class="app page console-page">
+<header class="app__header global-header"><div class="app__header-top"><a href="/" class="brand-link" aria-label="XSIC Home"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><span class="app__title">XSIC</span></div></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button><div data-global-nav></div></div></header>
+<main class="page__content watch-page">
+<section class="watch-hero"><p class="eyebrow">Labs / Multi-axis review</p><h1 class="page-title">Institutional Readiness Radar</h1><p class="page-subtitle">Review which public-source dimensions look passable and which remain weak. This page does not issue an institutional-ready verdict or a composite score.</p></section>
+<section class="card"><div class="watch-refresh-row"><div><p class="eyebrow">Target</p><h2 class="section-title">DNA Protocol on XRPL</h2></div><span class="watch-chip">External Project Using XRPL</span><span class="watch-chip watch-chip--experimental">Testnet-linked</span><button id="radar-refresh" class="secondary-button" type="button">Refresh sources</button><span id="radar-status" class="watch-chip">Not checked</span></div><p id="radar-checked" class="watch-muted">Last checked: —</p></section>
+<section><p class="eyebrow">Eight dimensions</p><h2 class="section-title">Public-source readiness profile</h2><div id="radar-axes" class="watch-card-grid"></div></section>
+<section class="watch-detail-grid"><article class="card watch-panel"><p class="eyebrow">Stronger / passable</p><h2 class="section-title">Dimensions with usable public signals</h2><ul id="radar-stronger" class="watch-list"></ul></article><article class="card watch-panel"><p class="eyebrow">Weaker</p><h2 class="section-title">Dimensions still limiting readiness</h2><ul id="radar-weaker" class="watch-list"></ul></article><article class="card watch-panel"><p class="eyebrow">Confirmed</p><h2 class="section-title">What public sources support</h2><ul id="radar-confirmed" class="watch-list"></ul></article><article class="card watch-panel"><p class="eyebrow">Not confirmed</p><h2 class="section-title">What must not be inferred</h2><ul id="radar-unconfirmed" class="watch-list"></ul></article></section>
+<section><p class="eyebrow">Freshness / source basis</p><h2 class="section-title">Primary and volatile sources</h2><p class="watch-muted">Volatile secondary sources are shown as context but excluded from the main readiness signal.</p><div id="radar-sources" class="watch-source-grid"></div></section>
+<section class="card"><h2 class="section-title">Interpretation boundary</h2><p>The radar compares eight dimensions independently. Testnet activity does not establish production readiness; an HTML-shell verifier does not establish auditability; and no single overall rating is produced.</p></section>
+</main><div data-global-footer></div></div>
+<script src="/shared/nav.js"></script><script src="/apps/institutional-readiness-radar/institutional-readiness-radar.js"></script>
+</body></html>
