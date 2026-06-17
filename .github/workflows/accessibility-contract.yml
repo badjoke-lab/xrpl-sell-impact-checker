@@ -1,0 +1,21 @@
+name: Accessibility Contract
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check accessibility layer
+        run: |
+          node --check shared/accessibility.js
+          node --check shared/nav.js
+          node scripts/check_accessibility_contract.cjs
