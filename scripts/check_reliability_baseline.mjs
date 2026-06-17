@@ -23,6 +23,9 @@ const requiredFiles = [
   'functions/api/ping.js',
   'functions/api/book-offers.js',
   'functions/api/amm-info.js',
+  'functions/api/_upstream.cjs',
+  'functions/api/_rpc.cjs',
+  'functions/api/book_offers.cjs',
   'functions/api/xrpl/amm-snapshot.js',
   'functions/api/xrpl/liquidity-history.js',
   'functions/api/xrpl/flow-history.js',
@@ -32,6 +35,7 @@ const requiredFiles = [
   'data/flow-history/exchanges-7d.json',
   'apps/token-heatmap/token-heatmap-snapshot.json',
   'scripts/audit-seo.mjs',
+  'scripts/check_upstream_contract.cjs',
 ];
 
 const apiFiles = requiredFiles.filter((file) => file.startsWith('functions/api/'));
@@ -97,6 +101,9 @@ for (const [file, links] of Object.entries(expectedLinks)) {
   const html = fs.readFileSync(absolute(file), 'utf8');
   for (const link of links) assert(html.includes(`href="${link}"`) || html.includes(`href='${link}'`), `${file}: missing critical link ${link}`);
 }
+
+const upstream = spawnSync(process.execPath, ['scripts/check_upstream_contract.cjs'], { cwd: root, encoding: 'utf8' });
+assert(upstream.status === 0, `Upstream contract check failed:\n${upstream.stdout}${upstream.stderr}`);
 
 const seo = spawnSync(process.execPath, ['scripts/audit-seo.mjs'], { cwd: root, encoding: 'utf8' });
 assert(seo.status === 0, `SEO audit failed:\n${seo.stdout}${seo.stderr}`);
