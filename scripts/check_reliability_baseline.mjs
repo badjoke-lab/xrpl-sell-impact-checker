@@ -81,10 +81,10 @@ const heatmapFile = 'apps/token-heatmap/token-heatmap-snapshot.json';
 if (fs.existsSync(absolute(heatmapFile))) {
   const payload = readJson(heatmapFile);
   if (payload) {
-    for (const key of ['snapshotVersion', 'generatedAt', 'source', 'status', 'items']) {
+    for (const key of ['snapshotVersion', 'generatedAt', 'source', 'status', 'tokens']) {
       assert(Object.hasOwn(payload, key), `${heatmapFile}: missing ${key}`);
     }
-    assert(Array.isArray(payload.items) && payload.items.length > 0, `${heatmapFile}: items must be a non-empty array`);
+    assert(Array.isArray(payload.tokens) && payload.tokens.length > 0, `${heatmapFile}: tokens must be a non-empty array`);
   }
 }
 
