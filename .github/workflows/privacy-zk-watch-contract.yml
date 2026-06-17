@@ -1,0 +1,22 @@
+name: Privacy ZK Watch Contract
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check Privacy ZK Watch
+        run: |
+          node --check functions/api/watch_sources.cjs
+          node --check functions/api/watch-sources.js
+          node --check apps/privacy-zk-watch/privacy-zk-watch.js
+          node scripts/check_privacy_zk_watch_contract.cjs
