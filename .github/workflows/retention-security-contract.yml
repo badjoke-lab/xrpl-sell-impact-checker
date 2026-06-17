@@ -1,0 +1,21 @@
+name: Retention Security Contract
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check retention and response security
+        run: |
+          node --check shared/retention-policy.cjs
+          node --check functions/api/retention-policy.js
+          node scripts/check_retention_security_contract.cjs
