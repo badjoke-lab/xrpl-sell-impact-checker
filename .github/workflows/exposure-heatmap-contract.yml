@@ -1,1 +1,22 @@
 name: Exposure Heatmap Contract
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check trust guardrails
+        run: |
+          node --check apps/exposure-graph/exposure-guardrails.js
+          node --check apps/token-heatmap/token-heatmap-guardrails.js
+          node --check shared/nav.js
+          node scripts/check_exposure_heatmap_contract.cjs
