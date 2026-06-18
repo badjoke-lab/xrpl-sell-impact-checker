@@ -3,6 +3,22 @@
 XSIC is a lightweight web tool that estimates the impact of selling XRPL IOUs against XRP using
 order book depth (CLOB) and AMM pool data. It is maintained by BadJoke-Lab.
 
+## Active roadmap and recovery point
+
+The fixed product-development schedule is maintained in:
+
+- `docs/xsic-growth-productization-roadmap.md`
+
+The compact, mutable current-position checkpoint is maintained in:
+
+- `docs/xsic-growth-productization-state.md`
+
+After an interrupted work session, read both files first. The state file is the authority for the active PR and next action; compare it with the latest `main` SHA, merged PRs, open branches, and workflow results. The roadmap remains the authority for scope, ordering, completion conditions, privacy, retention, and monetization gates.
+
+The completed reliability-remediation phase is recorded in:
+
+- `docs/xsic-remediation-closeout.md`
+
 ## Runbook
 
 ### Local development
