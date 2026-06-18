@@ -1,0 +1,18 @@
+name: Final Release Gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run aggregate release gate
+        run: node scripts/check_release_gate.mjs
