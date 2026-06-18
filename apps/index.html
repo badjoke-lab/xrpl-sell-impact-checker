@@ -1,184 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>XSIC Apps | XRPL Sell Impact, Heatmap, Route Compare, Liquidity, Flow, Exit Coverage, and Exposure Tools</title>
-    <meta
-      name="description"
-      content="Explore XSIC apps for XRPL sell impact estimation, token heatmap exploration, route comparison, liquidity pulse checks, flow alerts, exit route coverage, and issuer exposure review."
-    />
-    <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="XSIC" />
-    <meta property="og:title" content="XSIC Apps | XRPL Sell Impact, Heatmap, Route Compare, Liquidity, Flow, Exit Coverage, and Exposure Tools" />
-    <meta
-      property="og:description"
-      content="Explore XSIC apps for XRPL sell impact estimation, token heatmap exploration, route comparison, liquidity pulse checks, flow alerts, exit route coverage, and issuer exposure review."
-    />
-    <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/" />
-    <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="XSIC Apps | XRPL Sell Impact, Heatmap, Route Compare, Liquidity, Flow, Exit Coverage, and Exposure Tools" />
-    <meta
-      name="twitter:description"
-      content="Explore XSIC apps for XRPL sell impact estimation, token heatmap exploration, route comparison, liquidity pulse checks, flow alerts, exit route coverage, and issuer exposure review."
-    />
-    <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
-    <link rel="stylesheet" href="/styles.css" />
-    <link rel="stylesheet" href="/apps/apps.css" />
-    <link rel="icon" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/favicon.png" />
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "CollectionPage",
-        "name": "XSIC Apps",
-        "url": "https://xsic.badjoke-lab.com/apps/",
-        "description": "Explore XSIC apps for XRPL sell impact estimation, token heatmap exploration, route comparison, liquidity pulse checks, flow alerts, exit route coverage, and issuer exposure review.",
-        "isPartOf": {
-          "@type": "WebSite",
-          "name": "XSIC",
-          "url": "https://xsic.badjoke-lab.com/"
-        },
-        "mainEntity": {
-          "@type": "ItemList",
-          "itemListElement": [
-            {"@type": "ListItem", "position": 1, "name": "Sell Impact", "url": "https://xsic.badjoke-lab.com/apps/sell-impact/"},
-            {"@type": "ListItem", "position": 2, "name": "Route Compare", "url": "https://xsic.badjoke-lab.com/apps/route-compare/"},
-            {"@type": "ListItem", "position": 3, "name": "Liquidity Pulse", "url": "https://xsic.badjoke-lab.com/apps/liquidity-pulse/"},
-            {"@type": "ListItem", "position": 4, "name": "Flow Alert", "url": "https://xsic.badjoke-lab.com/apps/flow-alert/"},
-            {"@type": "ListItem", "position": 5, "name": "Exit Coverage Map", "url": "https://xsic.badjoke-lab.com/apps/exit-coverage-map/"},
-            {"@type": "ListItem", "position": 6, "name": "Exposure Graph", "url": "https://xsic.badjoke-lab.com/apps/exposure-graph/"},
-            {"@type": "ListItem", "position": 7, "name": "XRPL Token Heatmap", "url": "https://xsic.badjoke-lab.com/apps/token-heatmap/"}
-          ]
-        }
-      }
-    </script>
-  </head>
-  <body data-nav-key="apps">
-    <div class="app page console-page apps-hub-page">
-      <header class="app__header global-header">
-        <div class="app__header-top">
-          <a href="/" class="brand-link" aria-label="XSIC Home">
-            <div class="app__brand">
-              <img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" />
-              <span class="app__title">XSIC</span>
-            </div>
-          </a>
-          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-          <div data-global-nav></div>
-        </div>
-      </header>
-      <main class="page__content apps-hub-content">
-        <section class="card apps-hub-hero" aria-labelledby="apps-title">
-          <p class="eyebrow">XRPL Signal &amp; Insight Console</p>
-          <h1 id="apps-title" class="page__title">XSIC Apps</h1>
-          <p class="page__lede">Explore XSIC apps for XRPL sell impact estimation, token heatmap exploration, route comparison, liquidity pulse checks, flow alerts, exit route coverage, and issuer exposure review.</p>
-          <div class="apps-hub-actions" aria-label="Apps hub actions">
-            <a class="primary-button apps-hub-button" href="/apps/sell-impact/">Start with Sell Impact <span aria-hidden="true">→</span></a>
-            <a class="secondary-button apps-hub-button" href="/apps/token-heatmap/">Open Token Heatmap <span aria-hidden="true">→</span></a>
-            <a class="secondary-button apps-hub-button" href="/methods/">Read methods <span aria-hidden="true">→</span></a>
-          </div>
-        </section>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>XSIC Apps | XRPL Market, Liquidity, Coverage, Privacy, Proof, and Readiness Tools</title>
+  <meta name="description" content="Explore XSIC tools for XRPL sell impact, route comparison, liquidity, flow pressure, exit coverage, issuer exposure, privacy maturity, proof anchors, and institutional readiness signals." />
+  <link rel="canonical" href="https://xsic.badjoke-lab.com/apps/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="XSIC" />
+  <meta property="og:title" content="XSIC Apps | XRPL Market, Liquidity, Coverage, Privacy, Proof, and Readiness Tools" />
+  <meta property="og:description" content="Explore core XRPL execution tools and Labs evidence trackers in one XSIC directory." />
+  <meta property="og:url" content="https://xsic.badjoke-lab.com/apps/" />
+  <meta property="og:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="XSIC Apps | XRPL Signal & Insight Console" />
+  <meta name="twitter:description" content="Explore core XRPL execution tools and Labs evidence trackers in one XSIC directory." />
+  <meta name="twitter:image" content="https://xsic.badjoke-lab.com/xsic_logo.png" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/apps/apps.css" />
+  <link rel="icon" href="/favicon.png" />
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"CollectionPage",
+    "name":"XSIC Apps",
+    "url":"https://xsic.badjoke-lab.com/apps/",
+    "description":"XRPL market, liquidity, coverage, privacy, proof, and readiness tools.",
+    "isPartOf":{"@type":"WebSite","name":"XSIC","url":"https://xsic.badjoke-lab.com/"},
+    "mainEntity":{"@type":"ItemList","itemListElement":[
+      {"@type":"ListItem","position":1,"name":"Sell Impact","url":"https://xsic.badjoke-lab.com/apps/sell-impact/"},
+      {"@type":"ListItem","position":2,"name":"Route Compare","url":"https://xsic.badjoke-lab.com/apps/route-compare/"},
+      {"@type":"ListItem","position":3,"name":"Liquidity Pulse","url":"https://xsic.badjoke-lab.com/apps/liquidity-pulse/"},
+      {"@type":"ListItem","position":4,"name":"Flow Alert","url":"https://xsic.badjoke-lab.com/apps/flow-alert/"},
+      {"@type":"ListItem","position":5,"name":"Exit Coverage Map","url":"https://xsic.badjoke-lab.com/apps/exit-coverage-map/"},
+      {"@type":"ListItem","position":6,"name":"Exposure Graph","url":"https://xsic.badjoke-lab.com/apps/exposure-graph/"},
+      {"@type":"ListItem","position":7,"name":"XRPL Token Heatmap","url":"https://xsic.badjoke-lab.com/apps/token-heatmap/"},
+      {"@type":"ListItem","position":8,"name":"XRPL Privacy / ZK Watch","url":"https://xsic.badjoke-lab.com/apps/privacy-zk-watch/"},
+      {"@type":"ListItem","position":9,"name":"Proof Anchor Checker","url":"https://xsic.badjoke-lab.com/apps/proof-anchor-checker/"},
+      {"@type":"ListItem","position":10,"name":"Institutional Readiness Radar","url":"https://xsic.badjoke-lab.com/apps/institutional-readiness-radar/"}
+    ]}
+  }
+  </script>
+</head>
+<body data-nav-key="apps">
+<div class="app page console-page apps-hub-page">
+  <header class="app__header global-header"><div class="app__header-top"><a href="/" class="brand-link" aria-label="XSIC Home"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><span class="app__title">XSIC</span></div></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button><div data-global-nav></div></div></header>
+  <main class="page__content apps-hub-content">
+    <section class="card apps-hub-hero" aria-labelledby="apps-title"><p class="eyebrow">XRPL Signal &amp; Insight Console</p><h1 id="apps-title" class="page__title">XSIC Apps</h1><p class="page__lede">Use core execution and market-state tools first, then open Labs pages for maturity, proof-source, and readiness evidence that remains explicitly bounded.</p><div class="apps-hub-actions"><a class="primary-button apps-hub-button" href="/apps/sell-impact/">Start with Sell Impact →</a><a class="secondary-button apps-hub-button" href="/methods/">Read methods →</a></div></section>
+    <aside class="card apps-status-strip" data-status-strip="health" aria-label="Service status"><div class="apps-status-strip__main"><span class="apps-status-dot" aria-hidden="true">✓</span><strong>Service <span data-health="status">OK</span></strong><span class="apps-status-separator">·</span><span>Last refresh: <span data-health="last-refresh">—</span></span></div><details class="apps-status-strip__details"><summary>Details</summary><pre data-health="details">{}</pre></details></aside>
 
-        <aside class="card apps-status-strip" data-status-strip="health" aria-label="Service status">
-          <div class="apps-status-strip__main">
-            <span class="apps-status-dot" aria-hidden="true">✓</span>
-            <strong>Service <span data-health="status">OK</span></strong>
-            <span class="apps-status-separator">·</span>
-            <span>Last refresh: <span data-health="last-refresh">—</span></span>
-          </div>
-          <details class="apps-status-strip__details">
-            <summary>Details</summary>
-            <pre data-health="details">{}</pre>
-          </details>
-        </aside>
+    <section class="card apps-hub-section" aria-labelledby="core-tools-heading"><div class="apps-hub-section__header"><p class="eyebrow">Core tools</p><h2 id="core-tools-heading">Six execution and market-context tools</h2></div><div class="apps-hub-grid">
+      <article class="apps-hub-card"><span class="apps-hub-card__number">1</span><h3>Sell Impact</h3><p>Estimate receive, slippage, routes, and execution context for one amount.</p><a class="secondary-button apps-hub-button" href="/apps/sell-impact/">Estimate impact →</a></article>
+      <article class="apps-hub-card"><span class="apps-hub-card__number">2</span><h3>Route Compare</h3><p>Compare bounded order-book and AMM route estimates.</p><a class="secondary-button apps-hub-button" href="/apps/route-compare/">Compare routes →</a></article>
+      <article class="apps-hub-card"><span class="apps-hub-card__number">3</span><h3>Liquidity Pulse</h3><p>Read current and bounded-history liquidity with explicit freshness.</p><a class="secondary-button apps-hub-button" href="/apps/liquidity-pulse/">Check liquidity →</a></article>
+      <article class="apps-hub-card"><span class="apps-hub-card__number">4</span><h3>Flow Alert</h3><p>Review labelled exchange, whale, escrow, and history context.</p><a class="secondary-button apps-hub-button" href="/apps/flow-alert/">Open flow alerts →</a></article>
+      <article class="apps-hub-card"><span class="apps-hub-card__number">5</span><h3>Exit Coverage Map</h3><p>Check book, AMM, both, or no observed XRP exit route.</p><a class="secondary-button apps-hub-button" href="/apps/exit-coverage-map/">Check exit coverage →</a></article>
+      <article class="apps-hub-card"><span class="apps-hub-card__number">6</span><h3>Exposure Graph</h3><p>Inspect concentration and issuer-control context without a safety score.</p><a class="secondary-button apps-hub-button" href="/apps/exposure-graph/">Inspect exposure →</a></article>
+    </div></section>
 
-        <section class="card apps-hub-section" aria-labelledby="workflow-heading">
-          <div class="apps-hub-section__header">
-            <p class="eyebrow">Decision flow</p>
-            <h2 id="workflow-heading">Use the apps together</h2>
-          </div>
-          <ol class="apps-workflow-list">
-            <li><strong>Explore tokens</strong><span>Use Token Heatmap to find markets worth deeper inspection.</span></li>
-            <li><strong>Estimate impact</strong><span>Start with receive, slippage, and execution-quality context.</span></li>
-            <li><strong>Compare routes</strong><span>Check whether order book or AMM currently returns the better bounded estimate.</span></li>
-            <li><strong>Check liquidity</strong><span>Confirm current depth and short-horizon liquidity posture.</span></li>
-            <li><strong>Review flow pressure</strong><span>Look for recent exchange, whale, and escrow-related movement.</span></li>
-            <li><strong>Confirm exit coverage</strong><span>Check whether XRP exit routes exist through book, AMM, both, or neither.</span></li>
-            <li><strong>Inspect issuer exposure</strong><span>Review issuer concentration and trustline dependency.</span></li>
-          </ol>
-        </section>
+    <section class="card apps-hub-section" aria-labelledby="labs-heading"><div class="apps-hub-section__header"><p class="eyebrow">Labs / Evidence views</p><h2 id="labs-heading">Four bounded research and visualization tools</h2></div><div class="apps-hub-grid">
+      <article class="apps-hub-card"><span class="apps-hub-card__number">L1</span><h3>XRPL Token Heatmap</h3><p>Explore source-labelled market and liquidity snapshots; exit coloring remains disabled until coverage is connected.</p><a class="secondary-button apps-hub-button" href="/apps/token-heatmap/">Open heatmap →</a></article>
+      <article class="apps-hub-card"><span class="apps-hub-card__number">L2</span><h3>Privacy / ZK Watch</h3><p>Separate XRPL core work, proposals, external experiments, and live features.</p><a class="secondary-button apps-hub-button" href="/apps/privacy-zk-watch/">Open maturity watch →</a></article>
+      <article class="apps-hub-card"><span class="apps-hub-card__number">L3</span><h3>Proof Anchor Checker</h3><p>Compare chain, proof, verifier, and unresolved linkage evidence without a verified verdict.</p><a class="secondary-button apps-hub-button" href="/apps/proof-anchor-checker/">Compare evidence →</a></article>
+      <article class="apps-hub-card"><span class="apps-hub-card__number">L4</span><h3>Institutional Readiness Radar</h3><p>Review eight readiness dimensions independently, without a composite score.</p><a class="secondary-button apps-hub-button" href="/apps/institutional-readiness-radar/">Open readiness radar →</a></article>
+    </div></section>
 
-        <section class="card apps-hub-section" aria-labelledby="tools-heading">
-          <div class="apps-hub-section__header">
-            <p class="eyebrow">Core tools</p>
-            <h2 id="tools-heading">Six core tools, one XRPL decision flow</h2>
-          </div>
-          <div class="apps-hub-grid">
-            <article class="apps-hub-card">
-              <span class="apps-hub-card__number">1</span>
-              <h3>Sell Impact</h3>
-              <p>Estimate receive, slippage, route mix, and execution quality for a token amount before trading.</p>
-              <a class="secondary-button apps-hub-button" href="/apps/sell-impact/">Estimate impact <span aria-hidden="true">→</span></a>
-            </article>
-            <article class="apps-hub-card">
-              <span class="apps-hub-card__number">2</span>
-              <h3>Route Compare</h3>
-              <p>Compare bounded order book and AMM route estimates for one pair and one amount.</p>
-              <a class="secondary-button apps-hub-button" href="/apps/route-compare/">Compare routes <span aria-hidden="true">→</span></a>
-            </article>
-            <article class="apps-hub-card">
-              <span class="apps-hub-card__number">3</span>
-              <h3>Liquidity Pulse</h3>
-              <p>Check whether current liquidity depth and short-horizon movement support the same execution assumption.</p>
-              <a class="secondary-button apps-hub-button" href="/apps/liquidity-pulse/">Check liquidity <span aria-hidden="true">→</span></a>
-            </article>
-            <article class="apps-hub-card">
-              <span class="apps-hub-card__number">4</span>
-              <h3>Flow Alert</h3>
-              <p>Review recent exchange, whale, and escrow-related flow pressure before interpreting market state.</p>
-              <a class="secondary-button apps-hub-button" href="/apps/flow-alert/">Open flow alerts <span aria-hidden="true">→</span></a>
-            </article>
-            <article class="apps-hub-card">
-              <span class="apps-hub-card__number">5</span>
-              <h3>Exit Coverage Map</h3>
-              <p>Check whether issuer tokens still have an XRP exit route through book, AMM, both, or neither.</p>
-              <a class="secondary-button apps-hub-button" href="/apps/exit-coverage-map/">Check exit coverage <span aria-hidden="true">→</span></a>
-            </article>
-            <article class="apps-hub-card">
-              <span class="apps-hub-card__number">6</span>
-              <h3>Exposure Graph</h3>
-              <p>Inspect issuer concentration, trustline exposure, and issuer-control risk behind the quoted market.</p>
-              <a class="secondary-button apps-hub-button" href="/apps/exposure-graph/">Inspect exposure <span aria-hidden="true">→</span></a>
-            </article>
-          </div>
-        </section>
-
-        <section class="card apps-hub-section" aria-labelledby="labs-heading">
-          <div class="apps-hub-section__header">
-            <p class="eyebrow">Labs / Visualizers</p>
-            <h2 id="labs-heading">Experimental XRPL market views</h2>
-          </div>
-          <div class="apps-hub-grid">
-            <article class="apps-hub-card">
-              <span class="apps-hub-card__number">L1</span>
-              <h3>XRPL Token Heatmap</h3>
-              <p>Explore top XRPL tokens by market size, liquidity, price movement, and observed XRP exit-route state before opening focused tools.</p>
-              <a class="secondary-button apps-hub-button" href="/apps/token-heatmap/">Open heatmap <span aria-hidden="true">→</span></a>
-            </article>
-          </div>
-        </section>
-
-        <section class="card apps-hub-note" aria-labelledby="boundary-heading">
-          <h2 id="boundary-heading">Decision-support boundary</h2>
-          <p>XSIC provides decision-support signals. It does not execute trades, guarantee fills, guarantee prices, or replace risk governance.</p>
-        </section>
-      </main>
-      <div data-global-footer></div>
-    </div>
-    <script src="/shared/nav.js"></script>
-    <script src="/shared/status.js"></script>
-  </body>
+    <section class="card apps-hub-note"><h2>Decision-support boundary</h2><p>XSIC does not execute trades, guarantee fills, verify cryptographic proofs, or issue institutional-readiness verdicts.</p></section>
+  </main>
+  <div data-global-footer></div>
+</div>
+<script src="/shared/nav.js"></script><script src="/shared/status.js"></script>
+</body>
 </html>

@@ -19,71 +19,22 @@
   <link rel="stylesheet" href="/styles.css" />
   <link rel="stylesheet" href="/apps/watch-tools.css" />
   <link rel="icon" href="/favicon.png" />
+  <script type="application/ld+json">[{"@context":"https://schema.org","@type":"WebApplication","name":"XRPL Privacy / ZK Watch","url":"https://xsic.badjoke-lab.com/apps/privacy-zk-watch/","applicationCategory":"FinanceApplication","operatingSystem":"Web","isAccessibleForFree":true,"description":"Track maturity, network context, source quality, and freshness for public XRPL privacy and ZK initiatives."},{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://xsic.badjoke-lab.com/"},{"@type":"ListItem","position":2,"name":"Apps","item":"https://xsic.badjoke-lab.com/apps/"},{"@type":"ListItem","position":3,"name":"Privacy / ZK Watch","item":"https://xsic.badjoke-lab.com/apps/privacy-zk-watch/"}]}]</script>
 </head>
 <body data-nav-key="apps">
   <div class="app page console-page">
-    <header class="app__header global-header">
-      <div class="app__header-top">
-        <a href="/" class="brand-link" aria-label="XSIC Home"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><span class="app__title">XSIC</span></div></a>
-        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button>
-        <div data-global-nav></div>
-      </div>
-    </header>
+    <header class="app__header global-header"><div class="app__header-top"><a href="/" class="brand-link" aria-label="XSIC Home"><div class="app__brand"><img class="app__logo" src="/xsic_logo.png" alt="XSIC logo" width="36" height="36" /><span class="app__title">XSIC</span></div></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="global-nav">≡</button><div data-global-nav></div></div></header>
     <main class="page__content watch-page">
-      <section class="watch-hero">
-        <p class="eyebrow">Labs / Maturity tracker</p>
-        <h1 class="page-title">XRPL Privacy / ZK Watch</h1>
-        <p class="page-subtitle">Track what public sources actually support: proposal, development, external testnet experiment, or live feature. This page does not verify proof-to-transaction linkage.</p>
-      </section>
-
-      <section class="watch-stage-strip" aria-label="Maturity stages">
-        <div class="watch-stat"><span class="watch-chip watch-chip--proposal">Proposal</span><p>XLS draft; not live by itself.</p></div>
-        <div class="watch-stat"><span class="watch-chip">In Development</span><p>Official development signal without live confirmation.</p></div>
-        <div class="watch-stat"><span class="watch-chip watch-chip--experimental">Demo / Experimental</span><p>External testnet-linked surfaces and partial structured APIs.</p></div>
-        <div class="watch-stat"><span class="watch-chip watch-chip--live">Live / Production</span><p>Official source says the feature is live.</p></div>
-      </section>
-
-      <section class="card">
-        <div class="watch-refresh-row">
-          <div><p class="eyebrow">Watcher</p><h2 class="section-title">Source freshness</h2></div>
-          <button id="watch-refresh" class="secondary-button" type="button">Refresh sources</button>
-          <span id="watch-status" class="watch-chip">Not checked</span>
-          <span id="watch-checked" class="watch-muted">Last checked: —</span>
-        </div>
-      </section>
-
-      <section>
-        <p class="eyebrow">Watchlist</p>
-        <h2 class="section-title">Four fixed seed items</h2>
-        <div id="watch-items" class="watch-card-grid" aria-label="Privacy and ZK watch items"></div>
-      </section>
-
-      <section class="watch-detail-grid">
-        <article class="card watch-panel">
-          <div class="watch-panel__head"><div><p class="eyebrow">Selected item</p><h2 id="detail-name" class="section-title">—</h2></div><span id="detail-stage" class="watch-chip">—</span></div>
-          <div class="watch-meta"><span id="detail-role">Role: —</span><span id="detail-network">Network: —</span><span id="detail-quality">Source quality: —</span><span id="detail-freshness">Freshness: —</span></div>
-          <p id="detail-explanation" class="watch-muted">Select an item.</p>
-        </article>
-        <article class="card watch-panel"><p class="eyebrow">Confirmed</p><h2 class="section-title">Public evidence supports</h2><ul id="detail-confirmed" class="watch-list"></ul></article>
-        <article class="card watch-panel"><p class="eyebrow">Not confirmed</p><h2 class="section-title">Do not infer</h2><ul id="detail-unconfirmed" class="watch-list"></ul></article>
-        <article class="card watch-panel"><p class="eyebrow">Timeline</p><h2 class="section-title">Current review state</h2><div id="detail-timeline" class="watch-timeline"></div></article>
-      </section>
-
-      <section>
-        <p class="eyebrow">Source panel</p>
-        <h2 class="section-title">Primary and volatile sources</h2>
-        <p class="watch-muted">The DNA home page is intentionally excluded from the primary freshness signal because normalized content remains volatile.</p>
-        <div id="watch-sources" class="watch-source-grid"></div>
-      </section>
-
-      <section class="card">
-        <h2 class="section-title">Interpretation boundary</h2>
-        <p>External projects remain external. Testnet-linked activity remains experimental. Draft proposals are not live. This page never displays “proof verified” or “proof matched to XRPL transaction.”</p>
-      </section>
+      <section class="watch-hero"><p class="eyebrow">Labs / Maturity tracker</p><h1 class="page-title">XRPL Privacy / ZK Watch</h1><p class="page-subtitle">Track what public sources actually support: proposal, development, external testnet experiment, or live feature. This page does not verify proof-to-transaction linkage.</p></section>
+      <section class="watch-stage-strip" aria-label="Maturity stages"><div class="watch-stat"><span class="watch-chip watch-chip--proposal">Proposal</span><p>XLS draft; not live by itself.</p></div><div class="watch-stat"><span class="watch-chip">In Development</span><p>Official development signal without live confirmation.</p></div><div class="watch-stat"><span class="watch-chip watch-chip--experimental">Demo / Experimental</span><p>External testnet-linked surfaces and partial structured APIs.</p></div><div class="watch-stat"><span class="watch-chip watch-chip--live">Live / Production</span><p>Official source says the feature is live.</p></div></section>
+      <section class="card"><div class="watch-refresh-row"><div><p class="eyebrow">Watcher</p><h2 class="section-title">Source freshness</h2></div><button id="watch-refresh" class="secondary-button" type="button">Refresh sources</button><span id="watch-status" class="watch-chip">Not checked</span><span id="watch-checked" class="watch-muted">Last checked: —</span></div></section>
+      <section><p class="eyebrow">Watchlist</p><h2 class="section-title">Four fixed seed items</h2><div id="watch-items" class="watch-card-grid" aria-label="Privacy and ZK watch items"></div></section>
+      <section class="watch-detail-grid"><article class="card watch-panel"><div class="watch-panel__head"><div><p class="eyebrow">Selected item</p><h2 id="detail-name" class="section-title">—</h2></div><span id="detail-stage" class="watch-chip">—</span></div><div class="watch-meta"><span id="detail-role">Role: —</span><span id="detail-network">Network: —</span><span id="detail-quality">Source quality: —</span><span id="detail-freshness">Freshness: —</span></div><p id="detail-explanation" class="watch-muted">Select an item.</p></article><article class="card watch-panel"><p class="eyebrow">Confirmed</p><h2 class="section-title">Public evidence supports</h2><ul id="detail-confirmed" class="watch-list"></ul></article><article class="card watch-panel"><p class="eyebrow">Not confirmed</p><h2 class="section-title">Do not infer</h2><ul id="detail-unconfirmed" class="watch-list"></ul></article><article class="card watch-panel"><p class="eyebrow">Timeline</p><h2 class="section-title">Current review state</h2><div id="detail-timeline" class="watch-timeline"></div></article></section>
+      <section><p class="eyebrow">Source panel</p><h2 class="section-title">Primary and volatile sources</h2><p class="watch-muted">The DNA home page is intentionally excluded from the primary freshness signal because normalized content remains volatile.</p><div id="watch-sources" class="watch-source-grid"></div></section>
+      <section class="card"><h2 class="section-title">Interpretation boundary</h2><p>External projects remain external. Testnet-linked activity remains experimental. Draft proposals are not live. This page never displays “proof verified” or “proof matched to XRPL transaction.”</p></section>
     </main>
     <div data-global-footer></div>
   </div>
-  <script src="/shared/nav.js"></script>
-  <script src="/apps/privacy-zk-watch/privacy-zk-watch.js"></script>
+  <script src="/shared/nav.js"></script><script src="/apps/privacy-zk-watch/privacy-zk-watch.js"></script>
 </body>
 </html>
