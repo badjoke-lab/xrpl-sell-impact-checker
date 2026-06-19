@@ -14,6 +14,8 @@
     "check:reliability": "node scripts/check_reliability_baseline.mjs",
     "check:usage-metrics": "node scripts/check_usage_metrics_contract.cjs",
     "check:usage-instrumentation": "node scripts/check_usage_instrumentation_contract.mjs",
+    "check:usage-summary": "node scripts/check_usage_summary_contract.mjs",
+    "report:usage-operations": "node scripts/report_usage_operations.mjs",
     "check:release": "node scripts/check_release_gate.mjs",
     "smoke:production": "node scripts/smoke_production.mjs",
     "check:all": "pnpm run check:release"
