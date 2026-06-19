@@ -1,0 +1,21 @@
+name: Usage Metrics Contract
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check aggregate usage schema and privacy
+        run: |
+          node --check shared/usage-metrics-policy.cjs
+          node scripts/check_usage_metrics_contract.cjs
