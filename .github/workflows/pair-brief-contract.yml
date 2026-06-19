@@ -12,10 +12,9 @@ jobs:
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: '24'
-      - name: Check Pair Brief aggregate API
-        run: |
-          node --check functions/api/pair-brief.js
-          node scripts/check_pair_brief_contract.mjs
+          show-progress: false
+      - name: Check Pair Brief syntax
+        run: node --check functions/api/pair-brief.js
+      - name: Check Pair Brief complete and partial contracts
+        run: node scripts/check_pair_brief_contract.mjs
