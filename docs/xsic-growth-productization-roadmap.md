@@ -22,10 +22,12 @@ Next phase: Growth & Productization
 
 ```text
 Roadmap status: ACTIVE
-Current PR: NX-00
-Current task: freeze this roadmap in the repository
-Next PR after merge: NX-01 Repository truth alignment
-Completed NX PRs: 0 / 15
+Current PR: NX-01 Repository truth alignment
+Current branch: nx01-repository-truth
+Current GitHub PR: #270
+Last verified main: 8be5892efcc0312e2251f7a7f28f330343430b67
+Next PR after merge: NX-02 Usage metrics schema and privacy contract
+Completed NX PRs: 1 / 15
 Conditional paid PRs authorized: no
 ```
 
@@ -41,7 +43,7 @@ Conditional paid PRs authorized: no
 
 After any interruption:
 
-1. Read this file from current `main`.
+1. Read this file and `docs/xsic-growth-productization-state.md` from current `main`.
 2. Fetch the current `main` SHA.
 3. List open and recently merged PRs.
 4. Compare the current SHA with the last verified SHA recorded below.
@@ -51,9 +53,9 @@ After any interruption:
 
 Every NX PR must update this document before merge:
 
-- mark its schedule row complete;
+- mark its schedule row complete or in progress;
 - record GitHub PR number;
-- record merge SHA;
+- record the merge SHA at the next verified checkpoint when the SHA is not knowable before merge;
 - set the next PR;
 - update completed count;
 - record any accepted deviation;
@@ -87,8 +89,8 @@ The system must not emit a composite safety score, Buy/Sell recommendation, toke
 
 | Status | PR | Purpose | Depends on | GitHub PR | Merge SHA |
 |---|---|---|---|---:|---|
-| [~] | NX-00 | Freeze roadmap and recovery checkpoint | baseline | — | — |
-| [ ] | NX-01 | Repository truth alignment | NX-00 | — | — |
+| [x] | NX-00 | Freeze roadmap and recovery checkpoint | baseline | #269 | `8be5892efcc0312e2251f7a7f28f330343430b67` |
+| [~] | NX-01 | Repository truth alignment | NX-00 | #270 | pending |
 | [ ] | NX-02 | Usage metrics schema and privacy contract | NX-01 | — | — |
 | [ ] | NX-03 | Core usage instrumentation | NX-02 | — | — |
 | [ ] | NX-04 | Usage and operations summary | NX-03 | — | — |
@@ -129,7 +131,7 @@ Completion conditions:
 - public description matches the actual app surface;
 - `check:release` and `smoke:production` commands exist;
 - current/history/fallback ownership is explicit;
-- this roadmap records the merge.
+- this roadmap records the PR and verified merge checkpoint.
 
 ### NX-02 — Usage metrics schema and privacy contract
 
@@ -310,8 +312,10 @@ Dates are indicative. Completion conditions and verified merges take precedence 
 | Checkpoint | Main SHA | Result |
 |---|---|---|
 | Reliability remediation closeout | `c634aaadf068f6c8e1fba0fd3675e2f9101a0306` | verified baseline |
-| NX-00 | pending | roadmap branch in progress |
+| NX-00 / PR #269 | `8be5892efcc0312e2251f7a7f28f330343430b67` | merged; all required workflows passed |
+| Automated Flow history advance | `d21822499af988b7f93e6d70e665523d40ee1c45` | unrelated `data/flow-history` update; NX-01 changed paths do not overlap |
+| NX-01 / PR #270 | pending | in progress |
 
 ## 12. Next action
 
-Complete NX-00, merge it, update this file with the PR number and merge SHA, then begin NX-01 from the verified `main` SHA.
+Complete PR #270, verify the branch against the current `main`, merge NX-01, record its merge SHA, then begin NX-02.
