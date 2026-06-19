@@ -1,27 +1,53 @@
-# XRPL Sell Impact Checker (XSIC)
+# XRPL Signal & Insight Console (XSIC)
 
-XSIC is a lightweight web tool that estimates the impact of selling XRPL IOUs against XRP using
-order book depth (CLOB) and AMM pool data. It is maintained by BadJoke-Lab.
+XSIC is a reliability-first collection of XRPL decision-support and research tools maintained by BadJoke-Lab. It combines live XRPL checks, bounded materialized history, explicit freshness states, and source-labelled research surfaces. XSIC does not provide investment advice, a Buy/Sell recommendation, a token safety certification, or a composite institutional-readiness verdict.
+
+Production: https://xsic.badjoke-lab.com/
+
+## Product surface
+
+### Core decision tools
+
+- **Sell Impact** — estimates order-book and AMM execution impact for an XRPL IOU sale.
+- **Liquidity Pulse** — compares current liquidity with bounded materialized history.
+- **Flow Alert** — presents current and historical flow observations with explicit source mode and freshness.
+- **Exit Coverage Map** — distinguishes `dual`, `book-only`, `amm-only`, and `none` routes without turning upstream failure into route absence.
+- **Exposure Graph** — shows source-labelled issuer and market exposure; inferred output remains explicitly heuristic.
+- **Token Heatmap** — presents validated token snapshots; exit-route colouring remains disabled until route data is connected.
+
+### Labs and research tools
+
+- **Privacy / ZK Watch** — follows reviewed privacy and zero-knowledge sources without treating volatile activity as confirmed maturity.
+- **Proof Anchor Checker** — separates chain, proof, verifier, and linkage evidence and preserves unresolved outcomes.
+- **Institutional Readiness Radar** — presents eight reviewed axes without a composite institutional-ready verdict.
+
+The next central product is **XSIC Pair Brief**, which will combine Core results for one currency, issuer, and amount while preserving section-level source and freshness states.
 
 ## Active roadmap and recovery point
 
-The fixed product-development schedule is maintained in:
+The fixed development schedule is maintained in:
 
 - `docs/xsic-growth-productization-roadmap.md`
 
-The compact, mutable current-position checkpoint is maintained in:
+The compact current-position checkpoint is maintained in:
 
 - `docs/xsic-growth-productization-state.md`
 
-After an interrupted work session, read both files first. The state file is the authority for the active PR and next action; compare it with the latest `main` SHA, merged PRs, open branches, and workflow results. The roadmap remains the authority for scope, ordering, completion conditions, privacy, retention, and monetization gates.
+After an interrupted work session, read both files first. The state file is authoritative for the active PR and next action. The roadmap is authoritative for scope, order, completion conditions, privacy, retention, and monetization gates.
 
 The completed reliability-remediation phase is recorded in:
 
 - `docs/xsic-remediation-closeout.md`
 
-## Runbook
+Supporting runtime documentation:
 
-### Local development
+- `docs/architecture.md`
+- `docs/data-source-map.md`
+- `docs/runtime-ownership-map.md`
+- `docs/flow-alert-history.md`
+- `docs/final-gate.md`
+
+## Local development
 
 ```bash
 pnpm install
@@ -29,61 +55,57 @@ pnpm run dev
 ```
 
 > [!IMPORTANT]
-> Do **not** use `python -m http.server` for local verification. It only serves static files and will return HTML for `/api/*` instead of running Cloudflare Pages Functions.
-> Always run local development with `wrangler pages dev` (via `pnpm run dev`) so `/api/*` behaves like production.
+> Do **not** use `python -m http.server` for verification. It serves static files only and returns HTML for `/api/*`. Use `wrangler pages dev` through the package scripts so Pages Functions behave like production.
 
-Production: https://xsic.badjoke-lab.com/
+Default local URL: `http://0.0.0.0:5173`
 
-Dev: Open `http://0.0.0.0:5173` in your browser.
-
-### Deploy (Cloudflare Pages)
-
-1. Install dependencies.
-
-   ```bash
-   pnpm install
-   ```
-
-2. Preview locally with Pages Workers routing.
-
-   ```bash
-   pnpm run pages:dev
-   ```
-
-3. Deploy to Cloudflare Pages (requires your project configured in Cloudflare).
-
-   ```bash
-   npx wrangler pages deploy .
-   ```
-
-
-### Flow Alert history persistence
-
-- See `docs/flow-alert-history.md` for the GitHub Actions + repo JSON based history design.
-- Production source of truth is `data/flow-history/*.json` updated by workflow.
-
-### Troubleshooting checklist
-
-- Confirm the static site is reachable: `/` loads without 404s.
-- Verify API endpoints return JSON: `/api/ping`, `/api/book-offers`, `/api/amm-info`.
-- Check client console for CORS or network errors.
-- If XRPL endpoints are slow, retry or inspect Cloudflare logs for upstream timeouts.
-
-### Post-deploy verification
-
-Copy/paste the following commands (replace `https://your-domain.example`):
+## Validation
 
 ```bash
-curl -s https://your-domain.example/api/ping
-curl -s -X POST https://your-domain.example/api/book-offers \
-  -H 'content-type: application/json' \
-  -d '{"currency":"USD","issuer":"rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq","amount":100,"limit":20}'
-curl -s -X POST https://your-domain.example/api/amm-info \
-  -H 'content-type: application/json' \
-  -d '{"currency":"USD","issuer":"rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq"}'
+pnpm run check:reliability
+pnpm run audit:seo
+pnpm run check:release
+pnpm run smoke:production
 ```
 
-UI checklist:
-- Load the homepage, submit an estimate, and confirm results render.
-- Open `/methods`, `/faq`, `/disclaimer`, `/credits`, and `/donate` (no 404s).
-- On `/donate`, click **Copy address** and verify the address is copied.
+`pnpm run check:all` is the mandatory repository release command. Pull requests also run feature-specific contracts, the Final Release Gate, and the public production smoke workflow.
+
+## Deployment
+
+XSIC is deployed to Cloudflare Pages. Cloudflare Cron Triggers are prohibited. Recurring refresh work uses reviewed GitHub Actions `schedule` / `workflow_dispatch` workflows.
+
+```bash
+pnpm install
+pnpm run pages:dev
+npx wrangler pages deploy .
+```
+
+## Runtime source rules
+
+- Successful matching live XRPL results remain authoritative for user-triggered checks.
+- Materialized current rows, bounded history, repository JSON, and precompute rows are preload or fallback layers only unless a surface explicitly defines committed history as its history source.
+- Every fallback exposes source mode, observation time, and freshness.
+- Current records use stable-key upsert; history is bounded.
+- Raw upstream bodies, secrets, personal identifiers, and unrestricted debug dumps are not retained.
+- `fresh`, `aging`, `stale`, `missing`, `partial`, and `degraded` are distinct states.
+
+Flow Alert history is described in `docs/flow-alert-history.md`. Committed `data/flow-history/*.json` is authoritative for accumulated history; live/current observations and fallback state remain separately labelled.
+
+## Troubleshooting
+
+- Confirm `/` and `/apps/` load without a 404.
+- Confirm `/api/ping`, `/api/health`, and `/api/health-watchers` return JSON.
+- Inspect browser console output for network, CORS, or rendering errors.
+- Inspect GitHub Actions for materialized-history or watcher failures.
+- Inspect Cloudflare logs for request-time upstream timeout or binding errors.
+- Do not restore Cloudflare Cron as a recovery action.
+
+## Post-deploy verification
+
+Run the maintained smoke script rather than a handwritten partial checklist:
+
+```bash
+XSIC_BASE_URL=https://xsic.badjoke-lab.com pnpm run smoke:production
+```
+
+The smoke matrix checks the public app routes, health endpoints, watcher sources, Exit Coverage four-state rows and Sell Impact links, and Proof Anchor evidence structure.

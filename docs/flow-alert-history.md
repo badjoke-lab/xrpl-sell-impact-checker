@@ -1,33 +1,34 @@
-# Flow Alert History Persistence
+# Flow Alert Current and History Persistence
 
 ## Overview
 
-Flow Alert history persistence uses **repo-managed JSON snapshots** under `data/flow-history/`.
-The source of truth in production is these committed JSON files, updated by GitHub Actions.
+Flow Alert separates the **current observation** from **accumulated history**.
 
-- Runtime memory / filesystem storage in Pages Functions is treated as fallback only.
-- UI/API should prioritize repository JSON history when available.
+- Current/live state comes from the current Flow observation path and is labelled with its source mode and freshness.
+- Accumulated production history uses repo-managed JSON snapshots under `data/flow-history/`.
+- Runtime memory/filesystem history is fallback only.
+- A history fallback must never be presented as an unlabelled live/current observation.
 
 ## Storage layout
 
-Current required targets:
+Current required history targets:
 
 - `data/flow-history/exchanges-1h.json`
 - `data/flow-history/exchanges-24h.json`
 - `data/flow-history/exchanges-7d.json`
 
-Optional future targets (supported by update script):
+Optional targets supported by the update script:
 
 - `data/flow-history/whales-1h.json`
 - `data/flow-history/ripple-1h.json`
 
 ## JSON schema
 
-Each file stores:
+Each history file stores:
 
 - `latest`
 - `previous`
-- `recent` (time-ordered array)
+- `recent` as a time-ordered bounded array
 - `deltaSummary`
 - `historyMeta`
   - `count`
@@ -43,40 +44,57 @@ Each file stores:
 
 Updater script: `scripts/update_flow_history.mjs`
 
-1. Calls production snapshot endpoint:
-   - `/api/xrpl/flow-snapshot?preset=...&window=...`
-2. Loads existing `data/flow-history/*.json`.
-3. Prevents duplicate append by checking:
-   - same timestamp (`ts`), or
-   - same snapshot content fingerprint.
-4. Rebuilds `latest/previous/recent/deltaSummary/historyMeta`.
-5. Writes only when content changes.
+1. Calls `/api/xrpl/flow-snapshot?preset=...&window=...`.
+2. Loads the matching `data/flow-history/*.json` file.
+3. Rejects malformed or non-monotonic input.
+4. Prevents duplicate append by timestamp and snapshot-content fingerprint.
+5. Rebuilds `latest`, `previous`, `recent`, `deltaSummary`, and `historyMeta`.
+6. Writes only when validated content changes.
 
-Default `recent` cap is 168 entries (`FLOW_HISTORY_MAX_RECENT` override available).
+Default `recent` cap is 168 entries. `FLOW_HISTORY_MAX_RECENT` may reduce or explicitly adjust the bounded cap.
 
 ## GitHub Actions
 
 Workflow: `.github/workflows/update-flow-history.yml`
 
-- `workflow_dispatch` (manual)
-- hourly `schedule`
-- commits only `data/flow-history` changes on `main`
-- commit message:
-  - `chore(flow): update flow history snapshots`
+- supports `workflow_dispatch`;
+- uses GitHub Actions `schedule` for recurring refresh;
+- commits only validated `data/flow-history` changes;
+- does not use Cloudflare Cron Triggers;
+- uses commit message `chore(flow): update flow history snapshots`.
 
-## API/UI behavior
+## API and UI behavior
 
-`/api/xrpl/flow-history` behavior:
+`/api/xrpl/flow-history`:
 
-1. Reads static JSON from `/data/flow-history/<preset>-<window>.json`.
-2. If unavailable, falls back to runtime store (memory/fs fallback).
+1. reads `/data/flow-history/<preset>-<window>.json`;
+2. returns committed history with source and freshness metadata;
+3. if unavailable, uses the runtime fallback with an explicit fallback mode and stale/degraded reason;
+4. does not claim that fallback history is a fresh current observation.
 
-Flow Alert UI consumes `/api/xrpl/flow-history`, so it naturally prefers accumulated JSON history.
+Flow Alert UI keeps these concepts separate:
 
-## Migration note (D1/KV)
+- current observation;
+- latest accumulated history item;
+- previous history item;
+- delta;
+- history source mode;
+- current freshness;
+- history freshness;
+- stale/degraded reason.
 
-If migrating to Cloudflare D1/KV:
+## Future D1/KV migration
 
-- Replace `scripts/update_flow_history.mjs` write target (file output) with DB/KV writes.
-- Replace static JSON read path in `functions/api/xrpl/flow-history.js` with D1/KV lookup.
-- Keep response shape unchanged so UI does not require major changes.
+A migration may replace the history write/read target while preserving the public response contract:
+
+- current rows remain stable-key upserts;
+- history remains bounded;
+- raw upstream bodies remain forbidden;
+- source mode and freshness remain explicit;
+- the migration must not require Cloudflare Cron.
+
+See also:
+
+- `docs/architecture.md`
+- `docs/data-source-map.md`
+- `docs/runtime-ownership-map.md`
