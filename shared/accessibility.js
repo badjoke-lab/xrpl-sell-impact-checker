@@ -1,4 +1,6 @@
 (() => {
+  void import('/shared/usage-metrics.js');
+
   const main = document.querySelector('main');
   if (main && !main.id) main.id = 'main-content';
 
