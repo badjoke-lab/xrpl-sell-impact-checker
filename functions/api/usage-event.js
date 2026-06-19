@@ -2,6 +2,11 @@ import { validateUsagePayload } from '../../shared/usage-metrics-policy.js';
 
 const MAX_BODY_BYTES = 2048;
 const SYNTHETIC_HEADER = 'x-xsic-synthetic';
+const CORS_HEADERS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'POST, OPTIONS',
+  'access-control-allow-headers': 'content-type, x-xsic-synthetic',
+};
 
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -9,9 +14,7 @@ function json(payload, status = 200) {
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
-      'access-control-allow-origin': '*',
-      'access-control-allow-methods': 'POST, OPTIONS',
-      'access-control-allow-headers': 'content-type, x-xsic-synthetic',
+      ...CORS_HEADERS,
     },
   });
 }
@@ -39,7 +42,7 @@ function counters(outcome) {
   };
 }
 
-async function upsert(db, table, bucketColumn, bucketValue, event) {
+function upsert(db, table, bucketColumn, bucketValue, event) {
   const count = counters(event.outcome);
   const sql = `
     INSERT INTO ${table} (
@@ -68,7 +71,7 @@ async function upsert(db, table, bucketColumn, bucketValue, event) {
 }
 
 export async function onRequestOptions() {
-  return json({ ok: true, recorded: false }, 204);
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
 export async function onRequestPost({ request, env }) {
@@ -102,19 +105,16 @@ export async function onRequestPost({ request, env }) {
   }
 
   const db = getDb(env);
-  if (!db) {
-    return json({ ok: true, recorded: false, reason: 'metrics_unavailable' }, 202);
-  }
+  if (!db) return json({ ok: true, recorded: false, reason: 'metrics_unavailable' }, 202);
 
   const buckets = bucketKeys();
   const normalized = { ...event, updatedAt: buckets.updatedAt };
 
   try {
-    const hourly = await upsert(db, 'usage_metric_hourly', 'bucket_hour', buckets.bucketHour, normalized);
-    const daily = await upsert(db, 'usage_metric_daily', 'day_key', buckets.dayKey, normalized);
-    if (typeof db.batch === 'function') {
-      await db.batch([hourly, daily]);
-    } else {
+    const hourly = upsert(db, 'usage_metric_hourly', 'bucket_hour', buckets.bucketHour, normalized);
+    const daily = upsert(db, 'usage_metric_daily', 'day_key', buckets.dayKey, normalized);
+    if (typeof db.batch === 'function') await db.batch([hourly, daily]);
+    else {
       await hourly.run();
       await daily.run();
     }
@@ -124,6 +124,11 @@ export async function onRequestPost({ request, env }) {
   }
 }
 
-export async function onRequest() {
+function methodNotAllowed() {
   return json({ ok: false, error: 'method_not_allowed' }, 405);
 }
+
+export const onRequestGet = methodNotAllowed;
+export const onRequestPut = methodNotAllowed;
+export const onRequestPatch = methodNotAllowed;
+export const onRequestDelete = methodNotAllowed;
